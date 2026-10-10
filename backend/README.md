@@ -1,8 +1,10 @@
-# HandsOn Physics CV engine (backend)
+# HandsOn Physics CV and physics backend
 
 Python backend that receives camera frames from the mobile app over a WebSocket,
 downsamples and color-converts them, detects and tracks objects with stable IDs,
 and maps them to metric coordinates on the plane of motion for the kinematics stage.
+When an experiment mode is configured, the physics stage estimates motion,
+forces, and energy and replies with the app's `state` message.
 
 ## Setup
 
@@ -14,7 +16,7 @@ python -m pip install -r requirements.txt
 ## Run
 
 ```bash
-uvicorn app:app --host 0.0.0.0 --port 8000
+uvicorn app:app --host 0.0.0.0 --port 8000 --ws-max-size 1048576
 ```
 
 Then, in another terminal, stream frames to it the way the app will:
@@ -29,13 +31,26 @@ The client prints send rate, bandwidth, frames dropped by the server, and latenc
 Use `--send-width` and `--quality` to tune how much the phone downsamples and compresses.
 `CV_WORKING_WIDTH` (default 640) sets the resolution the server processes at.
 The server accepts frames up to 512 KiB and control messages up to 4096 characters.
+The Uvicorn WebSocket limit is 1 MiB so the app can reply with an error for
+oversized frames between 512 KiB and 1 MiB.
 `GET /health` reports the number of active WebSocket sessions. Run one Uvicorn
 worker because tracking and calibration state live in each server process.
+
+For a repeatable local streaming check that includes the physics stage:
+
+```bash
+python stream_client.py --source synthetic --fps 15 --send-width 320 \
+  --mode ramp --px-per-m 800 --ramp-angle-deg 0 --max-frames 60 --max-p95-ms 50
+```
+
+The client reports WebSocket round-trip p50/p95 and exits nonzero if p95 exceeds
+the supplied limit. The 800 px/m scale is illustrative. Localhost timing does
+not establish phone-to-server latency; measure again on the demonstration network.
 
 To run the same backend in Docker:
 
 ```bash
-docker build -t handson-backend backend
+docker build -f backend/Dockerfile -t handson-backend .
 docker run --rm -p 8000:8000 handson-backend
 ```
 
@@ -153,14 +168,14 @@ The app sends a `config` message on connect and whenever a setting changes
 - `target_px` is where the user tapped the object, in frame pixels. The nearest tracked object
   (within 20% of the frame width) becomes the target and is followed by ID from then on,
   re-acquired near its last position if lost. `null` means auto: the longest-tracked object.
-- `mode` (`free_fall`, `ramp`, `pendulum`, `collision`) and `mass_kg` are kept for the physics stage.
+- `mode` (`free_fall`, `ramp`, `pendulum`, `collision`) and `mass_kg` drive the physics stage.
 - Optional tracking keys can ride along: `detector`, `colors`, `min_area`, `mediapipe_labels`,
   `mediapipe_score`, `max_distance`, `max_missed`, `min_hits`.
 
 A valid config gets no reply (the app treats unknown message types as errors). An invalid one
 gets an `error` message and changes nothing.
 
-Server to client, per processed frame:
+Server to client, per processed frame without a configured experiment mode:
 
 ```json
 {"type": "frame", "frame_id": 12, "timestamp": 41.237,
@@ -179,6 +194,30 @@ Server to client, per processed frame:
  "process_ms": 6.5, "latency_ms": 6.6,
  "stats": {"received": 13, "dropped": 0, "processed": 13, "decode_errors": 0}}
 ```
+
+With `mode` configured, the reply is `type: state` instead of `type: frame`.
+It keeps the CV fields above and adds the target's `pixel`, `bbox`, and metric
+`position` at the top level, plus measured `velocity`, `acceleration`, model
+`forces`, `energy`, and numeric `extras`. Vectors are world-space SI values
+(positive Y up). Velocity appears after two valid calibrated positions;
+acceleration appears after three. Without calibration, pixel tracking still
+works but metric vectors and energy are omitted. In collision mode,
+`collision_objects` contains each tracked body's position and velocity.
+
+Optional physics config fields are:
+
+| Field | Purpose |
+|---|---|
+| `ramp_angle_deg` | Plane angle relative to +X. If absent, inferred from the recent straight track after at least 3 cm of horizontal travel. |
+| `sliding_body` | Set `true` only for a sliding body; enables estimated kinetic friction coefficient and thermal loss. A rolling ball's unmeasured rotational energy must not be labeled heat. |
+| `pendulum_pivot_m` | `{ "x": ..., "y": ... }` in world metres. If absent, estimated from a curved trajectory once enough arc is visible. |
+| `collision_masses_kg` | Two positive masses, ordered by ascending tracked object ID. Defaults to `mass_kg` for each body. |
+
+Gravity and geometry-based components are model-derived. The `net` force is
+mass times measured acceleration. Pendulum tension requires a known or fitted
+pivot. Collision restitution and momentum change appear only after a nearby
+pair has approached and separated with valid velocity estimates. Motion
+history resets when the mode or calibration changes.
 
 If frames arrive faster than the server can process them, only the newest one is
 kept and the rest are counted in `dropped`, so latency never builds up. Every processed
@@ -199,3 +238,6 @@ the third component.
 ```bash
 python -m pytest
 ```
+
+From the repository root, also run `python3 -m unittest discover -v` for the
+physics unit tests and experiment truth-data checks.

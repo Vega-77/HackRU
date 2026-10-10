@@ -1,0 +1,10 @@
+.git
+.venv
+mobile
+tests
+backend/models
+backend/samples
+**/__pycache__
+**/.pytest_cache
+**/*.pyc
+Hack RU planning.md

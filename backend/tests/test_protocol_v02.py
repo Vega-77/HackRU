@@ -41,7 +41,7 @@ def test_app_config_is_accepted_silently():
     with TestClient(app).websocket_connect("/ws/frames") as ws:
         ws.send_text(json.dumps(APP_CONFIG))
         out = send_frame(ws, 0, phone_frame())
-        assert out["type"] == "frame" and out["frame_id"] == 0
+        assert out["type"] == "state" and out["frame_id"] == 0
         assert out["calibration"]["method"] == "scale"
 
 

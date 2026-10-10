@@ -18,10 +18,10 @@ Protocol on ws://<host>:8000/ws/frames
             "width_m": 0.6, "height_m": 0.4}
            answered with {"type": "calibration", "calibration": {...}}
   server -> client
-    text   JSON result for each frame that was processed:
+    text   JSON result for each frame that was processed ("state" with a mode):
            {"type": "frame", "frame_id", "timestamp", "size": [w, h],
             "source_size": [w, h], "scale", "latency_ms", "process_ms",
-            "stats": {"received", "processed", "dropped", "decode_errors"},
+            "stats": {"received", "processed", "dropped", "decode_errors", "processing_errors"},
             "tracked", "target_id",
             "objects": [{"id", "label", "source", "score", "target",
                          "pixel": {x, y}, "bbox": {x, y, w, h},  (client frame pixels)
@@ -36,7 +36,7 @@ one, so the client never builds up lag. Dropped frames are never decoded.
 Debug view: open http://<host>:8000/debug in a browser to watch the annotated stream
 (boxes, IDs, trails, calibrated plane) of the most recent phone connection.
 
-Run with:  uvicorn app:app --host 0.0.0.0 --port 8000
+Run with:  uvicorn app:app --host 0.0.0.0 --port 8000 --ws-max-size 1048576
 """
 
 from __future__ import annotations
@@ -44,6 +44,8 @@ from __future__ import annotations
 import asyncio
 import itertools
 import json
+import logging
+import math
 import os
 import time
 from uuid import uuid4
@@ -59,10 +61,16 @@ from cv_engine.frame_slot import LatestFrameSlot
 from cv_engine.overlay import TrailHistory, draw_overlay
 from cv_engine.pipeline import PipelineConfig, TrackingPipeline
 from cv_engine.preprocess import PreprocessedFrame, decode_jpeg, preprocess_frame
+from physics_stage import PhysicsSession
 
 WORKING_WIDTH = int(os.environ.get("CV_WORKING_WIDTH", "640"))
 MAX_FRAME_BYTES = 512 * 1024
 MAX_CONTROL_CHARS = 4096
+logger = logging.getLogger(__name__)
+
+
+class FrameDecodeError(ValueError):
+    """The incoming image bytes could not be decoded."""
 
 # Takes a preprocessed frame and returns result fields ("objects", "calibration").
 FrameAnalyzer = Callable[[PreprocessedFrame], dict]
@@ -109,10 +117,11 @@ def health() -> dict:
 async def frames_ws(ws: WebSocket) -> None:
     await ws.accept()
     slot: LatestFrameSlot[IncomingFrame] = LatestFrameSlot()
-    stats = {"processed": 0, "decode_errors": 0}
+    stats = {"processed": 0, "decode_errors": 0, "processing_errors": 0}
     pipeline = ws.app.state.pipeline_factory()
     session_id = str(uuid4())
     ws.app.state.active_sessions.add(session_id)
+    physics = PhysicsSession()
     next_id = 0
     conn_id = next(_connection_ids)
     trails = TrailHistory()
@@ -158,9 +167,23 @@ async def frames_ws(ws: WebSocket) -> None:
                             error["frame_id"] = rejected_id
                         await send(error)
                         continue
-                    if "frame_id" not in pending_meta:
-                        pending_meta["frame_id"] = next_id
-                    next_id = int(pending_meta["frame_id"]) + 1
+                    frame_id = pending_meta.get("frame_id", next_id)
+                    timestamp = pending_meta.get("timestamp")
+                    if type(frame_id) is not int or frame_id < next_id:
+                        pending_meta = {}
+                        await send({"type": "error", "message": "frame_id must be an increasing nonnegative integer"})
+                        continue
+                    if timestamp is not None and (
+                        isinstance(timestamp, bool)
+                        or not isinstance(timestamp, (int, float))
+                        or abs(timestamp) > 1e15
+                        or not math.isfinite(timestamp)
+                    ):
+                        pending_meta = {}
+                        await send({"type": "error", "message": "timestamp must be a finite number", "frame_id": frame_id})
+                        continue
+                    pending_meta["frame_id"] = frame_id
+                    next_id = frame_id + 1
                     slot.put(IncomingFrame(msg["bytes"], pending_meta, time.time()))
                     pending_meta = {}
         finally:
@@ -190,10 +213,15 @@ async def frames_ws(ws: WebSocket) -> None:
             t0 = time.perf_counter()
             try:
                 async with pipeline_lock:
-                    result, image = await asyncio.to_thread(_process, frame, pipeline)
-            except ValueError as e:
+                    result, image = await asyncio.to_thread(_process_with_physics, frame, pipeline, physics)
+            except FrameDecodeError as e:
                 stats["decode_errors"] += 1
                 await send({"type": "error", "message": str(e), "frame_id": frame.meta["frame_id"]})
+                continue
+            except Exception:
+                stats["processing_errors"] += 1
+                logger.exception("Frame processing failed in session %s", session_id)
+                await send({"type": "error", "message": "could not process frame", "frame_id": frame.meta["frame_id"]})
                 continue
             stats["processed"] += 1
             result["process_ms"] = round((time.perf_counter() - t0) * 1000, 2)
@@ -218,7 +246,10 @@ async def frames_ws(ws: WebSocket) -> None:
 
 
 def _process(frame: IncomingFrame, analyzer: FrameAnalyzer) -> tuple[dict, np.ndarray]:
-    img = decode_jpeg(frame.data)
+    try:
+        img = decode_jpeg(frame.data)
+    except ValueError as exc:
+        raise FrameDecodeError(str(exc)) from exc
     pf = preprocess_frame(
         img,
         frame_id=int(frame.meta["frame_id"]),
@@ -235,6 +266,16 @@ def _process(frame: IncomingFrame, analyzer: FrameAnalyzer) -> tuple[dict, np.nd
         "scale": round(pf.scale, 5),
         **analyzer(pf),
     }, img
+
+
+def _process_with_physics(
+    frame: IncomingFrame, pipeline: TrackingPipeline, physics: PhysicsSession
+) -> tuple[dict, np.ndarray]:
+    result, image = _process(frame, pipeline)
+    session_settings = pipeline.session
+    if session_settings.get("mode") is not None:
+        result = physics.process_frame(result, session_settings)
+    return result, image
 
 
 DEBUG_PAGE = """<!doctype html><html><head><meta name="viewport" content="width=device-width">

@@ -1,0 +1,141 @@
+from __future__ import annotations
+
+import unittest
+
+from physics_engine import PhysicsSession, Vector2D, collision_metrics, motion_model
+
+
+class PhysicsModelTests(unittest.TestCase):
+    def test_ramp_force_components_balance_perpendicular_gravity(self) -> None:
+        result = motion_model(
+            "ramp", Vector2D(0.2, 0.3), Vector2D(0.0, 0.0),
+            Vector2D(1.0, -0.5), 0.2, {"ramp_angle_deg": -30.0},
+        )
+        forces = {item["name"]: item for item in result["forces"]}
+
+        self.assertAlmostEqual(forces["gravity"]["y"], -1.962)
+        self.assertAlmostEqual(forces["normal"]["x"] + forces["gravity_perpendicular"]["x"], 0.0)
+        self.assertAlmostEqual(forces["normal"]["y"] + forces["gravity_perpendicular"]["y"], 0.0)
+        self.assertAlmostEqual(forces["net"]["x"], 0.2)
+        self.assertAlmostEqual(result["energy"]["potential"], 0.2 * 9.81 * 0.3)
+        self.assertNotIn("mu", result["extras"])
+
+    def test_pendulum_at_bottom_has_radial_tension(self) -> None:
+        result = motion_model(
+            "pendulum", Vector2D(0.0, -0.5), Vector2D(1.0, 0.0),
+            Vector2D(0.0, 0.0), 0.1, {"pendulum_pivot_m": {"x": 0.0, "y": 0.0}},
+        )
+        forces = {item["name"]: item for item in result["forces"]}
+
+        self.assertAlmostEqual(forces["tension"]["y"], 0.1 * (9.81 + 2.0))
+        self.assertAlmostEqual(result["energy"]["potential"], 0.0)
+        self.assertAlmostEqual(result["extras"]["theta_deg"], 0.0)
+
+    def test_free_fall_gravity_and_measured_net_are_separate(self) -> None:
+        result = motion_model(
+            "free_fall", Vector2D(0.0, 2.0), Vector2D(0.0, -3.0),
+            Vector2D(0.0, -9.5), 0.1, {},
+        )
+        forces = {item["name"]: item for item in result["forces"]}
+
+        self.assertAlmostEqual(forces["gravity"]["y"], -0.981)
+        self.assertAlmostEqual(forces["net"]["y"], -0.95)
+        self.assertAlmostEqual(result["energy"]["kinetic"], 0.45)
+
+    def test_equal_mass_elastic_collision(self) -> None:
+        result = collision_metrics(
+            Vector2D(1.0, 0.0), Vector2D(0.0, 0.0),
+            Vector2D(0.0, 0.0), Vector2D(1.0, 0.0),
+            0.2, 0.2, Vector2D(1.0, 0.0),
+        )
+
+        self.assertAlmostEqual(result["restitution"], 1.0)
+        self.assertAlmostEqual(result["momentum_delta"], 0.0)
+        self.assertAlmostEqual(result["kinetic_after"], result["kinetic_before"])
+
+    def test_unmeasurable_collision_is_rejected(self) -> None:
+        with self.assertRaises(ValueError):
+            collision_metrics(
+                Vector2D(0.0, 0.0), Vector2D(1.0, 0.0),
+                Vector2D(0.0, 0.0), Vector2D(1.0, 0.0),
+                0.1, 0.1, Vector2D(1.0, 0.0),
+            )
+
+
+class PhysicsSessionTests(unittest.TestCase):
+    @staticmethod
+    def frame(index: int, x: float | None, mode: str = "ramp") -> dict:
+        obj = {
+            "id": 7, "target": True, "score": 0.99,
+            "pixel": {"x": 100 + index, "y": 200},
+            "bbox": {"x": 90 + index, "y": 190, "w": 20, "h": 20},
+            "position": None if x is None else {"x": x, "y": 0.3 - 0.5 * x},
+            "width_m": 0.04,
+        }
+        return {
+            "type": "frame", "frame_id": index, "timestamp": index * 0.1,
+            "tracked": True, "objects": [obj], "target_id": 7,
+        }
+
+    def test_cv_frame_becomes_frontend_state(self) -> None:
+        session = PhysicsSession()
+        settings = {"mode": "ramp", "mass_kg": 0.1, "ramp_angle_deg": -26.565}
+
+        for index in range(5):
+            result = session.process_frame(self.frame(index, 0.02 * index), settings)
+
+        self.assertEqual(result["type"], "state")
+        self.assertEqual(result["frame_id"], 4)
+        self.assertEqual(result["pixel"], {"x": 104, "y": 200})
+        self.assertAlmostEqual(result["velocity"]["x"], 0.2)
+        self.assertAlmostEqual(result["velocity"]["y"], -0.1)
+        self.assertAlmostEqual(result["acceleration"]["x"], 0.0)
+        self.assertIn("gravity_parallel", {force["name"] for force in result["forces"]})
+
+    def test_no_calibration_does_not_fabricate_si_vectors(self) -> None:
+        result = PhysicsSession().process_frame(
+            self.frame(0, None), {"mode": "ramp", "mass_kg": 0.1}
+        )
+
+        self.assertTrue(result["tracked"])
+        self.assertIsNone(result["position"])
+        self.assertNotIn("velocity", result)
+        self.assertNotIn("energy", result)
+
+    def test_missing_target_reports_untracked(self) -> None:
+        session = PhysicsSession()
+        result = session.process_frame(
+            {"type": "frame", "frame_id": 0, "timestamp": 0.0,
+             "tracked": False, "objects": []},
+            {"mode": "free_fall", "mass_kg": 0.1},
+        )
+
+        self.assertFalse(result["tracked"])
+        self.assertEqual(result["forces"], [])
+
+    def test_mode_change_resets_derivatives(self) -> None:
+        session = PhysicsSession()
+        for index in range(4):
+            session.process_frame(self.frame(index, 0.02 * index), {"mode": "ramp", "mass_kg": 0.1})
+
+        result = session.process_frame(self.frame(4, 0.08), {"mode": "free_fall", "mass_kg": 0.1})
+
+        self.assertNotIn("velocity", result)
+
+    def test_recalibration_resets_derivatives(self) -> None:
+        session = PhysicsSession()
+        settings = {"mode": "ramp", "mass_kg": 0.1}
+        for index in range(4):
+            frame = self.frame(index, 0.02 * index)
+            frame["calibration"] = {"method": "scale", "settings": {"px_per_m": 1000}}
+            session.process_frame(frame, settings)
+
+        frame = self.frame(4, 0.08)
+        frame["calibration"] = {"method": "scale", "settings": {"px_per_m": 500}}
+        result = session.process_frame(frame, settings)
+
+        self.assertNotIn("velocity", result)
+
+
+if __name__ == "__main__":
+    unittest.main()
