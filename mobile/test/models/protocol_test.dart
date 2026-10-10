@@ -169,6 +169,7 @@ void main() {
         'mass_kg': 0.1,
         'px_per_m': 812.5,
         'target_px': {'x': 161.0, 'y': 118.5},
+        'target_bbox': null,
         'frame_size': {'w': 320, 'h': 240},
         'ar_plane': null,
       });
@@ -185,6 +186,8 @@ void main() {
       expect(json.containsKey('px_per_m'), isTrue);
       expect(json['px_per_m'], isNull);
       expect(json['target_px'], isNull);
+      expect(json.containsKey('target_bbox'), isTrue);
+      expect(json['target_bbox'], isNull);
     });
   });
 

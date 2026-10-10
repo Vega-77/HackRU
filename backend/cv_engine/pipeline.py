@@ -187,7 +187,18 @@ class TrackingPipeline:
         manual = None
         if tap is not None:
             if self._pending_selection:
-                manual = self._manual.select(frame, (tap["x"] * frame.scale, tap["y"] * frame.scale), self.session["target_bbox"])
+                point = (tap["x"] * frame.scale, tap["y"] * frame.scale)
+                box = self.session["target_bbox"]
+                if box is None:
+                    containing = [d for d in self.color.detect(frame)
+                                  if d.bbox[0] <= point[0] < d.bbox[0] + d.bbox[2]
+                                  and d.bbox[1] <= point[1] < d.bbox[1] + d.bbox[3]]
+                    if len(containing) == 1:
+                        x, y, w, h = containing[0].bbox
+                        s = frame.scale
+                        box = {"x": (x - 2) / s, "y": (y - 2) / s,
+                               "w": (w + 4) / s, "h": (h + 4) / s}
+                self._manual.select(frame, point, box)
                 self._pending_selection = False
             else:
                 manual = self._manual.detect(frame)
@@ -203,14 +214,23 @@ class TrackingPipeline:
             o["target"] = o["id"] == self._target_id
             o["timestamp"] = frame.timestamp
             o["tracking_status"] = "low_confidence" if o["score"] < 0.6 else "detected"
-        return {
+        if target is not None:
+            tracking_status = "low_confidence" if target.score < 0.6 else "detected"
+        elif self._target_id is not None:
+            tracking_status = "lost"
+        else:
+            tracking_status = self._manual.debug.get("reason", "searching") if tap is not None else "searching"
+        result = {
             "tracked": target is not None,
-            "tracking_status": ("low_confidence" if target.score < 0.6 else "detected") if target is not None
-                               else ("lost" if self._target_id is not None else "searching"),
+            "tracking_status": tracking_status,
             "target_id": self._target_id,
             "objects": objects,
             "calibration": self.spatial.status(),
         }
+        if self.session.get("debug_tracking"):
+            result["tracking_debug"] = {"frame_id": frame.frame_id, "timestamp": frame.timestamp,
+                                        "detections": len(detections), **self._manual.debug}
+        return result
 
     def _pick_target(self, tracks: list[Track], frame: PreprocessedFrame) -> Track | None:
         """The object the app cares about: the one the user tapped (target_px), followed by
@@ -218,28 +238,17 @@ class TrackingPipeline:
         object that is moving most (see _auto_target)."""
         if not tracks:
             return None
-        scale = frame.scale
         by_id = {t.id: t for t in tracks}
         manual_tracks = [t for t in tracks if t.source == "manual"] if self.session["target_px"] is not None else []
         if manual_tracks:
             chosen = max(manual_tracks, key=lambda t: t.score)
-        elif self.session["target_px"] is not None and self._manual.template is not None:
+        elif self.session["target_px"] is not None:
             return None
-        elif self.session["target_px"] is None:
-            chosen = self._auto_target(tracks, by_id.get(self._target_id))
-        elif self._target_id in by_id:
-            chosen = by_id[self._target_id]
-        elif self._target_last is not None:
-            lx, ly = self._target_last
-            dist = {t.id: np.hypot(t.centroid[0] / scale - lx, t.centroid[1] / scale - ly) for t in tracks}
-            chosen = min(tracks, key=lambda t: dist[t.id])
-            if dist[chosen.id] > 0.2 * frame.source_size[0]:
-                return None  # nothing near where the user tapped (or where it was last seen)
         else:
-            return None
+            chosen = self._auto_target(tracks, by_id.get(self._target_id))
         self._target_id = chosen.id
         if self.session["target_px"] is not None:
-            self._target_last = (chosen.centroid[0] / scale, chosen.centroid[1] / scale)
+            self._target_last = (chosen.centroid[0] / frame.scale, chosen.centroid[1] / frame.scale)
         return chosen
 
     @staticmethod

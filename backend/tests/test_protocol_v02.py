@@ -103,6 +103,8 @@ def test_target_px_picks_the_tapped_object():
     # Re-tapping the other object switches the target.
     pipe.apply_config({"type": "config", "target_px": {"x": 62, "y": 121}})
     out = pipe(preprocess_frame(phone_frame(balls), 2, 2 / 15))
+    assert not out["tracked"]
+    out = pipe(preprocess_frame(phone_frame(balls), 3, 3 / 15))
     (target,) = [o for o in out["objects"] if o["target"]]
     assert target["source"] == "manual" and target["pixel"]["x"] < 100
 

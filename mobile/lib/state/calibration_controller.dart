@@ -4,6 +4,8 @@ import '../core/config/app_config.dart';
 import '../core/logging/debug_log.dart';
 import '../models/calibration.dart';
 import '../models/camera_pose.dart';
+import '../models/physics_state.dart';
+import '../models/session_config.dart';
 import '../models/vec2.dart';
 
 /// Holds the ruler endpoints and tracking target, all in frame pixels, and
@@ -31,8 +33,17 @@ class CalibrationController extends Notifier<Calibration> {
   }
 
   void setTarget(Vec2 p) {
-    state = state.copyWith(target: p);
+    state = state.clearTarget().copyWith(target: p);
     log.i('Target tapped at $p');
+  }
+
+  void selectObject(Vec2 point, PixelRect? box, EncodedFrame frame) {
+    state = state.clearTarget().copyWith(
+      target: point,
+      targetBbox: box,
+      selectionFrame: frame,
+    );
+    log.i('Object selected at $point in captured frame ${frame.captureTime}');
   }
 
   void clearTarget() {

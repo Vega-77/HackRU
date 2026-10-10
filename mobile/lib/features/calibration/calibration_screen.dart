@@ -361,9 +361,12 @@ class _Steps extends ConsumerWidget {
             number: ++number,
             title: 'Mark the object',
             body: calibration.target == null
-                ? 'Tap the object in the picture so the tracker knows which '
-                      'one to follow.'
-                : 'Marked. Tap somewhere else to move it.',
+                ? 'Drag a box tightly around the object. A tap also works '
+                      'for a distinct red, blue, green or yellow object. '
+                      'With a keyboard, focus the picture and press Enter; '
+                      'arrows move the box and + or - resize it.'
+                : 'Picture held for selection. Check the box, then start. '
+                      'Clear to select again from the live picture.',
             done: calibration.target != null,
             trailing: calibration.target == null
                 ? null

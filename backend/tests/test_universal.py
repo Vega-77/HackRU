@@ -41,7 +41,9 @@ def test_manual_selection_tracks_stationary_near_gray_object_and_reports_loss():
     pipe = TrackingPipeline()
     pipe.apply_config({"type": "config", "target_px": {"x": 80, "y": 120},
                        "target_bbox": {"x": 64, "y": 104, "w": 32, "h": 32}})
-    first = run(pipe, image([(80, 120, 12, (104, 104, 104))], background=90), 0)
+    selected = image([(80, 120, 12, (104, 104, 104))], background=90)
+    assert run(pipe, selected, 0)["tracked"] is False
+    first = run(pipe, selected, 1)
     obj = first["objects"][0]
     object_id = obj["id"]
     assert obj["source"] == "manual" and obj["target"] is True
@@ -61,7 +63,8 @@ def test_manual_box_maps_back_to_client_pixels_after_resize():
                        "target_bbox": {"x": 370, "y": 210, "w": 60, "h": 60},
                        "px_per_m": 1000, "frame_size": {"w": 640, "h": 480}})
     img = image([(400, 240, 22, (170, 170, 170))], size=(640, 480))
-    out = pipe(preprocess_frame(img, 0, 0.0, working_width=320))
+    assert pipe(preprocess_frame(img, 0, 0.0, working_width=320))["tracked"] is False
+    out = pipe(preprocess_frame(img, 1, 0.1, working_width=320))
     obj = out["objects"][0]
     assert obj["pixel"] == pytest.approx({"x": 400, "y": 240}, abs=1)
     assert obj["bbox"] == pytest.approx({"x": 370, "y": 210, "w": 60, "h": 60}, abs=1)
@@ -75,6 +78,9 @@ def test_selected_object_remains_target_during_modest_scale_change():
     ids = set()
     for i, radius in enumerate((11, 12, 13, 14, 15)):
         out = run(pipe, image([(100 + 2 * i, 120, radius, (180, 180, 180))]), i)
+        if i == 0:
+            assert out["tracked"] is False
+            continue
         assert out["tracked"] is True
         ids.add(out["target_id"])
         assert out["objects"][0]["pixel"]["x"] == pytest.approx(100 + 2 * i, abs=5)
