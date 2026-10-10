@@ -10,6 +10,7 @@ import '../../models/experiment_mode.dart';
 import '../../services/network/physics_socket.dart';
 import '../../state/experiment_settings.dart';
 import '../../state/session_controller.dart';
+import '../settings/backend_url.dart';
 import 'widgets/experiment_stage.dart';
 import 'widgets/telemetry_panel.dart';
 
@@ -361,8 +362,10 @@ class _Banners extends ConsumerWidget {
       if (!demo && connection == ConnectionStatus.offline)
         _Banner(
           icon: AppIcons.cellSignalSlash,
-          message:
-              "Can't reach the backend at $url. Retrying every few seconds.",
+          message: isHostedBackend(url)
+              ? "Can't reach the hosted backend yet. If it was asleep, it "
+                    'takes up to a minute to wake. Retrying.'
+              : "Can't reach the backend at $url. Retrying every few seconds.",
           action: 'Settings',
           onAction: () => context.push(Routes.settings),
         ),

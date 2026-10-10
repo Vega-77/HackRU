@@ -47,11 +47,30 @@ toolbar (iPhone 12/13/14 is 390 x 844).
 
 ### Against the backend
 
+The backend is hosted on Render (`../render.yaml`), and the app points at it
+by default. In the app, open Settings and choose **Live backend**. It tests
+the connection straight away. Nothing to run on a laptop.
+
+- If nobody has used it for 15 minutes the server is asleep, and the first
+  connection takes up to a minute. The app waits and says so.
+- The iOS Simulator and laptops without a webcam have no camera. Live mode
+  then streams a test video instead: a red ball swinging on a string, which
+  the backend tracks like a real one.
+
+To deploy it the first time (one teammate, once): sign in to
+[render.com](https://render.com) with GitHub, choose New > Blueprint, and
+pick this repo. If the URL Render gives is not
+`handson-physics-backend.onrender.com`, update `defaultBackendUrl` in
+`lib/core/config/app_config.dart`.
+
+To use a backend on a laptop instead:
+
 1. Put the laptop running the backend and the phone on the **same Wi-Fi**.
 2. Find the laptop's IP (`ipconfig` on Windows, `ipconfig getifaddr en0` on
    a Mac).
-3. In the app, open Settings, choose **Live backend**, and enter
-   `ws://<that IP>:8000/ws/frames`. Press **Test connection**.
+3. In Settings, choose **Live backend**, and enter
+   `ws://<that IP>:8000/ws/frames`. Press **Test connection**. **Use the
+   hosted backend** switches back.
 
 To set the address at build time instead:
 
@@ -101,7 +120,7 @@ app from the bottom up.
 | Folder | What lives there |
 |---|---|
 | `lib/models/` | Plain Dart types that mirror `docs/protocol.md`: `PhysicsState`, `SessionConfig`, `Calibration`, `Vec2`. No Flutter. |
-| `lib/services/camera/` | `FrameSource`: start the camera, grab a JPEG frame, show a preview. One version for iOS (`native_`), one for Chrome (`web_`). |
+| `lib/services/camera/` | `FrameSource`: start the camera, grab a JPEG frame, show a preview. One version for iOS (`native_`), one for Chrome (`web_`), and a drawn test video (`test_video_`) for devices with no camera. |
 | `lib/services/network/` | `PhysicsSocket` (the WebSocket client, with reconnect and flow control) and `MockPhysics` (the demo data). |
 | `lib/state/` | Riverpod controllers: experiment settings, calibration, the running session, and the rolling telemetry buffer for charts. |
 | `lib/features/` | One folder per screen: `home`, `calibration`, `experiment`, `settings`. Screen-only widgets sit in each `widgets/`. |
