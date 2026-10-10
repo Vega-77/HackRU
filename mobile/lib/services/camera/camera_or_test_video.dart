@@ -8,8 +8,8 @@ import 'frame_source.dart';
 import 'test_video_frame_source.dart';
 
 /// The device camera, or the [TestVideoFrameSource] when the device has
-/// none, so live mode on the iOS Simulator still streams something the
-/// backend can track.
+/// none, so the iOS Simulator still streams something the backend can
+/// track.
 ///
 /// Only a missing camera switches to the test video. Any other failure,
 /// like camera access being turned off, is passed on so the user can fix it.

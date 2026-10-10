@@ -4,16 +4,16 @@ import '../../../core/theme/tokens.dart';
 import '../../../models/experiment_mode.dart';
 import '../../../models/session_config.dart';
 import '../../../models/vec2.dart';
-import '../../../services/network/mock_physics_stream.dart';
-import 'coordinate_mapper.dart';
+import '../../experiment/widgets/coordinate_mapper.dart';
+import 'preview_physics.dart';
 
-/// The background for demo mode: graph paper at a true scale with the
-/// simulated apparatus (ramp, floor, pendulum mount, second cart) drawn in
-/// engineering-drawing style.
+/// The background for a home screen preview: graph paper at a true scale
+/// with the simulated apparatus (ramp, floor, pendulum mount, second cart)
+/// drawn in engineering-drawing style.
 ///
 /// Uses [BoxFit.contain], so the overlay on top must too.
-class DemoScene extends StatelessWidget {
-  const DemoScene({
+class PreviewScene extends StatelessWidget {
+  const PreviewScene({
     super.key,
     required this.mode,
     required this.frameSize,
@@ -35,8 +35,8 @@ class DemoScene extends StatelessWidget {
 
   /// The pendulum pivot in frame pixels, for the overlay's string.
   static Vec2? tetherFor(ExperimentMode mode, FrameSize frameSize) {
-    final pivot = MockPhysics.scenery(mode, 0).pivot;
-    return pivot == null ? null : MockPhysics.worldToFrame(pivot, frameSize);
+    final pivot = PreviewPhysics.scenery(mode, 0).pivot;
+    return pivot == null ? null : PreviewPhysics.worldToFrame(pivot, frameSize);
   }
 
   @override
@@ -44,7 +44,7 @@ class DemoScene extends StatelessWidget {
     return RepaintBoundary(
       child: CustomPaint(
         size: Size.infinite,
-        painter: _DemoScenePainter(
+        painter: _PreviewScenePainter(
           mode: mode,
           // Only the collision scene moves; elsewhere pin t so the painter
           // can skip repaints.
@@ -57,8 +57,8 @@ class DemoScene extends StatelessWidget {
   }
 }
 
-class _DemoScenePainter extends CustomPainter {
-  _DemoScenePainter({
+class _PreviewScenePainter extends CustomPainter {
+  _PreviewScenePainter({
     required this.mode,
     required this.t,
     required this.frameSize,
@@ -77,19 +77,19 @@ class _DemoScenePainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    final scenery = MockPhysics.scenery(mode, t);
+    final scenery = PreviewPhysics.scenery(mode, t);
     final mapper = CoordinateMapper(
       frameSize: frameSize,
       viewSize: size,
-      fit: DemoScene.fit,
+      fit: PreviewScene.fit,
     );
     Offset world(Vec2 p) =>
-        mapper.toScreen(MockPhysics.worldToFrame(p, frameSize));
-    final metre = MockPhysics.pxPerM(frameSize) * mapper.scale;
+        mapper.toScreen(PreviewPhysics.worldToFrame(p, frameSize));
+    final metre = PreviewPhysics.pxPerM(frameSize) * mapper.scale;
 
     canvas.drawRect(Offset.zero & size, Paint()..color = _paper);
     if (showGrid) {
-      _grid(canvas, size, world(Vec2.zero), DemoScene.gridSquareM * metre);
+      _grid(canvas, size, world(Vec2.zero), PreviewScene.gridSquareM * metre);
     }
 
     final line = Paint()
@@ -207,7 +207,7 @@ class _DemoScenePainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(_DemoScenePainter old) =>
+  bool shouldRepaint(_PreviewScenePainter old) =>
       old.frameSize != frameSize ||
       old.showGrid != showGrid ||
       old.mode != mode ||

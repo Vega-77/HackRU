@@ -301,50 +301,52 @@ class _TopBar extends ConsumerWidget {
   }
 }
 
-/// Where the data comes from and how it is doing. Neutral on purpose:
-/// colour on this screen means physics.
+/// How the connection to the backend is doing. Neutral on purpose: colour
+/// on this screen means physics.
 class _StatusChip extends ConsumerWidget {
   const _StatusChip();
 
+  /// Leaves the experiment pill room on a small phone.
+  static const _maxWidth = 140.0;
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final demo = ref.watch(
-      experimentSettingsProvider.select((s) => s.demoMode),
-    );
     final connection = ref.watch(sessionProvider.select((s) => s.connection));
     final latency = ref.watch(sessionProvider.select((s) => s.latencyMs));
 
-    final (IconData icon, String text) = demo
-        ? (AppIcons.flask, 'Demo')
-        : switch (connection) {
-            ConnectionStatus.live => (
-              AppIcons.broadcast,
-              latency == null ? 'Live' : 'Live ${latency.round()} ms',
-            ),
-            ConnectionStatus.connecting => (
-              AppIcons.arrowClockwise,
-              'Connecting',
-            ),
-            ConnectionStatus.offline => (AppIcons.wifiSlash, 'Offline'),
-            ConnectionStatus.idle => (AppIcons.plugs, 'Not connected'),
-          };
+    final (IconData icon, String text) = switch (connection) {
+      ConnectionStatus.live => (
+        AppIcons.broadcast,
+        latency == null ? 'Live' : 'Live ${latency.round()} ms',
+      ),
+      ConnectionStatus.connecting => (AppIcons.arrowClockwise, 'Connecting'),
+      ConnectionStatus.offline => (AppIcons.wifiSlash, 'Offline'),
+      ConnectionStatus.idle => (AppIcons.plugs, 'Not connected'),
+    };
 
     return Semantics(
       liveRegion: true,
-      label: demo ? 'Demo data' : text,
+      label: text,
       excludeSemantics: true,
-      child: _GlassPill(
-        dense: true,
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, size: 14, color: AppColors.inkMutedDark),
-            const SizedBox(width: 6),
-            Text(
-              text,
-              style: AppType.readoutSmall.copyWith(color: AppColors.vellum),
-            ),
-          ],
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: _maxWidth),
+        child: _GlassPill(
+          dense: true,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, size: 14, color: AppColors.inkMutedDark),
+              const SizedBox(width: 6),
+              Flexible(
+                child: Text(
+                  text,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: AppType.readoutSmall.copyWith(color: AppColors.vellum),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -357,9 +359,6 @@ class _Banners extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final demo = ref.watch(
-      experimentSettingsProvider.select((s) => s.demoMode),
-    );
     final url = ref.watch(
       experimentSettingsProvider.select((s) => s.backendUrl),
     );
@@ -367,7 +366,7 @@ class _Banners extends ConsumerWidget {
     final serverError = ref.watch(sessionProvider.select((s) => s.serverError));
 
     final banners = <Widget>[
-      if (!demo && connection == ConnectionStatus.offline)
+      if (connection == ConnectionStatus.offline)
         _Banner(
           icon: AppIcons.cellSignalSlash,
           message: isHostedBackend(url)
@@ -515,7 +514,7 @@ class _StageMessage extends ConsumerWidget {
   }
 }
 
-/// Live mode needs the camera. Explain what happened and offer a way on.
+/// The experiment needs the camera. Explain what happened and offer a way on.
 class _CameraFailed extends ConsumerWidget {
   const _CameraFailed();
 
@@ -553,29 +552,13 @@ class _CameraFailed extends ConsumerWidget {
                 const SizedBox(height: AppSpace.sm),
                 Text(
                   '${error ?? 'No camera was found.'} '
-                  'Check that the app may use the camera, then try again. '
-                  'Demo mode works without one.',
+                  'Check that the app may use the camera, then try again.',
                   style: AppType.body.copyWith(color: AppColors.inkMutedDark),
                 ),
                 const SizedBox(height: AppSpace.xl),
-                Wrap(
-                  spacing: AppSpace.sm,
-                  runSpacing: AppSpace.sm,
-                  children: [
-                    FilledButton(
-                      onPressed: session.start,
-                      child: const Text('Try again'),
-                    ),
-                    OutlinedButton(
-                      onPressed: () {
-                        ref
-                            .read(experimentSettingsProvider.notifier)
-                            .setDemoMode(true);
-                        session.start();
-                      },
-                      child: const Text('Use demo mode'),
-                    ),
-                  ],
+                FilledButton(
+                  onPressed: session.start,
+                  child: const Text('Try again'),
                 ),
               ],
             ),

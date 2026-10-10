@@ -6,7 +6,6 @@ import '../core/config/app_config.dart';
 import '../models/physics_state.dart';
 import '../models/session_config.dart';
 import '../services/camera/frame_source_factory.dart';
-import '../services/network/mock_physics_stream.dart';
 import '../services/network/physics_socket.dart';
 import 'calibration_controller.dart';
 import 'experiment_settings.dart';
@@ -31,14 +30,13 @@ class SessionState {
   final SessionPhase phase;
   final ConnectionStatus connection;
 
-  /// Newest state from the backend or the mock.
+  /// Newest state from the backend.
   final PhysicsState? latest;
 
   /// Size of the frames we stream; overlay coordinates are in these pixels.
   final FrameSize? frameSize;
 
-  /// Set when the camera could not start. Live mode only: demo mode
-  /// never opens the camera.
+  /// Set when the camera could not start.
   final String? cameraError;
 
   /// The last `error` message from the backend.
@@ -84,22 +82,20 @@ final frameSourceProvider = Provider<FrameSource>((ref) {
   return source;
 });
 
-/// Runs an experiment session:
-///
-/// * demo mode: [mockPhysicsStream] over a drawn scene; no camera;
-/// * live mode: camera → [PhysicsSocket] → backend → states back.
+/// Runs an experiment session: camera → [PhysicsSocket] → backend → states
+/// back.
 ///
 /// Incoming states update [SessionState.latest] and feed [telemetry].
 /// Changing settings or calibration mid-session re-sends the config.
 class SessionController extends Notifier<SessionState> {
-  /// The frame size demo mode pretends to stream; matches the mock world.
-  static const demoFrameSize = FrameSize(320, 240);
+  /// A 4:3 frame at the streaming width, assumed until the camera reports
+  /// its real size.
+  static const fallbackFrameSize = FrameSize(AppConfig.frameWidth, 240);
 
   final TelemetryBuffer telemetry = TelemetryBuffer();
 
   PhysicsSocket? _socket;
   final List<StreamSubscription<dynamic>> _subscriptions = [];
-  StreamSubscription<PhysicsState>? _mock;
   Timer? _frameTimer;
   Timer? _statsTimer;
   bool _capturing = false;
@@ -126,14 +122,10 @@ class SessionController extends Notifier<SessionState> {
 
     ref.listen(experimentSettingsProvider, (previous, next) {
       if (!state.isActive || previous == null) return;
-      if (previous.demoMode != next.demoMode) {
-        // Demo and live differ in whether the camera runs at all.
-        _restartSession();
-      } else if (previous.backendUrl != next.backendUrl) {
-        _restartDataSource();
+      if (previous.backendUrl != next.backendUrl) {
+        _startSocket(next.backendUrl);
       } else if (previous.mode != next.mode || previous.massKg != next.massKg) {
         telemetry.clear();
-        if (next.demoMode) _startMock();
         _socket?.sendConfig(_config());
       }
     });
@@ -151,28 +143,25 @@ class SessionController extends Notifier<SessionState> {
     state = state.copyWith(phase: SessionPhase.starting, clearErrors: true);
     telemetry.clear();
 
-    final demo = ref.read(experimentSettingsProvider).demoMode;
-    if (!demo) {
-      _ownsCamera = !_camera.isRunning;
-      try {
-        await _camera.start();
-      } on CameraUnavailableException catch (e) {
-        if (ref.mounted) {
-          state = state.copyWith(
-            phase: SessionPhase.failed,
-            cameraError: e.message,
-          );
-        }
-        return;
+    _ownsCamera = !_camera.isRunning;
+    try {
+      await _camera.start();
+    } on CameraUnavailableException catch (e) {
+      if (ref.mounted) {
+        state = state.copyWith(
+          phase: SessionPhase.failed,
+          cameraError: e.message,
+        );
       }
-      if (!ref.mounted) return;
+      return;
     }
+    if (!ref.mounted) return;
 
     state = state.copyWith(
       phase: SessionPhase.running,
-      frameSize: demo ? demoFrameSize : (_camera.frameSize ?? demoFrameSize),
+      frameSize: _camera.frameSize ?? fallbackFrameSize,
     );
-    _restartDataSource();
+    _startSocket(ref.read(experimentSettingsProvider).backendUrl);
     _statsTimer = Timer.periodic(
       const Duration(seconds: 1),
       (_) => _tickStats(),
@@ -229,33 +218,9 @@ class SessionController extends Notifier<SessionState> {
     if (ref.mounted) state = const SessionState();
   }
 
-  Future<void> _restartSession() async {
-    await stop();
-    if (ref.mounted) await start();
-  }
-
-  void _restartDataSource() {
-    _stopDataSource();
-    final settings = ref.read(experimentSettingsProvider);
-    if (settings.demoMode) {
-      state = state.copyWith(connection: ConnectionStatus.idle);
-      _startMock();
-    } else {
-      _startSocket(settings.backendUrl);
-    }
-  }
-
-  void _startMock() {
-    _mock?.cancel();
-    final settings = ref.read(experimentSettingsProvider);
-    _mock = mockPhysicsStream(
-      mode: settings.mode,
-      frameSize: state.frameSize ?? demoFrameSize,
-      massKg: settings.massKg,
-    ).listen(_onState);
-  }
-
+  /// Connects to [url], replacing any socket that is already open.
   void _startSocket(String url) {
+    _stopSocket();
     _hasPhysics = false;
     final socket = PhysicsSocket(url);
     _socket = socket;
@@ -333,16 +298,14 @@ class SessionController extends Notifier<SessionState> {
     return SessionConfig(
       mode: settings.mode,
       massKg: settings.massKg,
-      frameSize: state.frameSize ?? demoFrameSize,
+      frameSize: state.frameSize ?? fallbackFrameSize,
       pxPerM: calibration.pxPerM,
       targetPx: calibration.target,
       surface: calibration.surface,
     );
   }
 
-  void _stopDataSource() {
-    _mock?.cancel();
-    _mock = null;
+  void _stopSocket() {
     _frameTimer?.cancel();
     _frameTimer = null;
     for (final s in _subscriptions) {
@@ -354,7 +317,7 @@ class SessionController extends Notifier<SessionState> {
   }
 
   void _teardown() {
-    _stopDataSource();
+    _stopSocket();
     _statsTimer?.cancel();
     _statsTimer = null;
   }

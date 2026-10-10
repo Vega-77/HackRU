@@ -4,7 +4,7 @@ import '../core/config/app_config.dart';
 import '../models/experiment_mode.dart';
 
 /// What the user has chosen for the current experiment: mode, mass, which
-/// vectors to draw, and where the data comes from.
+/// vectors to draw, and which backend measures it.
 class ExperimentSettings {
   const ExperimentSettings({
     this.mode = ExperimentMode.ramp,
@@ -12,7 +12,6 @@ class ExperimentSettings {
     this.showVelocity = true,
     this.showAcceleration = true,
     this.showForces = true,
-    this.demoMode = AppConfig.startInDemoMode,
     this.backendUrl = AppConfig.defaultBackendUrl,
   });
 
@@ -21,9 +20,6 @@ class ExperimentSettings {
   final bool showVelocity;
   final bool showAcceleration;
   final bool showForces;
-
-  /// When true the app uses synthetic data and never opens a socket.
-  final bool demoMode;
   final String backendUrl;
 
   ExperimentSettings copyWith({
@@ -32,7 +28,6 @@ class ExperimentSettings {
     bool? showVelocity,
     bool? showAcceleration,
     bool? showForces,
-    bool? demoMode,
     String? backendUrl,
   }) => ExperimentSettings(
     mode: mode ?? this.mode,
@@ -40,7 +35,6 @@ class ExperimentSettings {
     showVelocity: showVelocity ?? this.showVelocity,
     showAcceleration: showAcceleration ?? this.showAcceleration,
     showForces: showForces ?? this.showForces,
-    demoMode: demoMode ?? this.demoMode,
     backendUrl: backendUrl ?? this.backendUrl,
   );
 }
@@ -62,8 +56,6 @@ class ExperimentSettingsController extends Notifier<ExperimentSettings> {
       state = state.copyWith(showAcceleration: !state.showAcceleration);
 
   void toggleForces() => state = state.copyWith(showForces: !state.showForces);
-
-  void setDemoMode(bool value) => state = state.copyWith(demoMode: value);
 
   void setBackendUrl(String url) =>
       state = state.copyWith(backendUrl: url.trim());

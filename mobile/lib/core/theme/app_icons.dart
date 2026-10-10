@@ -22,7 +22,6 @@ abstract final class AppIcons {
   static const checkCircle = IconData(0xe184, fontFamily: _family);
   static const circle = IconData(0xe18a, fontFamily: _family);
   static const crosshair = IconData(0xe1d6, fontFamily: _family);
-  static const flask = IconData(0xe79e, fontFamily: _family);
   static const gear = IconData(0xe270, fontFamily: _family);
   static const info = IconData(0xe2ce, fontFamily: _family);
   static const minus = IconData(0xe32a, fontFamily: _family);
