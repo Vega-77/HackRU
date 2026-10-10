@@ -138,7 +138,7 @@ class MotionDetector:
 
     def reset(self) -> None:
         self._subtractor = cv2.createBackgroundSubtractorMOG2(
-            history=self.history, varThreshold=self.var_threshold, detectShadows=True
+            history=self.history, varThreshold=self.var_threshold, detectShadows=False
         )
         # OpenCV's 0.9 lets a new color join the background once it holds 10% of the pixel's
         # weight, about 1 s at this learning rate: a cart that stops vanishes almost at once.
@@ -190,7 +190,7 @@ class MotionDetector:
                 continue
             surface = np.median(patch[ring > 0], axis=0)
             spread = np.median(np.linalg.norm(patch[ring > 0] - surface, axis=1))
-            looks_like_surface = np.linalg.norm(patch - surface, axis=2) < max(30.0, 3 * spread)
+            looks_like_surface = np.linalg.norm(patch - surface, axis=2) < max(12.0, 3 * spread)
             blob[looks_like_surface] = 0
             out[y0:y1, x0:x1] |= cv2.morphologyEx(blob, cv2.MORPH_OPEN, self._kernel)
         return out
@@ -217,7 +217,8 @@ class MotionDetector:
         self._frames += 1
         if first:
             return []  # the first frame only seeds the background model
-        # MOG2 marks shadows 127 and foreground 255; keep only real foreground.
+        # Shadow detection is off: with it on, MOG2 files any darker gray object under "shadow"
+        # (no color to tell it apart from a shadowed table), so dark gray balls vanished.
         _, fg = cv2.threshold(fg, 254, 255, cv2.THRESH_BINARY)
         if valid is not None:
             fg &= valid  # parts of the view the reference frame never saw
