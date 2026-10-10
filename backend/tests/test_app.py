@@ -50,6 +50,20 @@ def test_frame_without_metadata_gets_an_id():
         assert ws.receive_json()["frame_id"] == 0
 
 
+def test_bad_frame_metadata_does_not_end_session():
+    with TestClient(app).websocket_connect("/ws/frames") as ws:
+        ws.send_text(json.dumps({"frame_id": "not-an-integer", "timestamp": 1.0}))
+        ws.send_bytes(frame_bytes())
+        assert ws.receive_json()["type"] == "error"
+        ws.send_text(json.dumps({"frame_id": 1, "timestamp": float("inf")}))
+        ws.send_bytes(frame_bytes())
+        error = ws.receive_json()
+        assert error["type"] == "error" and error["frame_id"] == 1
+        ws.send_text(json.dumps({"frame_id": 2, "timestamp": 2.0}))
+        ws.send_bytes(frame_bytes())
+        assert ws.receive_json()["frame_id"] == 2
+
+
 def test_bad_image_reports_error_and_keeps_connection():
     with TestClient(app).websocket_connect("/ws/frames") as ws:
         ws.send_bytes(b"garbage")

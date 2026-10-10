@@ -61,3 +61,27 @@ def test_invalid_physics_geometry_rejected_before_processing() -> None:
 
     assert error["type"] == "error"
     assert "ramp_angle_deg" in error["message"]
+
+
+def test_two_clients_keep_separate_physics_history() -> None:
+    config = {
+        "type": "config", "mode": "ramp", "mass_kg": 0.2,
+        "px_per_m": 1000.0, "frame_size": {"w": 320, "h": 240},
+        "ramp_angle_deg": 0.0,
+    }
+    with TestClient(app) as client:
+        with client.websocket_connect("/ws/frames") as first:
+            with client.websocket_connect("/ws/frames") as second:
+                assert client.get("/health").json()["active_sessions"] == 2
+                first.send_text(json.dumps(config))
+                second.send_text(json.dumps(config))
+                send_ball(first, 0, 80)
+                send_ball(first, 1, 90)
+                moving = send_ball(first, 2, 100)
+                send_ball(second, 0, 180)
+                fresh = send_ball(second, 1, 180)
+                assert moving["type"] == fresh["type"] == "state"
+                assert moving["velocity"]["x"] > 0
+                assert "velocity" not in fresh
+            assert client.get("/health").json()["active_sessions"] == 1
+        assert client.get("/health").json()["active_sessions"] == 0
