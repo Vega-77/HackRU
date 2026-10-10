@@ -44,8 +44,9 @@ class _TelemetryPanelState extends ConsumerState<TelemetryPanel> {
   void initState() {
     super.initState();
     _timer = Timer.periodic(_refresh, (_) {
+      if (!mounted) return;
       final version = ref.read(sessionProvider).telemetryVersion;
-      if (version != _shownVersion && mounted) setState(() {});
+      if (version != _shownVersion) setState(() {});
     });
   }
 

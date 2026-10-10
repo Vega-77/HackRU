@@ -39,7 +39,7 @@ class WebFrameSource implements FrameSource {
   static int _nextViewId = 0;
 
   final String _viewType = 'hands-on-camera-${_nextViewId++}';
-  final web.HTMLVideoElement _video = _newVideo();
+  final web.HTMLVideoElement _captureVideo = _newVideo();
   final Set<web.HTMLVideoElement> _previews = {};
   final web.HTMLCanvasElement _canvas = web.HTMLCanvasElement();
   web.MediaStream? _stream;
@@ -49,7 +49,7 @@ class WebFrameSource implements FrameSource {
 
   @override
   FrameSize? get frameSize {
-    if (!isRunning || _video.videoWidth == 0) return null;
+    if (!isRunning || _captureVideo.videoWidth == 0) return null;
     return _sizeForWidth(AppConfig.frameWidth);
   }
 
@@ -83,9 +83,9 @@ class WebFrameSource implements FrameSource {
     _previews
       ..removeWhere((preview) => !preview.isConnected)
       ..forEach(_attach);
-    _attach(_video);
+    _attach(_captureVideo);
     // videoWidth is 0 until the first frame's metadata arrives.
-    while (_video.videoWidth == 0) {
+    while (_captureVideo.videoWidth == 0) {
       await Future<void>.delayed(const Duration(milliseconds: 30));
     }
   }
@@ -95,25 +95,27 @@ class WebFrameSource implements FrameSource {
     final stream = _stream;
     _stream = null;
     if (stream == null) return;
+    // srcObject goes first, so the pause listener does not restart them.
+    for (final video in [..._previews, _captureVideo]) {
+      video
+        ..srcObject = null
+        ..pause();
+    }
     for (final track in stream.getTracks().toDart) {
       track.stop();
-    }
-    _video.srcObject = null;
-    for (final preview in _previews) {
-      preview.srcObject = null;
     }
   }
 
   @override
   Future<EncodedFrame?> capture({int width = AppConfig.frameWidth}) async {
-    if (!isRunning || _video.videoWidth == 0) return null;
+    if (!isRunning || _captureVideo.videoWidth == 0) return null;
 
     final size = _sizeForWidth(width);
     _canvas
       ..width = size.width
       ..height = size.height;
     final context = _canvas.getContext('2d') as web.CanvasRenderingContext2D;
-    context.drawImage(_video, 0, 0, size.width, size.height);
+    context.drawImage(_captureVideo, 0, 0, size.width, size.height);
 
     // toDataURL is synchronous and fast at 320 px wide.
     final dataUrl = _canvas.toDataURL('image/jpeg', AppConfig.jpegQuality.toJS);
@@ -153,7 +155,8 @@ class WebFrameSource implements FrameSource {
   }
 
   FrameSize _sizeForWidth(int width) {
-    final height = (width * _video.videoHeight / _video.videoWidth).round();
+    final height =
+        (width * _captureVideo.videoHeight / _captureVideo.videoWidth).round();
     return FrameSize(width, height);
   }
 

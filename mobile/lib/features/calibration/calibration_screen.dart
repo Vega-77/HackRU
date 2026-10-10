@@ -116,9 +116,12 @@ class _CalibrationScreenState extends ConsumerState<CalibrationScreen> {
 
   Future<void> _startExperiment() async {
     await context.push(Routes.experiment);
-    // The camera normally stays on through the experiment. If it was
-    // stopped there (a switch to demo data and back), open it again.
-    if (mounted && !_demo) _startCamera();
+    if (!mounted) return;
+    // A popped route can finish disposing after this Future completes. Stop
+    // its session before setup takes the shared camera back, and open the
+    // camera again if the experiment stopped it (a switch to demo data).
+    await ref.read(sessionProvider.notifier).stop();
+    if (mounted && !_demo) await _startCamera();
   }
 
   @override

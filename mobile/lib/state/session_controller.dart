@@ -103,6 +103,10 @@ class SessionController extends Notifier<SessionState> {
   Timer? _frameTimer;
   Timer? _statsTimer;
   bool _capturing = false;
+  Future<void>? _stopInProgress;
+  int _sessionEpoch = 0;
+
+  int get sessionEpoch => _sessionEpoch;
 
   /// Set once the backend sends a real `state`; from then on CV-only
   /// reports are ignored so the two never fight over the overlay.
@@ -139,7 +143,11 @@ class SessionController extends Notifier<SessionState> {
   }
 
   Future<void> start() async {
+    final stopping = _stopInProgress;
+    if (stopping != null) await stopping;
+    if (!ref.mounted) return;
     if (state.phase == SessionPhase.starting || state.isActive) return;
+    _sessionEpoch++;
     state = state.copyWith(phase: SessionPhase.starting, clearErrors: true);
     telemetry.clear();
 
@@ -199,10 +207,20 @@ class SessionController extends Notifier<SessionState> {
     );
   }
 
-  Future<void> stop() async {
-    // Already disposed (the whole app closed): onDispose did the teardown
-    // and the camera provider released the camera.
-    if (!ref.mounted) return;
+  Future<void> stop({int? onlyIfEpoch}) {
+    // A screen from an older route transition must not stop a newer session.
+    if (!ref.mounted || (onlyIfEpoch != null && onlyIfEpoch != _sessionEpoch)) {
+      return Future.value();
+    }
+    if (_stopInProgress != null) return _stopInProgress!;
+    // Setup may already have restarted the shared camera after this session.
+    if (state.phase == SessionPhase.idle) return Future.value();
+    return _stopInProgress = _stopSession().whenComplete(() {
+      _stopInProgress = null;
+    });
+  }
+
+  Future<void> _stopSession() async {
     _teardown();
     if (_ownsCamera) {
       _ownsCamera = false;

@@ -5,6 +5,7 @@ import 'package:hands_on_physics/app.dart';
 import 'package:hands_on_physics/core/config/app_config.dart';
 import 'package:hands_on_physics/core/routing/router.dart';
 import 'package:hands_on_physics/features/settings/backend_url.dart';
+import 'package:hands_on_physics/models/experiment_mode.dart';
 import 'package:hands_on_physics/models/session_config.dart';
 import 'package:hands_on_physics/services/camera/frame_source.dart';
 import 'package:hands_on_physics/state/experiment_settings.dart';
@@ -13,18 +14,28 @@ import 'package:hands_on_physics/state/session_controller.dart';
 /// Counts how often the app tries to open the camera.
 class _FakeCamera implements FrameSource {
   int starts = 0;
+  int stops = 0;
+  bool running = false;
 
   @override
-  Future<void> start() async => starts++;
+  Future<void> start() async {
+    if (running) return;
+    starts++;
+    running = true;
+  }
 
   @override
-  Future<void> stop() async {}
+  Future<void> stop() async {
+    if (!running) return;
+    stops++;
+    running = false;
+  }
 
   @override
-  bool get isRunning => false;
+  bool get isRunning => running;
 
   @override
-  FrameSize? get frameSize => null;
+  FrameSize? get frameSize => running ? const FrameSize(320, 240) : null;
 
   @override
   Future<EncodedFrame?> capture({int width = 320}) async => null;
@@ -153,6 +164,47 @@ void main() {
       container.read(experimentSettingsProvider).backendUrl,
       AppConfig.defaultBackendUrl,
     );
+
+    await unmount(tester);
+  });
+
+  testWidgets('live camera resumes on setup after an experiment', (
+    tester,
+  ) async {
+    final container = await pumpApp(tester);
+    tester.view.physicalSize = const Size(600, 900) * 3;
+    await tester.pump();
+
+    await tester.tap(find.byTooltip('Settings'));
+    await tester.pump(const Duration(milliseconds: 600));
+    await tester.tap(find.text('Live backend'));
+    await tester.pump(const Duration(milliseconds: 400));
+    await tester.tap(find.byTooltip('Back'));
+    await tester.pump(const Duration(milliseconds: 600));
+
+    await tester.tap(find.textContaining('Set up'));
+    await tester.pump(const Duration(milliseconds: 600));
+    expect(camera.isRunning, isTrue);
+
+    await tester.tap(find.text('Start experiment'));
+    await tester.pump(const Duration(milliseconds: 600));
+    expect(container.read(sessionProvider).phase, SessionPhase.running);
+    expect(camera.isRunning, isTrue);
+
+    container
+        .read(experimentSettingsProvider.notifier)
+        .setMode(ExperimentMode.freeFall);
+    await tester.pump(const Duration(milliseconds: 400));
+    expect(container.read(experimentSettingsProvider).mode.label, 'Free fall');
+    expect(camera.isRunning, isTrue);
+    expect(camera.stops, 0);
+
+    await tester.tap(find.byTooltip('Back'));
+    await tester.pump(const Duration(milliseconds: 600));
+    // Setup opened the camera, so the session leaves it running throughout.
+    expect(camera.isRunning, isTrue);
+    expect(camera.starts, 1);
+    expect(camera.stops, 0);
 
     await unmount(tester);
   });
