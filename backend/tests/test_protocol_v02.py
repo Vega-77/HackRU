@@ -11,6 +11,13 @@ from app import app
 from cv_engine.pipeline import TrackingPipeline
 from cv_engine.preprocess import encode_jpeg, preprocess_frame
 
+@pytest.fixture(autouse=True)
+def color_detector(monkeypatch):
+    # These tests check the protocol with red/blue test objects, so pin the color detector
+    # (the app default is motion, which needs a moving object against a learned background).
+    monkeypatch.setenv("CV_DETECTOR", "color")
+
+
 APP_CONFIG = {
     "type": "config",
     "mode": "ramp",
