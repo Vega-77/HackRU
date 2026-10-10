@@ -52,8 +52,8 @@ def test_ball_world_position_from_aruco(ball):
     assert out["calibration"]["status"] == "ok"
     (obj,) = [o for o in out["objects"] if o["label"] == "red"]
     # Within 5 mm of the truth despite the perspective tilt and 640 px processing.
-    assert obj["world"] == pytest.approx(list(ball), abs=0.005)
-    assert obj["world_width"] == pytest.approx(0.04, abs=0.006)
+    assert obj["position"] == pytest.approx({"x": ball[0], "y": ball[1]}, abs=0.005)
+    assert obj["width_m"] == pytest.approx(0.04, abs=0.006)
 
 
 def test_manual_calibration_in_client_and_normalized_pixels():
@@ -73,7 +73,7 @@ def test_manual_calibration_in_client_and_normalized_pixels():
         for i in range(2):
             out = pipe(preprocess_frame(view, i, 0.0))
         (obj,) = [o for o in out["objects"] if o["label"] == "red"]
-        assert obj["world"] == pytest.approx([0.25, 0.10], abs=0.005)
+        assert obj["position"] == pytest.approx({"x": 0.25, "y": 0.10}, abs=0.005)
 
 
 def test_aruco_holds_briefly_then_reports_lost():

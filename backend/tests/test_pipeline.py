@@ -19,17 +19,17 @@ def test_reports_tracks_in_source_pixels_and_normalized():
     assert len(objs) == 1
     o = objs[0]
     assert o["label"] == "red" and o["id"] == 1
-    assert o["centroid"] == pytest.approx([320, 400], abs=2)
-    assert o["centroid_norm"] == pytest.approx([0.25, 0.5556], abs=0.005)
-    assert o["bbox"][2] == pytest.approx(80, abs=5)
-    assert o["world"] is None  # no calibration yet
+    assert o["pixel"] == pytest.approx({"x": 320, "y": 400}, abs=2)
+    assert o["pixel_norm"] == pytest.approx({"x": 0.25, "y": 0.5556}, abs=0.005)
+    assert o["bbox"]["w"] == pytest.approx(80, abs=5)
+    assert o["position"] is None  # no calibration yet
 
 
 def test_config_validation_and_update():
     cfg = PipelineConfig()
     assert cfg.updated({"colors": ["blue"]}).colors == ["blue"]
     with pytest.raises(ValueError):
-        cfg.updated({"mode": "magic"})
+        cfg.updated({"detector": "magic"})
     with pytest.raises(ValueError):
         cfg.updated({"nope": 1})
 
@@ -42,7 +42,7 @@ def test_failed_reconfigure_keeps_old_setup():
 
 
 def test_mediapipe_mode_switch():
-    pipe = TrackingPipeline(PipelineConfig(mode="both"))
+    pipe = TrackingPipeline(PipelineConfig(detector="both"))
     assert pipe._mediapipe is not None
-    pipe.configure(pipe.config.updated({"mode": "color"}))
+    pipe.configure(pipe.config.updated({"detector": "color"}))
     assert pipe._mediapipe is None

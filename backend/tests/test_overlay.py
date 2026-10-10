@@ -27,7 +27,7 @@ def test_overlay_handles_empty_result():
 def test_trails_grow_and_are_forgotten():
     th = TrailHistory(length=3, forget_after=2)
     for x in range(5):
-        trails = th.update([{"id": 1, "centroid": [x, 0]}])
+        trails = th.update([{"id": 1, "pixel": {"x": x, "y": 0}}])
     assert list(trails[1]) == [(2, 0), (3, 0), (4, 0)]
     for _ in range(3):
         trails = th.update([])

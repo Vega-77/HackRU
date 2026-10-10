@@ -51,13 +51,12 @@ def test_tracked_object_reported_after_two_frames():
         ws.send_bytes(frame_bytes(220))
         objs = ws.receive_json()["objects"]
     assert len(objs) == 1 and objs[0]["label"] == "red"
-    assert abs(objs[0]["centroid"][0] - 220) < 3 and abs(objs[0]["centroid"][1] - 200) < 3
+    assert abs(objs[0]["pixel"]["x"] - 220) < 3 and abs(objs[0]["pixel"]["y"] - 200) < 3
 
 
 def test_config_message_changes_colors():
     with TestClient(app).websocket_connect("/ws/frames") as ws:
         ws.send_text(json.dumps({"type": "config", "colors": ["blue"]}))
-        assert ws.receive_json()["config"]["colors"] == ["blue"]
         ws.send_bytes(frame_bytes(200))
         ws.receive_json()
         ws.send_bytes(frame_bytes(220))
@@ -81,7 +80,7 @@ def test_calibrate_message_adds_world_coordinates():
             out = ws.receive_json()
         assert out["calibration"]["status"] == "ok"
         (obj,) = out["objects"]
-        assert abs(obj["world"][0] - 0.2) < 0.006 and abs(obj["world"][1] - 0.1) < 0.006
+        assert abs(obj["position"]["x"] - 0.2) < 0.006 and abs(obj["position"]["y"] - 0.1) < 0.006
         ws.send_text(json.dumps({"type": "calibrate", "method": "aruco"}))
         assert ws.receive_json()["type"] == "error"
 

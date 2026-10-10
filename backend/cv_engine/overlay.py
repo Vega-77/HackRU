@@ -43,7 +43,7 @@ class TrailHistory:
     def update(self, objects: list[dict]) -> dict[int, deque]:
         self._frame += 1
         for o in objects:
-            self._trails.setdefault(o["id"], deque(maxlen=self.length)).append(tuple(o["centroid"]))
+            self._trails.setdefault(o["id"], deque(maxlen=self.length)).append((o["pixel"]["x"], o["pixel"]["y"]))
             self._last_seen[o["id"]] = self._frame
         for i in [i for i, f in self._last_seen.items() if self._frame - f > self.forget_after]:
             del self._trails[i], self._last_seen[i]
@@ -108,13 +108,14 @@ def draw_overlay(img: np.ndarray, result: dict, trail_map: dict[int, deque] | No
             for k in range(1, len(pts)):
                 thickness = 1 + 3 * k // len(pts)  # thicker toward the newest point
                 cv2.line(out, tuple(pts[k - 1]), tuple(pts[k]), color, thickness, cv2.LINE_AA)
-        x, y, w, h = (int(round(v)) for v in o["bbox"])
-        cx, cy = (int(round(v)) for v in o["centroid"])
-        cv2.rectangle(out, (x, y), (x + w, y + h), color, 2, cv2.LINE_AA)
+        b = o["bbox"]
+        x, y, w, h = (int(round(b[k])) for k in "xywh")
+        cx, cy = int(round(o["pixel"]["x"])), int(round(o["pixel"]["y"]))
+        cv2.rectangle(out, (x, y), (x + w, y + h), color, 4 if o.get("target") else 2, cv2.LINE_AA)
         cv2.drawMarker(out, (cx, cy), (255, 255, 255), cv2.MARKER_CROSS, 12, 2, cv2.LINE_AA)
-        label = f"#{o['id']} {o['label']}"
-        if o.get("world"):
-            label += f"  ({o['world'][0]:.3f}, {o['world'][1]:.3f}) m"
+        label = f"#{o['id']} {o['label']}" + (" [target]" if o.get("target") else "")
+        if o.get("position"):
+            label += f"  ({o['position']['x']:.3f}, {o['position']['y']:.3f}) m"
         _text_box(out, label, (x, max(14, y - 6)), color)
 
     _hud(out, result)

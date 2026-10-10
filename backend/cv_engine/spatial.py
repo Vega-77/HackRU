@@ -12,7 +12,7 @@ import numpy as np
 from cv_engine.calibration import ArucoCalibrator, PlaneMapping, rectangle_world_points
 from cv_engine.preprocess import PreprocessedFrame
 
-METHODS = ("none", "aruco", "manual")
+METHODS = ("none", "aruco", "manual")  # requestable; "scale" is set from the app's px_per_m
 
 
 class SpatialMapper:
@@ -52,6 +52,23 @@ class SpatialMapper:
         self.method = method
         self._settings = {k: v for k, v in request.items() if k != "type"}
         return self.status()
+
+    def set_scale(self, px_per_m: float | None, frame_size: dict | None) -> None:
+        """Simple calibration from the app's ruler: a fixed pixels-per-meter scale, with the
+        origin at the bottom-left of the frame and y up. It assumes the camera faces the
+        plane of motion squarely; ArUco or manual calibration, if active, takes priority."""
+        if self.method not in ("none", "scale"):
+            return
+        if px_per_m is None:
+            self.method, self.mapping, self._settings = "none", None, {}
+            return
+        w, h = (float(frame_size["w"]), float(frame_size["h"])) if frame_size else (100.0, 0.0)
+        # The frame's corners (TL, TR, BR, BL) and where they land in meters: (x / s, (h - y) / s).
+        img = np.array([[0, 0], [w, 0], [w, h or 100.0], [0, h or 100.0]], np.float64)
+        world = np.column_stack([img[:, 0] / px_per_m, (h - img[:, 1]) / px_per_m])
+        self.mapping = PlaneMapping.fit(img, world, "scale")
+        self.method, self.space = "scale", "px"
+        self._settings = {"px_per_m": px_per_m, "frame_size": frame_size}
 
     def update(self, frame: PreprocessedFrame) -> None:
         """Re-detect markers on this frame (ArUco mode only)."""

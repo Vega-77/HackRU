@@ -64,15 +64,15 @@ Regenerate them with `python samples/generate_samples.py`.
 
 ## Detection and tracking
 
-Two detectors, picked with `CV_MODE` (or a config message, see below):
+Two detectors, picked with `CV_DETECTOR` (or `"detector"` in a config message, see below):
 
-| mode | what it runs | cost on a laptop CPU |
+| detector | what it runs | cost on a laptop CPU |
 |---|---|---|
 | `color` (default) | HSV thresholding + contours for colored objects (`red`, `orange`, `yellow`, `green`, `blue`, `purple`) | ~2-3 ms/frame |
 | `mediapipe` | MediaPipe EfficientDet-Lite0, 80 COCO classes (`sports ball`, `bottle`, `cup`, ...) | ~25-30 ms/frame |
 | `both` | both of the above | ~30 ms/frame |
 
-Color mode is the reliable choice for lab setups: use a brightly colored ball, or stick
+The color detector is the reliable choice for lab setups: use a brightly colored ball, or stick
 colored tape on carts and pendulum bobs. `CV_COLORS=red,blue` limits which colors are tracked.
 The MediaPipe model (4.6 MB) downloads to `models/` on first use.
 On a headless Linux server MediaPipe also needs `libegl1` and `libgles2` from apt.
@@ -111,6 +111,11 @@ Use `world_points` instead of `width_m`/`height_m` for a non-rectangular layout,
  "width_m": 0.60, "height_m": 0.40}
 ```
 
+**From the app's ruler (`px_per_m`).** If the app's config message has `px_per_m`, the server
+uses a plain scale: `x = px / px_per_m`, `y = (frame_h - py) / px_per_m`, origin at the frame's
+bottom-left. That assumes the phone faces the plane of motion squarely; ArUco or manual
+calibration, when set, takes priority over it.
+
 `{"type": "calibrate", "method": "none"}` turns mapping off. The server answers with
 `{"type": "calibration", "calibration": {...}}`, or an error (the previous calibration stays).
 
@@ -126,26 +131,36 @@ Client to server, per frame:
    Any extra fields (such as AR anchor data) are passed through to later stages.
 2. a binary message with the JPEG bytes.
 
-At any time the client can change tracking settings, effective from the next frame:
+The app sends a `config` message on connect and whenever a setting changes
+(see `docs/protocol.md` on Dev1); it applies from the next frame:
 
 ```json
-{"type": "config", "mode": "both", "colors": ["red", "blue"], "mediapipe_labels": ["sports ball"]}
+{"type": "config", "mode": "ramp", "mass_kg": 0.1, "px_per_m": 812.5,
+ "target_px": {"x": 161.0, "y": 118.5}, "frame_size": {"w": 320, "h": 240}}
 ```
 
-Other keys: `min_area`, `mediapipe_score`, `max_distance`, `max_missed`, `min_hits`.
-The server replies `{"type": "config", "config": {...}}` with the full settings, or an
-error message if a value is invalid (the previous settings stay in place).
+- `px_per_m` turns on scale calibration (see Spatial mapping); `null` turns it off.
+- `target_px` is where the user tapped the object, in frame pixels. The nearest tracked object
+  (within 20% of the frame width) becomes the target and is followed by ID from then on,
+  re-acquired near its last position if lost. `null` means auto: the longest-tracked object.
+- `mode` (`free_fall`, `ramp`, `pendulum`, `collision`) and `mass_kg` are kept for the physics stage.
+- Optional tracking keys can ride along: `detector`, `colors`, `min_area`, `mediapipe_labels`,
+  `mediapipe_score`, `max_distance`, `max_missed`, `min_hits`.
+
+A valid config gets no reply (the app treats unknown message types as errors). An invalid one
+gets an `error` message and changes nothing.
 
 Server to client, per processed frame:
 
 ```json
-{"type": "frame", "frame_id": 12, "timestamp": 1728575000.12,
+{"type": "frame", "frame_id": 12, "timestamp": 41.237,
  "size": [640, 360], "source_size": [960, 540], "scale": 0.66667,
+ "tracked": true, "target_id": 1,
  "objects": [
-   {"id": 1, "label": "red", "source": "color", "score": 0.98,
-    "centroid": [329.6, 292.9], "bbox": [298.5, 262.5, 63.0, 63.0],
-    "centroid_norm": [0.34336, 0.54239], "bbox_norm": [0.31094, 0.48611, 0.06563, 0.11667],
-    "area": 3080.0, "hits": 57, "world": [0.3301, 0.1622], "world_width": 0.0401}
+   {"id": 1, "label": "red", "source": "color", "score": 0.98, "target": true,
+    "pixel": {"x": 329.6, "y": 292.9}, "bbox": {"x": 298.5, "y": 262.5, "w": 63.0, "h": 63.0},
+    "pixel_norm": {"x": 0.34336, "y": 0.54239}, "bbox_norm": {"x": 0.31094, "y": 0.48611, "w": 0.06563, "h": 0.11667},
+    "area": 3080.0, "hits": 57, "position": {"x": 0.3301, "y": 0.1622}, "width_m": 0.0401}
  ],
  "calibration": {"method": "aruco", "status": "ok", "space": "px",
    "image_points": [[...], [...], [...], [...]], "world_points": [[0, 0.4], [0.6, 0.4], [0.6, 0], [0, 0]],
@@ -156,12 +171,13 @@ Server to client, per processed frame:
 ```
 
 If frames arrive faster than the server can process them, only the newest one is
-kept and the rest are counted in `dropped`, so latency never builds up.
+kept and the rest are counted in `dropped`, so latency never builds up. Every processed
+frame gets a reply, with `"tracked": false` and empty `objects` when nothing is found.
 
-`centroid` and `bbox` (`[x, y, w, h]`) are in the pixel space of the image the client sent;
-the `_norm` versions are 0-1 fractions of the frame, which is the easiest form for drawing
-overlays at any resolution. `world` is the centroid in meters on the calibrated plane and
-`world_width` the object's width there; both are `null` while there is no calibration.
+`pixel` (the object's center) and `bbox` are in the pixel space of the image the client sent
+(x right, y down); the `_norm` versions are 0-1 fractions of the frame. `position` is the
+center in meters on the calibrated plane (y up) and `width_m` the object's width there; both
+are `null` while there is no calibration. `target` marks the object the app should follow.
 
 `calibration.world_to_image` is the 3x3 homography from meters to image pixels (the space
 named by `space`: `px` for the image you sent, `norm` for 0-1 fractions). The AR renderer can

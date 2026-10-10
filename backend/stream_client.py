@@ -97,8 +97,11 @@ def _report(sent: int, bytes_sent: int, results: list[dict], elapsed: float) -> 
     if cal.get("method", "none") != "none":
         print(f"    plane: {cal['method']} {cal['status']}")
     for o in last.get("objects", []):
-        world = f"  world {o['world']} m" if o.get("world") else ""
-        print(f"    #{o['id']} {o['label']:<12} centroid {o['centroid']}  bbox {o['bbox']}{world}")
+        pos = o.get("position")
+        world = f"  position ({pos['x']}, {pos['y']}) m" if pos else ""
+        px, b = o["pixel"], o["bbox"]
+        print(f"    #{o['id']} {o['label']:<12} pixel ({px['x']}, {px['y']})  "
+              f"bbox ({b['x']}, {b['y']}, {b['w']}, {b['h']}){world}")
 
 
 def main() -> None:

@@ -31,7 +31,7 @@ def run(args: argparse.Namespace) -> list[dict]:
     if not cap.isOpened():
         raise SystemExit(f"could not open {clip}")
     fps = cap.get(cv2.CAP_PROP_FPS) or 30.0
-    config = PipelineConfig(mode=args.mode)
+    config = PipelineConfig(detector=args.detector)
     if args.colors:
         config.colors = args.colors
     pipe = TrackingPipeline(config)
@@ -76,8 +76,8 @@ def run(args: argparse.Namespace) -> list[dict]:
         w = csv.writer(f)
         w.writerow(["frame", "t", "id", "label", "cx_px", "cy_px", "x_m", "y_m"])
         for r in rows:
-            world = r["world"] or ["", ""]
-            w.writerow([r["frame"], f"{r['t']:.4f}", r["id"], r["label"], *r["centroid"], *world])
+            pos = r["position"] or {"x": "", "y": ""}
+            w.writerow([r["frame"], f"{r['t']:.4f}", r["id"], r["label"], r["pixel"]["x"], r["pixel"]["y"], pos["x"], pos["y"]])
     ms = sorted(times)
     print(f"{k} frames, processing median {ms[len(ms) // 2]:.1f} ms, p95 {ms[int(len(ms) * 0.95)]:.1f} ms")
     print(f"wrote {out_path} and {tracks_path}")
@@ -92,7 +92,7 @@ def score(rows: list[dict], truth_path: Path) -> None:
     """Match each true object to the tracked object of the same color nearest to it."""
     tracked = defaultdict(list)
     for r in rows:
-        if r["world"]:
+        if r["position"]:
             tracked[r["frame"]].append(r)
     by_object = defaultdict(lambda: {"frames": 0, "found": 0, "errors": [], "ids": []})
     with open(truth_path) as f:
@@ -103,8 +103,8 @@ def score(rows: list[dict], truth_path: Path) -> None:
             same = [r for r in tracked[int(t["frame"])] if r["label"] == t["color"]]
             if not same:
                 continue
-            best = min(same, key=lambda r: math.hypot(r["world"][0] - tx, r["world"][1] - ty))
-            err = math.hypot(best["world"][0] - tx, best["world"][1] - ty)
+            best = min(same, key=lambda r: math.hypot(r["position"]["x"] - tx, r["position"]["y"] - ty))
+            err = math.hypot(best["position"]["x"] - tx, best["position"]["y"] - ty)
             if err < 0.05:
                 s["found"] += 1
                 s["errors"].append(err * 1000)
@@ -129,7 +129,7 @@ def main() -> None:
     p.add_argument("clip")
     p.add_argument("--aruco", type=float, nargs=2, metavar=("WIDTH_M", "HEIGHT_M"),
                    help="calibrate with ArUco markers 0-3 on a rectangle of this size (center to center)")
-    p.add_argument("--mode", default="color", choices=["color", "mediapipe", "both"])
+    p.add_argument("--detector", default="color", choices=["color", "mediapipe", "both"])
     p.add_argument("--colors", nargs="+", help="colors to track (default: red green blue yellow)")
     p.add_argument("--out", help="annotated video path")
     p.add_argument("--show", action="store_true", help="also show a live window")

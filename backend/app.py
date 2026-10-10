@@ -5,9 +5,13 @@ Protocol on ws://<host>:8000/ws/frames
     text   (optional) JSON metadata for the next image, e.g.
            {"frame_id": 12, "timestamp": 1728575000.123, "anchor": {...}}
     binary JPEG (or PNG) bytes of one downsampled camera frame
-    text   (any time) tracking settings, applied from the next frame:
-           {"type": "config", "mode": "color", "colors": ["red", "blue"], ...}
-           answered with {"type": "config", "config": {...}}
+    text   (on connect, and whenever settings change) the app's session settings,
+           plus optional tracking settings, applied from the next frame:
+           {"type": "config", "mode": "ramp", "mass_kg": 0.1, "px_per_m": 812.5,
+            "target_px": {"x": 161, "y": 118}, "frame_size": {"w": 320, "h": 240},
+            "detector": "color", "colors": ["red", "blue"], ...}
+           No reply on success (the app treats unknown message types as errors);
+           an invalid config gets {"type": "error"} and changes nothing.
     text   (any time) plane calibration for metric coordinates:
            {"type": "calibrate", "method": "aruco", "width_m": 0.6, "height_m": 0.4}
            {"type": "calibrate", "method": "manual", "image_points": [[x, y] x4],
@@ -18,9 +22,11 @@ Protocol on ws://<host>:8000/ws/frames
            {"type": "frame", "frame_id", "timestamp", "size": [w, h],
             "source_size": [w, h], "scale", "latency_ms", "process_ms",
             "stats": {"received", "processed", "dropped", "decode_errors"},
-            "objects": [{"id", "label", "source", "score", "centroid", "bbox",
-                         "centroid_norm", "bbox_norm", "area", "hits",
-                         "world", "world_width"}],
+            "tracked", "target_id",
+            "objects": [{"id", "label", "source", "score", "target",
+                         "pixel": {x, y}, "bbox": {x, y, w, h},  (client frame pixels)
+                         "pixel_norm", "bbox_norm", "area", "hits",
+                         "position": {x, y} | null, "width_m"}],  (meters, y up)
             "calibration": {"method", "status", "world_to_image", ...}}
            or {"type": "error", "message": ...} for a bad message.
 
@@ -60,7 +66,7 @@ FrameAnalyzer = Callable[[PreprocessedFrame], dict]
 
 
 def default_config() -> PipelineConfig:
-    config = PipelineConfig(mode=os.environ.get("CV_MODE", "color"))
+    config = PipelineConfig(detector=os.environ.get("CV_DETECTOR", "color"))
     if colors := os.environ.get("CV_COLORS"):
         config.colors = [c.strip() for c in colors.split(",") if c.strip()]
     return config
@@ -122,7 +128,7 @@ async def frames_ws(ws: WebSocket) -> None:
                         await ws.send_json({"type": "error", "message": f"bad metadata: {e}"})
                         continue
                     if data.get("type") == "config":
-                        await apply_config({k: v for k, v in data.items() if k != "type"})
+                        await apply_config(data)
                     elif data.get("type") == "calibrate":
                         await apply_calibration(data)
                     else:
@@ -139,15 +145,12 @@ async def frames_ws(ws: WebSocket) -> None:
     # Serializes reconfiguration with frame processing, which runs in a worker thread.
     pipeline_lock = asyncio.Lock()
 
-    async def apply_config(changes: dict) -> None:
+    async def apply_config(message: dict) -> None:
         try:
             async with pipeline_lock:
-                new = pipeline.config.updated(changes)
-                await asyncio.to_thread(pipeline.configure, new)
+                await asyncio.to_thread(pipeline.apply_config, message)
         except (TypeError, ValueError, OSError, RuntimeError) as e:
             await ws.send_json({"type": "error", "message": f"bad config: {e}"})
-            return
-        await ws.send_json({"type": "config", "config": pipeline.config.__dict__})
 
     async def apply_calibration(request: dict) -> None:
         try:
