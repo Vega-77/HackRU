@@ -151,8 +151,12 @@ async def frames_ws(ws: WebSocket) -> None:
                         pending_meta = data
                 elif msg.get("bytes") is not None:
                     if len(msg["bytes"]) > MAX_FRAME_BYTES:
+                        rejected_id = pending_meta.get("frame_id")
                         pending_meta = {}
-                        await send({"type": "error", "message": "frame exceeds 512 KiB"})
+                        error = {"type": "error", "message": "frame exceeds 512 KiB"}
+                        if rejected_id is not None:
+                            error["frame_id"] = rejected_id
+                        await send(error)
                         continue
                     if "frame_id" not in pending_meta:
                         pending_meta["frame_id"] = next_id

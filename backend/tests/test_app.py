@@ -23,8 +23,10 @@ def test_session_count_and_frame_size_limit():
     with TestClient(app) as client:
         with client.websocket_connect("/ws/frames") as ws:
             assert client.get("/health").json()["active_sessions"] == 1
+            ws.send_text(json.dumps({"frame_id": 7, "timestamp": 123.5}))
             ws.send_bytes(b"x" * (512 * 1024 + 1))
-            assert ws.receive_json()["type"] == "error"
+            error = ws.receive_json()
+            assert error["type"] == "error" and error["frame_id"] == 7
             ws.send_bytes(frame_bytes())
             assert ws.receive_json()["type"] == "frame"
         assert client.get("/health").json()["active_sessions"] == 0
