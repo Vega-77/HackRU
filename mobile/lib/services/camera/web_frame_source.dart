@@ -70,9 +70,10 @@ class WebFrameSource implements FrameSource {
 
     try {
       _stream = await devices.getUserMedia(constraints).toDart;
-    } catch (e) {
-      throw CameraUnavailableException(
-        'Camera access was blocked or no camera was found. '
+    } catch (_) {
+      if (!await _hasCamera()) throw const NoCameraException();
+      throw const CameraUnavailableException(
+        'Camera access was blocked. '
         'Allow camera access in the browser and try again.',
       );
     }
@@ -135,6 +136,20 @@ class WebFrameSource implements FrameSource {
     if (stream == null) return;
     video.srcObject = stream;
     _play(video);
+  }
+
+  /// Whether the browser knows of any camera. Only asked after getUserMedia
+  /// fails: before permission some browsers list devices sparsely, but a
+  /// list with no camera at all is reliable.
+  static Future<bool> _hasCamera() async {
+    try {
+      final devices = await web.window.navigator.mediaDevices
+          .enumerateDevices()
+          .toDart;
+      return devices.toDart.any((device) => device.kind == 'videoinput');
+    } catch (_) {
+      return true; // Can't tell, so don't hide a real problem.
+    }
   }
 
   FrameSize _sizeForWidth(int width) {

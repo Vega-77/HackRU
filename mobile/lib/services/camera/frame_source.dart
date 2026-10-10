@@ -11,9 +11,10 @@ import '../../models/session_config.dart';
 /// Implementations:
 /// * `WebFrameSource`: browser getUserMedia, used for development in Chrome.
 /// * `NativeFrameSource`: the `camera` plugin on iOS.
+/// * `TestVideoFrameSource`: a drawn ball, for devices with no camera.
 abstract class FrameSource {
-  /// Opens the camera. Throws [CameraUnavailableException] if there is no
-  /// camera or the user denied permission.
+  /// Opens the camera. Throws [NoCameraException] if the device has no
+  /// camera, or [CameraUnavailableException] if it could not be opened.
   Future<void> start();
 
   /// Releases the camera. Safe to call more than once.
@@ -40,4 +41,9 @@ class CameraUnavailableException implements Exception {
 
   @override
   String toString() => message;
+}
+
+/// The device has no camera at all, as in the iOS Simulator.
+class NoCameraException extends CameraUnavailableException {
+  const NoCameraException() : super('No camera found on this device.');
 }
