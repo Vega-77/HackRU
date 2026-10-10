@@ -22,6 +22,7 @@ class SessionState {
     this.frameSize,
     this.cameraError,
     this.serverError,
+    this.serverErrorCount = 0,
     this.latencyMs,
     this.sendFps = 0,
     this.telemetryVersion = 0,
@@ -40,7 +41,11 @@ class SessionState {
   final String? cameraError;
 
   /// The last `error` message from the backend.
-  final String? serverError;
+  final ErrorMessage? serverError;
+
+  /// How many times in a row the backend sent [serverError]'s message, so a
+  /// one-off glitch reads differently from a crash on every frame.
+  final int serverErrorCount;
 
   final double? latencyMs;
   final double sendFps;
@@ -57,7 +62,8 @@ class SessionState {
     PhysicsState? latest,
     FrameSize? frameSize,
     String? cameraError,
-    String? serverError,
+    ErrorMessage? serverError,
+    int? serverErrorCount,
     double? latencyMs,
     double? sendFps,
     int? telemetryVersion,
@@ -69,6 +75,9 @@ class SessionState {
     frameSize: frameSize ?? this.frameSize,
     cameraError: clearErrors ? null : (cameraError ?? this.cameraError),
     serverError: clearErrors ? null : (serverError ?? this.serverError),
+    serverErrorCount: clearErrors
+        ? 0
+        : (serverErrorCount ?? this.serverErrorCount),
     latencyMs: latencyMs ?? this.latencyMs,
     sendFps: sendFps ?? this.sendFps,
     telemetryVersion: telemetryVersion ?? this.telemetryVersion,
@@ -240,8 +249,12 @@ class SessionController extends Notifier<SessionState> {
             // where the object is, so the marker and x(t) chart work.
             case FrameAckMessage(:final target?) when !_hasPhysics:
               _onState(target);
-            case ErrorMessage(:final message):
-              state = state.copyWith(serverError: message);
+            case final ErrorMessage error:
+              final repeat = error.message == state.serverError?.message;
+              state = state.copyWith(
+                serverError: error,
+                serverErrorCount: repeat ? state.serverErrorCount + 1 : 1,
+              );
             case FrameAckMessage() || UnknownMessage():
               break;
           }

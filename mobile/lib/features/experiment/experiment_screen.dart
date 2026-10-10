@@ -11,6 +11,7 @@ import '../../services/network/physics_socket.dart';
 import '../../state/experiment_settings.dart';
 import '../../state/session_controller.dart';
 import '../settings/backend_url.dart';
+import 'server_error_text.dart';
 import 'widgets/experiment_stage.dart';
 import 'widgets/telemetry_panel.dart';
 
@@ -364,6 +365,9 @@ class _Banners extends ConsumerWidget {
     );
     final connection = ref.watch(sessionProvider.select((s) => s.connection));
     final serverError = ref.watch(sessionProvider.select((s) => s.serverError));
+    final errorCount = ref.watch(
+      sessionProvider.select((s) => s.serverErrorCount),
+    );
 
     final banners = <Widget>[
       if (connection == ConnectionStatus.offline)
@@ -379,7 +383,7 @@ class _Banners extends ConsumerWidget {
       if (serverError != null)
         _Banner(
           icon: AppIcons.warning,
-          message: 'The backend reported: $serverError',
+          message: describeServerError(serverError, count: errorCount),
           action: 'Dismiss',
           onAction: ref.read(sessionProvider.notifier).dismissServerError,
         ),

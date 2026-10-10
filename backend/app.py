@@ -33,7 +33,8 @@ Protocol on ws://<host>:8000/ws/frames
                          "screen_axes": {"x": {x, y}, "y": {x, y}} | null,
                          "position_3d": {x, y, z} | null}],  (ARKit world, meters)
             "calibration": {"method", "status", "world_to_image", ...}}
-           or {"type": "error", "message": ...} for a bad message.
+           or {"type": "error", "message": ...} for a bad message. A frame that crashes
+           the engine adds "error": {"kind", "detail", "where", "server"} (see describe_failure).
 
 Frames that arrive while the engine is busy are dropped in favour of the newest
 one, so the client never builds up lag. Dropped frames are never decoded.
@@ -53,6 +54,7 @@ import logging
 import math
 import os
 import time
+import traceback
 from uuid import uuid4
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -73,9 +75,27 @@ MAX_FRAME_BYTES = 512 * 1024
 MAX_CONTROL_CHARS = 4096
 logger = logging.getLogger(__name__)
 
+# Render sets RENDER_GIT_COMMIT to the deployed commit, so /health and error
+# reports show whether a fix is live yet.
+SERVER_VERSION = os.environ.get("RENDER_GIT_COMMIT", "")[:7] or "local"
+_REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+_OWN_CODE = tuple(os.path.join(_REPO_ROOT, d) + os.sep for d in ("backend", "physics_engine"))
+
 
 class FrameDecodeError(ValueError):
     """The incoming image bytes could not be decoded."""
+
+
+def describe_failure(exc: BaseException) -> dict:
+    """What a crash was and where, for the client: the exception and the innermost
+    line of our own code it went through (numpy, OpenCV and stdlib frames skipped)."""
+    where = None
+    for entry in reversed(traceback.extract_tb(exc.__traceback__)):
+        path = os.path.abspath(entry.filename)
+        if path.startswith(_OWN_CODE):
+            where = f"{os.path.relpath(path, _REPO_ROOT).replace(os.sep, '/')}:{entry.lineno} in {entry.name}"
+            break
+    return {"kind": type(exc).__name__, "detail": str(exc)[:300], "where": where, "server": SERVER_VERSION}
 
 # Takes a preprocessed frame and returns result fields ("objects", "calibration").
 FrameAnalyzer = Callable[[PreprocessedFrame], dict]
@@ -115,7 +135,7 @@ _connection_ids = itertools.count(1)
 @app.get("/health")
 def health() -> dict:
     return {"status": "ok", "working_width": WORKING_WIDTH,
-            "active_sessions": len(app.state.active_sessions)}
+            "active_sessions": len(app.state.active_sessions), "commit": SERVER_VERSION}
 
 
 @app.websocket("/ws/frames")
@@ -223,10 +243,13 @@ async def frames_ws(ws: WebSocket) -> None:
                 stats["decode_errors"] += 1
                 await send({"type": "error", "message": str(e), "frame_id": frame.meta["frame_id"]})
                 continue
-            except Exception:
+            except Exception as exc:
                 stats["processing_errors"] += 1
                 logger.exception("Frame processing failed in session %s", session_id)
-                await send({"type": "error", "message": "could not process frame", "frame_id": frame.meta["frame_id"]})
+                failure = describe_failure(exc)
+                summary = f"{failure['kind']}: {failure['detail']}" if failure["detail"] else failure["kind"]
+                await send({"type": "error", "message": f"could not process frame: {summary}",
+                            "frame_id": frame.meta["frame_id"], "error": failure})
                 continue
             stats["processed"] += 1
             result["process_ms"] = round((time.perf_counter() - t0) * 1000, 2)
