@@ -1,0 +1,41 @@
+name: hands_on_physics
+description: "HandsOn Physics: live AR motion vectors for tabletop physics experiments."
+publish_to: 'none'
+version: 0.1.0+1
+
+environment:
+  sdk: ^3.13.5
+
+dependencies:
+  camera: ^0.12.1
+  fl_chart: ^1.2.0
+  flutter:
+    sdk: flutter
+  flutter_riverpod: ^3.4.3
+  go_router: ^18.0.2
+  image: ^4.10.2
+  web: ^1.1.1
+  web_socket_channel: ^3.0.3
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true
+
+  fonts:
+    # Archivo variable font (OFL, see assets/fonts/OFL.txt). Width and weight
+    # are set per style with FontVariation in lib/core/theme/tokens.dart.
+    - family: Archivo
+      fonts:
+        - asset: assets/fonts/Archivo-Variable.ttf
+        - asset: assets/fonts/Archivo-Italic-Variable.ttf
+          style: italic
+
+    # Phosphor icons, Regular weight (MIT, see assets/fonts/Phosphor-LICENSE.txt).
+    # Code points live in lib/core/theme/app_icons.dart.
+    - family: PhosphorRegular
+      fonts:
+        - asset: assets/fonts/Phosphor-Regular.ttf

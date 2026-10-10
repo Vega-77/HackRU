@@ -1,0 +1,35 @@
+{
+    "name": "HandsOn Physics",
+    "short_name": "HandsOn",
+    "start_url": ".",
+    "display": "standalone",
+    "background_color": "#15191D",
+    "theme_color": "#15191D",
+    "description": "Live motion vectors and kinematics for tabletop physics experiments.",
+    "orientation": "any",
+    "prefer_related_applications": false,
+    "icons": [
+        {
+            "src": "icons/Icon-192.png",
+            "sizes": "192x192",
+            "type": "image/png"
+        },
+        {
+            "src": "icons/Icon-512.png",
+            "sizes": "512x512",
+            "type": "image/png"
+        },
+        {
+            "src": "icons/Icon-maskable-192.png",
+            "sizes": "192x192",
+            "type": "image/png",
+            "purpose": "maskable"
+        },
+        {
+            "src": "icons/Icon-maskable-512.png",
+            "sizes": "512x512",
+            "type": "image/png",
+            "purpose": "maskable"
+        }
+    ]
+}
