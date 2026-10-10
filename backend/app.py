@@ -46,6 +46,7 @@ import itertools
 import json
 import os
 import time
+from uuid import uuid4
 from collections.abc import Callable
 from dataclasses import dataclass
 
@@ -60,6 +61,8 @@ from cv_engine.pipeline import PipelineConfig, TrackingPipeline
 from cv_engine.preprocess import PreprocessedFrame, decode_jpeg, preprocess_frame
 
 WORKING_WIDTH = int(os.environ.get("CV_WORKING_WIDTH", "640"))
+MAX_FRAME_BYTES = 512 * 1024
+MAX_CONTROL_CHARS = 4096
 
 # Takes a preprocessed frame and returns result fields ("objects", "calibration").
 FrameAnalyzer = Callable[[PreprocessedFrame], dict]
@@ -81,6 +84,7 @@ class IncomingFrame:
 
 app = FastAPI(title="HandsOn Physics CV engine")
 app.state.pipeline_factory = lambda: TrackingPipeline(default_config())
+app.state.active_sessions = set()
 
 
 @dataclass
@@ -97,7 +101,8 @@ _connection_ids = itertools.count(1)
 
 @app.get("/health")
 def health() -> dict:
-    return {"status": "ok", "working_width": WORKING_WIDTH}
+    return {"status": "ok", "working_width": WORKING_WIDTH,
+            "active_sessions": len(app.state.active_sessions)}
 
 
 @app.websocket("/ws/frames")
@@ -106,9 +111,16 @@ async def frames_ws(ws: WebSocket) -> None:
     slot: LatestFrameSlot[IncomingFrame] = LatestFrameSlot()
     stats = {"processed": 0, "decode_errors": 0}
     pipeline = ws.app.state.pipeline_factory()
+    session_id = str(uuid4())
+    ws.app.state.active_sessions.add(session_id)
     next_id = 0
     conn_id = next(_connection_ids)
     trails = TrailHistory()
+    send_lock = asyncio.Lock()
+
+    async def send(payload: dict) -> None:
+        async with send_lock:
+            await ws.send_json(payload)
 
     async def receive_loop() -> None:
         nonlocal next_id
@@ -119,13 +131,17 @@ async def frames_ws(ws: WebSocket) -> None:
                 if msg["type"] == "websocket.disconnect":
                     return
                 if msg.get("text") is not None:
+                    if len(msg["text"]) > MAX_CONTROL_CHARS:
+                        pending_meta = {}
+                        await send({"type": "error", "message": "control message too large"})
+                        continue
                     try:
                         data = json.loads(msg["text"])
                         if not isinstance(data, dict):
                             raise ValueError("metadata must be a JSON object")
                     except ValueError as e:
                         pending_meta = {}
-                        await ws.send_json({"type": "error", "message": f"bad metadata: {e}"})
+                        await send({"type": "error", "message": f"bad metadata: {e}"})
                         continue
                     if data.get("type") == "config":
                         await apply_config(data)
@@ -134,6 +150,14 @@ async def frames_ws(ws: WebSocket) -> None:
                     else:
                         pending_meta = data
                 elif msg.get("bytes") is not None:
+                    if len(msg["bytes"]) > MAX_FRAME_BYTES:
+                        rejected_id = pending_meta.get("frame_id")
+                        pending_meta = {}
+                        error = {"type": "error", "message": "frame exceeds 512 KiB"}
+                        if rejected_id is not None:
+                            error["frame_id"] = rejected_id
+                        await send(error)
+                        continue
                     if "frame_id" not in pending_meta:
                         pending_meta["frame_id"] = next_id
                     next_id = int(pending_meta["frame_id"]) + 1
@@ -150,16 +174,16 @@ async def frames_ws(ws: WebSocket) -> None:
             async with pipeline_lock:
                 await asyncio.to_thread(pipeline.apply_config, message)
         except (TypeError, ValueError, OSError, RuntimeError) as e:
-            await ws.send_json({"type": "error", "message": f"bad config: {e}"})
+            await send({"type": "error", "message": f"bad config: {e}"})
 
     async def apply_calibration(request: dict) -> None:
         try:
             async with pipeline_lock:
                 status = pipeline.calibrate(request)
         except (TypeError, ValueError) as e:
-            await ws.send_json({"type": "error", "message": f"bad calibration: {e}"})
+            await send({"type": "error", "message": f"bad calibration: {e}"})
             return
-        await ws.send_json({"type": "calibration", "calibration": status})
+        await send({"type": "calibration", "calibration": status})
 
     async def process_loop() -> None:
         while (frame := await slot.get()) is not None:
@@ -169,14 +193,14 @@ async def frames_ws(ws: WebSocket) -> None:
                     result, image = await asyncio.to_thread(_process, frame, pipeline)
             except ValueError as e:
                 stats["decode_errors"] += 1
-                await ws.send_json({"type": "error", "message": str(e), "frame_id": frame.meta["frame_id"]})
+                await send({"type": "error", "message": str(e), "frame_id": frame.meta["frame_id"]})
                 continue
             stats["processed"] += 1
             result["process_ms"] = round((time.perf_counter() - t0) * 1000, 2)
             result["latency_ms"] = round((time.time() - frame.received_at) * 1000, 2)
             result["stats"] = {"received": slot.received, "dropped": slot.dropped, **stats}
             ws.app.state.debug[conn_id] = DebugSnapshot(image, result, dict(trails.update(result["objects"])))
-            await ws.send_json(result)
+            await send(result)
 
     receiver = asyncio.create_task(receive_loop())
     processor = asyncio.create_task(process_loop())
@@ -190,6 +214,7 @@ async def frames_ws(ws: WebSocket) -> None:
         processor.cancel()
         pipeline.close()
         ws.app.state.debug.pop(conn_id, None)
+        ws.app.state.active_sessions.discard(session_id)
 
 
 def _process(frame: IncomingFrame, analyzer: FrameAnalyzer) -> tuple[dict, np.ndarray]:

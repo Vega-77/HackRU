@@ -56,10 +56,9 @@ changes a setting.
 | `target_px` | `{x,y}` or null | where the user tapped the object, frame pixels; null means "auto-detect" |
 | `frame_size` | `{w,h}` | size of the JPEGs that follow |
 
-> Backend today: `app.py` treats every text message as metadata for the next
-> image, so a `config` is currently overwritten by the next frame's metadata
-> and ignored (harmless). It should be handled separately when the physics
-> stage needs it: `if meta.get("type") == "config": ...`.
+The backend applies `config` separately from frame metadata. Valid settings
+apply from the next frame without an acknowledgement; invalid settings get an
+`error` message and leave the previous configuration unchanged.
 
 ### Video frame (two messages)
 
@@ -75,6 +74,9 @@ changes a setting.
    | `timestamp` | capture time in seconds on the phone's **monotonic** clock. Only differences are meaningful (use it for dt); it is not Unix time |
 
 2. Binary: the JPEG bytes, `frame_size.w` x `frame_size.h`, quality 0.7.
+
+The backend accepts binary frames up to 512 KiB. An oversized frame receives
+an `error` response, including its `frame_id` when metadata supplied one.
 
 ### Flow control
 
