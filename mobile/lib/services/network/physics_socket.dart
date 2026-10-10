@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:web_socket_channel/web_socket_channel.dart';
 
@@ -47,6 +48,8 @@ class PhysicsSocket {
   Timer? _reconnectTimer;
   SessionConfig? _lastConfig;
   bool _wanted = false;
+  Completer<InitializationMessage>? _initialization;
+  int? _initializationFrameId;
   int _nextFrameId = 0;
 
   /// frame_id → time it was sent, for frames still awaiting a reply.
@@ -82,6 +85,7 @@ class PhysicsSocket {
   /// True when a frame may be sent right now.
   bool get canSendFrame =>
       _currentStatus == ConnectionStatus.live &&
+      _initialization == null &&
       framesInFlight < AppConfig.maxFramesInFlight;
 
   /// Opens the connection and keeps it open until [disconnect].
@@ -122,6 +126,36 @@ class PhysicsSocket {
     );
     sink.add(frame.jpeg);
     return true;
+  }
+
+  Future<InitializationMessage> initialize(EncodedFrame frame) async {
+    if (!canSendFrame) {
+      throw StateError('The connection is not ready for initialization');
+    }
+    final completer = Completer<InitializationMessage>();
+    _initialization = completer;
+    final id = _nextFrameId++;
+    _initializationFrameId = id;
+    _inFlight[id] = _clock();
+    _channel!.sink.add(
+      jsonEncode({
+        ...FrameMetadata(
+          frameId: id,
+          timestamp: frame.captureTime,
+          pose: frame.pose,
+        ).toJson(),
+        'type': 'initialize',
+        'selection_id': '$id',
+      }),
+    );
+    _channel!.sink.add(frame.jpeg);
+    try {
+      return await completer.future.timeout(const Duration(seconds: 15));
+    } finally {
+      _initialization = null;
+      _initializationFrameId = null;
+      _inFlight.remove(id);
+    }
   }
 
   /// Opens and closes one connection to [url], for "Test connection" in
@@ -197,6 +231,20 @@ class PhysicsSocket {
       return;
     }
     final message = ServerMessage.parse(data);
+    if (message is InitializationMessage) {
+      if (message.frameId == _initializationFrameId &&
+          _initialization?.isCompleted == false) {
+        _recordReply(message.frameId);
+        _initialization?.complete(message);
+      }
+      return;
+    }
+    if (message is ErrorMessage &&
+        message.frameId == _initializationFrameId &&
+        _initialization?.isCompleted == false) {
+      _initialization!.completeError(StateError(message.message));
+      return;
+    }
     final frameId = message.frameId;
     if (frameId != null) _recordReply(frameId);
     _messages.add(message);
@@ -262,6 +310,11 @@ class PhysicsSocket {
   }
 
   void _closeChannel() {
+    if (_initialization case final pending? when !pending.isCompleted) {
+      pending.completeError(
+        StateError('The connection closed during initialization'),
+      );
+    }
     _subscription?.cancel();
     _subscription = null;
     _channel?.sink.close();

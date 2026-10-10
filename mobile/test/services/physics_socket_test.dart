@@ -85,6 +85,62 @@ void main() {
 
   tearDown(() => socket.dispose());
 
+  test(
+    'initialization blocks live frames until matching acknowledgement',
+    () async {
+      final pending = socket.initialize(frame);
+      expect(socket.sendFrame(frame), isFalse);
+      expect(
+        jsonDecode(
+          channel.sink.sent[channel.sink.sent.length - 2] as String,
+        )['type'],
+        'initialize',
+      );
+      channel.server.add(
+        jsonEncode({
+          'type': 'initialization',
+          'frame_id': 99,
+          'status': 'initialized',
+        }),
+      );
+      await pumpEventQueue();
+      expect(socket.canSendFrame, isFalse);
+      channel.server.add(
+        jsonEncode({
+          'type': 'initialization',
+          'frame_id': 0,
+          'status': 'initialized',
+          'reason': 'initialized',
+        }),
+      );
+      expect((await pending).status, 'initialized');
+      expect(socket.sendFrame(frame), isTrue);
+    },
+  );
+
+  test('failed initialization can retry on the same connection', () async {
+    final pending = socket.initialize(frame);
+    channel.server.add(
+      jsonEncode({
+        'type': 'initialization',
+        'frame_id': 0,
+        'status': 'failed',
+        'reason': 'insufficient_contrast',
+      }),
+    );
+    expect((await pending).status, 'failed');
+    final retry = socket.initialize(frame);
+    channel.server.add(
+      jsonEncode({
+        'type': 'initialization',
+        'frame_id': 1,
+        'status': 'initialized',
+        'reason': 'initialized',
+      }),
+    );
+    expect((await retry).status, 'initialized');
+  });
+
   test('goes live and sends the config first', () {
     expect(socket.status, ConnectionStatus.live);
     expect(channel.sink.sent, hasLength(1));

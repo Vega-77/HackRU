@@ -1,8 +1,10 @@
 # HandsOn Physics CV and physics backend
 
-For gray balls, draw a tight box in calibration. The app holds that image and
-sends it first, followed by live frames. A tap can initialize from one colored
-contour containing the point; a background/ambiguous tap requests a box.
+Tap an object in calibration to propose its region on the captured image.
+Stable seed-based Lab region growing supports neutral colors; enclosing contours
+provide a fallback. Border leaks and ambiguous boundaries request a manual box.
+Confirm the proposed box, or draw a replacement on the held image. The app sends
+that exact image through an acknowledged initialization request before live frames.
 Selection reports `initialized` without claiming tracking. A subsequent image
 must verify the appearance. Loss triggers a full-frame search against the
 original patch; duplicate matches stay lost instead of switching objects.
@@ -145,16 +147,19 @@ too far to align, or most of it changes at once, the background is relearned. Th
 
 The color detector remains available for existing clients and controlled lab setups.
 `CV_COLORS=red,blue` limits only that mode. The default requires no named colors.
-For an arbitrary object, send `target_px` to start grayscale template tracking. For
-precise bounds, also send `target_bbox` (`x`, `y`, `w`, `h`) in the sent image's pixels.
-The box must include the tap and be at least 8 pixels wide and tall. A tap without a
-box uses a 48 pixel square at working resolution. Selection also works for stationary
-objects with enough texture or contrast. A selected object is reported immediately;
-automatic proposals still need two matches. Matching loss reports `tracking_status: lost`
+For an arbitrary object, send `target_px` and optionally `target_bbox` (`x`, `y`,
+`w`, `h`) in the sent image's pixels. The box must include the tap and be at least
+8 pixels wide and tall. A tap without a box attempts image segmentation; it does
+not create a fixed square template. Initialization returns `tracked: false`;
+the selected appearance must be verified in a later image. Matching loss reports `tracking_status: lost`
 without claiming a predicted position is an observation. A reacquired object keeps its
 ID for up to `max_missed` processed frames.
 The MediaPipe model (4.6 MB) downloads to `models/` on first use.
 On a headless Linux server MediaPipe also needs `libegl1` and `libgles2` from apt.
+
+Run `python benchmark_acquisition.py` for a reproducible comparison of region
+growing, contours and tap-seeded GrabCut on labeled synthetic JPEGs. These fixtures
+do not establish real-camera reliability. See `../docs/tap-acquisition-verification.md`.
 
 A centroid tracker then assigns each object an ID that stays the same across frames. It
 matches against each track's predicted position, so fast-moving objects keep their ID, and it

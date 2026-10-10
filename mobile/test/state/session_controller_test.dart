@@ -15,6 +15,8 @@ import 'package:hands_on_physics/state/session_controller.dart';
 import 'package:hands_on_physics/state/calibration_controller.dart';
 
 class _FakeCamera implements FrameSource {
+  EncodedFrame? liveFrame;
+  int captures = 0;
   @override
   String get name => 'fake camera';
 
@@ -31,7 +33,10 @@ class _FakeCamera implements FrameSource {
   FrameSize? get frameSize => isRunning ? const FrameSize(320, 240) : null;
 
   @override
-  Future<EncodedFrame?> capture({int width = 320}) async => null;
+  Future<EncodedFrame?> capture({int width = 320}) async {
+    captures++;
+    return liveFrame;
+  }
 
   @override
   Widget buildPreview(BuildContext context) => const SizedBox.expand();
@@ -61,9 +66,11 @@ void main() {
       final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
       addTearDown(() => server.close(force: true));
       final received = <dynamic>[];
-      server
-          .transform(WebSocketTransformer())
-          .listen((ws) => ws.listen(received.add));
+      WebSocket? peer;
+      server.transform(WebSocketTransformer()).listen((ws) {
+        peer = ws;
+        ws.listen(received.add);
+      });
       final frame = EncodedFrame(
         jpeg: Uint8List.fromList([1, 2, 3]),
         size: const FrameSize(320, 240),
@@ -91,7 +98,33 @@ void main() {
         'h': 32.0,
       });
       expect(jsonDecode(received[1] as String)['timestamp'], .25);
+      expect(jsonDecode(received[1] as String)['type'], 'initialize');
       expect(received[2], [1, 2, 3]);
+      await Future<void>.delayed(const Duration(milliseconds: 150));
+      expect(
+        received,
+        hasLength(3),
+        reason: 'no live frames before the acknowledgement',
+      );
+      expect(camera.captures, 0);
+      camera.liveFrame = EncodedFrame(
+        jpeg: Uint8List.fromList([4, 5, 6]),
+        size: frame.size,
+        captureTime: .5,
+      );
+      peer!.add(
+        jsonEncode({
+          'type': 'initialization',
+          'frame_id': 0,
+          'status': 'initialized',
+          'reason': 'initialized',
+        }),
+      );
+      for (var i = 0; i < 50 && received.length < 6; i++) {
+        await Future<void>.delayed(const Duration(milliseconds: 20));
+      }
+      expect(received.length, greaterThanOrEqualTo(6));
+      expect(received[4], [4, 5, 6]);
       await session().stop();
     },
   );
@@ -106,6 +139,72 @@ void main() {
       await session().stop();
 
       expect(camera.isRunning, isTrue);
+    },
+  );
+
+  test(
+    'failed initialization stops capture and a new attempt can initialize',
+    () async {
+      final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+      addTearDown(() => server.close(force: true));
+      var connections = 0;
+      server.transform(WebSocketTransformer()).listen((ws) {
+        final fails = ++connections == 1;
+        Map<String, dynamic>? meta;
+        ws.listen((message) {
+          if (message is String) {
+            final data = jsonDecode(message) as Map<String, dynamic>;
+            if (data['type'] == 'initialize') meta = data;
+          } else if (meta != null) {
+            ws.add(
+              jsonEncode({
+                'type': 'initialization',
+                'frame_id': meta!['frame_id'],
+                'status': fails ? 'failed' : 'initialized',
+                'reason': fails ? 'insufficient_contrast' : 'initialized',
+              }),
+            );
+            meta = null;
+          }
+        });
+      });
+      container
+          .read(calibrationProvider.notifier)
+          .selectObject(
+            const Vec2(80, 90),
+            const PixelRect(64, 74, 32, 32),
+            EncodedFrame(
+              jpeg: Uint8List.fromList([1, 2, 3]),
+              size: const FrameSize(320, 240),
+              captureTime: 1,
+            ),
+          );
+      container
+          .read(experimentSettingsProvider.notifier)
+          .setBackendUrl('ws://127.0.0.1:${server.port}/ws/frames');
+      await session().start();
+      for (
+        var i = 0;
+        i < 50 && container.read(sessionProvider).phase != SessionPhase.failed;
+        i++
+      ) {
+        await Future<void>.delayed(const Duration(milliseconds: 20));
+      }
+      expect(container.read(sessionProvider).phase, SessionPhase.failed);
+      expect(
+        container.read(sessionProvider).serverError?.message,
+        contains('retry selection'),
+      );
+      expect(camera.captures, 0);
+      await session().stop();
+      await session().start();
+      for (var i = 0; i < 50 && camera.captures == 0; i++) {
+        await Future<void>.delayed(const Duration(milliseconds: 20));
+      }
+      expect(container.read(sessionProvider).phase, SessionPhase.running);
+      expect(camera.captures, greaterThan(0));
+      expect(container.read(sessionProvider).serverError, isNull);
+      await session().stop();
     },
   );
 

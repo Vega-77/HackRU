@@ -13,6 +13,7 @@ from dataclasses import dataclass, field
 import numpy as np
 
 from cv_engine.ar_plane import ArPlane, image_axes
+from cv_engine.acquisition import propose_region
 from cv_engine.detect import DEFAULT_COLORS, ColorDetector, Detection, MediaPipeDetector, MotionDetector
 from cv_engine.preprocess import PreprocessedFrame
 from cv_engine.spatial import SpatialMapper
@@ -58,6 +59,9 @@ class PipelineConfig:
 def validated_session(current: dict, changes: dict) -> dict:
     """Merge the app's session settings, checking the fields the CV engine relies on."""
     s = {**current, **changes}
+    for key in ("initialization_required", "debug_tracking"):
+        if key in s and not isinstance(s[key], bool):
+            raise ValueError(f"{key} must be a boolean")
     if s["mode"] is not None and s["mode"] not in EXPERIMENT_MODES:
         raise ValueError(f"mode must be one of {EXPERIMENT_MODES}")
     if s["px_per_m"] is not None and not (isinstance(s["px_per_m"], (int, float)) and s["px_per_m"] > 0):
@@ -190,14 +194,9 @@ class TrackingPipeline:
                 point = (tap["x"] * frame.scale, tap["y"] * frame.scale)
                 box = self.session["target_bbox"]
                 if box is None:
-                    containing = [d for d in self.color.detect(frame)
-                                  if d.bbox[0] <= point[0] < d.bbox[0] + d.bbox[2]
-                                  and d.bbox[1] <= point[1] < d.bbox[1] + d.bbox[3]]
-                    if len(containing) == 1:
-                        x, y, w, h = containing[0].bbox
-                        s = frame.scale
-                        box = {"x": (x - 2) / s, "y": (y - 2) / s,
-                               "w": (w + 4) / s, "h": (h + 4) / s}
+                    proposal = propose_region(frame.bgr, point)
+                    if proposal["bbox"]:
+                        box = {key: value / frame.scale for key, value in proposal["bbox"].items()}
                 self._manual.select(frame, point, box)
                 self._pending_selection = False
             else:
@@ -231,6 +230,21 @@ class TrackingPipeline:
             result["tracking_debug"] = {"frame_id": frame.frame_id, "timestamp": frame.timestamp,
                                         "detections": len(detections), **self._manual.debug}
         return result
+
+    def initialize(self, frame: PreprocessedFrame) -> dict:
+        """Retry acquisition on this exact image; initialization is never a detection."""
+        self._manual.reset()
+        self._target_id = None
+        self.tracker = CentroidTracker(self.config.max_distance, self.config.max_missed, self.config.min_hits)
+        self._pending_selection = self.session["target_px"] is not None
+        expected = self.session["frame_size"]
+        if expected is not None and frame.source_size != (expected["w"], expected["h"]):
+            return {"status": "failed", "reason": "selection_image_size_mismatch", "tracked": False, "bbox": None}
+        self(frame)
+        return {"status": "initialized" if self._manual.original is not None else "failed",
+                "reason": self._manual.debug["reason"], "tracked": False,
+                "bbox": None if self._manual.bbox is None else
+                    {key: value / frame.scale for key, value in zip(("x", "y", "w", "h"), self._manual.bbox)}}
 
     def _pick_target(self, tracks: list[Track], frame: PreprocessedFrame) -> Track | None:
         """The object the app cares about: the one the user tapped (target_px), followed by
