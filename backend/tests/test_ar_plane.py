@@ -5,7 +5,7 @@ import numpy as np
 import pytest
 
 from cv_engine.ar_plane import ArPlane, CameraPose, image_axes
-from cv_engine.pipeline import TrackingPipeline
+from cv_engine.pipeline import PipelineConfig, TrackingPipeline
 from cv_engine.preprocess import preprocess_frame
 
 FX, CX, CY = 500.0, 320.0, 240.0
@@ -140,7 +140,9 @@ def ball_frame(frame_id, meta, world_point):
 
 
 def test_pipeline_reports_plane_and_3d_positions():
-    pipe = TrackingPipeline()
+    # The ball sits still on the board while the phone moves, so a pose-aligned motion
+    # detector rightly ignores it; this test is about mapping, so use the color detector.
+    pipe = TrackingPipeline(PipelineConfig(detector="color"))
     pipe.apply_config({"type": "config", "mode": "free_fall", "frame_size": {"w": 640, "h": 480},
                        "ar_plane": {"point": [0, 0, 0], "normal": [0, 0, 1]}})
     point = [0.1, 0.2, 0.0]
@@ -183,3 +185,60 @@ def test_malformed_pose_is_reported_not_fatal():
     out = pipe(preprocess_frame(np.full((480, 640, 3), 90, np.uint8), frame_id=0, timestamp=0.0, meta=meta))
     assert out["calibration"]["status"] == "no_pose"
     assert "pose" in out["calibration"]["pose_error"]
+
+
+# A blank board with a few broad shapes: too little texture for ORB to align, so a moving
+# phone looks like a moving scene unless the ARKit pose aligns the views.
+TEXTURE_PX_PER_M = 1000
+TEXTURE_TO_PLANE = np.array([[1 / TEXTURE_PX_PER_M, 0, -0.4], [0, -1 / TEXTURE_PX_PER_M, 0.5], [0, 0, 1]])
+
+
+def plain_board(ball_xy=None):
+    tex = np.full((800, 800, 3), 175, np.uint8)
+    cv2.rectangle(tex, (80, 120), (330, 700), (95, 95, 95), -1)
+    cv2.rectangle(tex, (520, 60), (760, 300), (130, 150, 170), -1)
+    if ball_xy is not None:
+        u, v = (ball_xy[0] + 0.4) * TEXTURE_PX_PER_M, (0.5 - ball_xy[1]) * TEXTURE_PX_PER_M
+        cv2.circle(tex, (round(u), round(v)), 22, (40, 40, 220), -1)
+    return tex
+
+
+def board_view(meta, plane, tex):
+    """The board as an ARKit camera with this pose sees it (640x480)."""
+    mapping = plane.mapping(CameraPose.from_meta(meta))
+    return cv2.warpPerspective(tex, mapping.H_inv @ TEXTURE_TO_PLANE, (640, 480), borderValue=(60, 60, 60))
+
+
+def moving_phone(i):
+    return pose_meta([0.02 * i, 0.1 + 0.005 * i, 0.9], yaw_pitch(1.5 * i))
+
+
+def test_motion_detector_aligns_a_plain_board_with_the_pose():
+    pipe = TrackingPipeline(PipelineConfig(detector="motion"))
+    pipe.apply_config({"type": "config", "frame_size": {"w": 640, "h": 480},
+                       "ar_plane": {"point": [0, 0, 0], "normal": [0, 0, 1]}})
+    renderer = ArPlane([0, 0, 0], [0, 0, 1])
+    ball = (0.05, 0.12)
+    for i in range(14):
+        meta = moving_phone(i)
+        tex = plain_board(ball if i >= 11 else None)
+        img = board_view(meta, renderer, tex)
+        out = pipe(preprocess_frame(img, frame_id=i, timestamp=i / 30, working_width=640, meta=meta))
+        if i < 11:
+            assert out["objects"] == [], f"frame {i}: the phone's motion was reported as an object"
+    (obj,) = out["objects"]
+    assert obj["position"] == pytest.approx({"x": ball[0], "y": ball[1]}, abs=0.005)
+    assert obj["position_3d"] == pytest.approx({"x": ball[0], "y": ball[1], "z": 0.0}, abs=0.005)
+
+
+def test_new_surface_restarts_the_motion_background():
+    pipe = TrackingPipeline(PipelineConfig(detector="motion"))
+    pipe.apply_config({"type": "config", "ar_plane": {"point": [0, 0, 0], "normal": [0, 0, 1]}})
+    meta = moving_phone(0)
+    pipe(preprocess_frame(board_view(meta, ArPlane([0, 0, 0], [0, 0, 1]), plain_board()),
+                          frame_id=0, timestamp=0.0, working_width=640, meta=meta))
+    assert pipe.motion._ref_plane is not None
+    pipe.apply_config({"type": "config", "mass_kg": 0.2})  # same surface: keep the background
+    assert pipe.motion._ref_plane is not None
+    pipe.apply_config({"type": "config", "ar_plane": {"point": [0, 0, 0.1], "normal": [0, 0, 1]}})
+    assert pipe.motion._ref_plane is None
