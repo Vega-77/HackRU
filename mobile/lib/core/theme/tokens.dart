@@ -19,6 +19,11 @@ abstract final class AppColors {
   static const inkMuted = Color(0xFF5B6670);
   static const inkMutedDark = Color(0xFF9AA6B0);
 
+  // Burnished copper marks the app's controls and active selection. Physics
+  // colours stay reserved for measured quantities.
+  static const instrumentAccent = Color(0xFFA44724);
+  static const instrumentAccentDark = Color(0xFFE9A480);
+
   // Physics quantities. Do not use these for UI chrome.
   static const velocity = Color(0xFF2FBF71);
   static const acceleration = Color(0xFFE5484D);
@@ -116,11 +121,15 @@ abstract final class AppType {
   );
 }
 
-/// Shape rule: instrument panels and sheets use [panel]; anything you tap
-/// (buttons, chips, toggles) is a full pill.
+/// Instrument panels use [panel]. Primary controls use [control], while
+/// compact selectors can use the pill shape.
 abstract final class AppRadii {
   static const double panel = 14;
+  static const double control = 10;
   static const BorderRadius panelAll = BorderRadius.all(Radius.circular(panel));
+  static const BorderRadius controlAll = BorderRadius.all(
+    Radius.circular(control),
+  );
   static const BorderRadius sheetTop = BorderRadius.vertical(
     top: Radius.circular(panel),
   );

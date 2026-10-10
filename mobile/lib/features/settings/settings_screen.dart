@@ -47,6 +47,20 @@ class SettingsScreen extends ConsumerWidget {
               ),
               children: [
                 const _SectionTitle('Data source'),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(
+                    AppSpace.xs,
+                    0,
+                    AppSpace.xs,
+                    AppSpace.md,
+                  ),
+                  child: Text(
+                    'Choose a simulation for demos or connect a live camera stream.',
+                    style: AppType.body.copyWith(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ),
                 RadioGroup<bool>(
                   groupValue: demo,
                   onChanged: (value) {

@@ -38,26 +38,44 @@ class HomeScreen extends ConsumerWidget {
                   ),
                   sliver: SliverToBoxAdapter(
                     child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                      crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
                         Expanded(
-                          child: Padding(
-                            padding: const EdgeInsets.only(top: AppSpace.sm),
-                            child: Semantics(
-                              header: true,
-                              child: Text(
-                                'HandsOn\nPhysics',
-                                style: Theme.of(context).textTheme.displaySmall,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'HANDSON PHYSICS',
+                                style: AppType.label.copyWith(
+                                  color: scheme.primary,
+                                  fontSize: 12,
+                                ),
                               ),
-                            ),
+                              const SizedBox(height: AppSpace.xs),
+                              Semantics(
+                                header: true,
+                                child: Text(
+                                  'Motion lab',
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .displaySmall,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
-                        IconButton(
-                          onPressed: () => context.push(Routes.settings),
-                          tooltip: 'Settings',
-                          iconSize: 24,
-                          padding: const EdgeInsets.all(AppSpace.md),
-                          icon: const Icon(AppIcons.gear),
+                        DecoratedBox(
+                          decoration: BoxDecoration(
+                            border: Border.all(color: scheme.outline),
+                            borderRadius: AppRadii.controlAll,
+                          ),
+                          child: IconButton(
+                            onPressed: () => context.push(Routes.settings),
+                            tooltip: 'Settings',
+                            iconSize: 22,
+                            padding: const EdgeInsets.all(AppSpace.md),
+                            icon: const Icon(AppIcons.gear),
+                          ),
                         ),
                       ],
                     ),
@@ -72,8 +90,7 @@ class HomeScreen extends ConsumerWidget {
                   ),
                   sliver: SliverToBoxAdapter(
                     child: Text(
-                      'Point your phone at a real experiment and see the '
-                      'forces acting on it.',
+                      'Follow position, velocity and force as an experiment moves.',
                       style: AppType.body.copyWith(
                         fontSize: 17,
                         color: scheme.onSurfaceVariant,
@@ -82,13 +99,9 @@ class HomeScreen extends ConsumerWidget {
                   ),
                 ),
                 SliverPadding(
-                  padding: const EdgeInsets.symmetric(horizontal: AppSpace.lg),
-                  sliver: SliverToBoxAdapter(child: _Hero(mode: mode)),
-                ),
-                SliverPadding(
                   padding: const EdgeInsets.fromLTRB(
                     AppSpace.xl,
-                    AppSpace.xxl,
+                    AppSpace.lg,
                     AppSpace.xl,
                     AppSpace.sm,
                   ),
@@ -101,6 +114,10 @@ class HomeScreen extends ConsumerWidget {
                       ),
                     ),
                   ),
+                ),
+                SliverPadding(
+                  padding: const EdgeInsets.symmetric(horizontal: AppSpace.lg),
+                  sliver: SliverToBoxAdapter(child: _Hero(mode: mode)),
                 ),
                 SliverList.list(
                   children: [
@@ -158,25 +175,94 @@ class _Hero extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final index = HomeScreen._order.indexOf(mode) + 1;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        ClipRRect(
-          borderRadius: AppRadii.panelAll,
-          child: AspectRatio(
-            aspectRatio: 4 / 3,
-            child: ColoredBox(
-              color: AppColors.graphiteDeep,
-              child: AnimatedSwitcher(
-                duration: AppMotion.slow,
-                switchInCurve: AppMotion.ease,
-                child: ExperimentPreview(key: ValueKey(mode), mode: mode),
-              ),
+        DecoratedBox(
+          decoration: BoxDecoration(
+            color: scheme.surfaceContainerLow,
+            border: Border.all(color: scheme.outline),
+            borderRadius: AppRadii.panelAll,
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(AppSpace.md),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(
+                    AppSpace.xs,
+                    AppSpace.xs,
+                    AppSpace.xs,
+                    AppSpace.md,
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 7,
+                        height: 7,
+                        decoration: BoxDecoration(
+                          color: scheme.primary,
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                      const SizedBox(width: AppSpace.sm),
+                      Text('MODEL PREVIEW', style: AppType.label),
+                      const Spacer(),
+                      Text(
+                        '${index.toString().padLeft(2, '0')}  /  04',
+                        style: AppType.readoutSmall.copyWith(
+                          color: scheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                ClipRRect(
+                  borderRadius: const BorderRadius.all(Radius.circular(10)),
+                  child: AspectRatio(
+                    aspectRatio: 4 / 3,
+                    child: ColoredBox(
+                      color: AppColors.graphiteDeep,
+                      child: AnimatedSwitcher(
+                        duration: AppMotion.slow,
+                        switchInCurve: AppMotion.ease,
+                        child: ExperimentPreview(
+                          key: ValueKey(mode),
+                          mode: mode,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: AppSpace.md),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: AppSpace.xs),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        mode.label,
+                        style: Theme.of(context).textTheme.titleLarge,
+                      ),
+                      const SizedBox(height: AppSpace.xs),
+                      Text(
+                        _blurb(mode),
+                        style: AppType.body.copyWith(
+                          color: scheme.onSurfaceVariant,
+                        ),
+                      ),
+                      const SizedBox(height: AppSpace.md),
+                      const _Legend(),
+                    ],
+                  ),
+                ),
+              ],
             ),
           ),
         ),
-        const SizedBox(height: AppSpace.md),
-        const _Legend(),
       ],
     );
   }
@@ -233,64 +319,79 @@ class _ModeRow extends StatelessWidget {
       selected: selected,
       button: true,
       inMutuallyExclusiveGroup: true,
-      child: InkWell(
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(
-            horizontal: AppSpace.xl,
-            vertical: AppSpace.md,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: AppSpace.lg),
+        child: AnimatedContainer(
+          duration: AppMotion.quick,
+          curve: AppMotion.ease,
+          padding: const EdgeInsets.all(AppSpace.sm),
+          decoration: BoxDecoration(
+            color: selected
+                ? scheme.primary.withValues(alpha: 0.07)
+                : Colors.transparent,
+            borderRadius: AppRadii.controlAll,
+            border: Border.all(
+              color: selected ? scheme.primary : Colors.transparent,
+            ),
           ),
-          child: Row(
-            children: [
-              AnimatedContainer(
-                duration: AppMotion.quick,
-                width: 88,
-                height: 66,
-                decoration: BoxDecoration(
-                  borderRadius: const BorderRadius.all(Radius.circular(10)),
-                  border: Border.all(
-                    color: selected ? scheme.primary : Colors.transparent,
-                    width: 2,
-                  ),
-                ),
-                padding: const EdgeInsets.all(2),
-                child: ClipRRect(
-                  borderRadius: const BorderRadius.all(Radius.circular(8)),
-                  child: ExperimentPreview(
-                    mode: mode,
-                    animate: false,
-                    showLabels: false,
-                    showGrid: false,
-                  ),
-                ),
-              ),
-              const SizedBox(width: AppSpace.lg),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      mode.label,
-                      style: AppType.bodyStrong.copyWith(fontSize: 16),
+          child: InkWell(
+            onTap: onTap,
+            borderRadius: AppRadii.controlAll,
+            child: Row(
+              children: [
+                AnimatedContainer(
+                  duration: AppMotion.quick,
+                  width: 88,
+                  height: 66,
+                  decoration: BoxDecoration(
+                    borderRadius: const BorderRadius.all(Radius.circular(10)),
+                    border: Border.all(
+                      color: selected ? scheme.primary : Colors.transparent,
+                      width: 2,
                     ),
-                    const SizedBox(height: 2),
-                    Text(
-                      _blurb(mode),
-                      style: AppType.caption.copyWith(
-                        fontSize: 13,
-                        color: scheme.onSurfaceVariant,
+                  ),
+                  padding: const EdgeInsets.all(2),
+                  child: ClipRRect(
+                    borderRadius: const BorderRadius.all(Radius.circular(8)),
+                    child: ExperimentPreview(
+                      mode: mode,
+                      animate: false,
+                      showLabels: false,
+                      showGrid: false,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: AppSpace.lg),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        mode.label,
+                        style: AppType.bodyStrong.copyWith(fontSize: 16),
                       ),
-                    ),
-                  ],
+                      const SizedBox(height: 2),
+                      Text(
+                        _blurb(mode),
+                        style: AppType.caption.copyWith(
+                          fontSize: 13,
+                          color: scheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-              const SizedBox(width: AppSpace.sm),
-              AnimatedOpacity(
-                duration: AppMotion.quick,
-                opacity: selected ? 1 : 0,
-                child: Icon(AppIcons.checkCircle, color: scheme.primary),
-              ),
-            ],
+                const SizedBox(width: AppSpace.sm),
+                SizedBox(
+                  width: 24,
+                  child: AnimatedOpacity(
+                    duration: AppMotion.quick,
+                    opacity: selected ? 1 : 0,
+                    child: Icon(AppIcons.checkCircle, color: scheme.primary),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),
