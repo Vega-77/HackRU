@@ -6,6 +6,7 @@ import 'package:flutter/widgets.dart';
 import 'package:image/image.dart' as img;
 
 import '../../core/config/app_config.dart';
+import '../../core/logging/debug_log.dart';
 import '../../models/session_config.dart';
 import 'arkit_frame_source.dart';
 import 'frame_source.dart';
@@ -26,6 +27,9 @@ class NativeFrameSource implements FrameSource {
   final Stopwatch _clock = Stopwatch()..start();
 
   @override
+  String get name => 'iOS camera';
+
+  @override
   bool get isRunning => _controller?.value.isInitialized ?? false;
 
   @override
@@ -42,14 +46,22 @@ class NativeFrameSource implements FrameSource {
     final List<CameraDescription> cameras;
     try {
       cameras = await availableCameras();
-    } on CameraException catch (e) {
+    } on CameraException catch (e, stack) {
+      log.e('Listing cameras failed: ${e.code}', e, stack);
       throw CameraUnavailableException(e.description ?? e.code);
     }
-    if (cameras.isEmpty) throw const NoCameraException();
+    if (cameras.isEmpty) {
+      log.w('This device has no camera');
+      throw const NoCameraException();
+    }
 
     final back = cameras.firstWhere(
       (c) => c.lensDirection == CameraLensDirection.back,
       orElse: () => cameras.first,
+    );
+    log.i(
+      'Opening ${back.name} (${back.lensDirection.name}) of '
+      '${cameras.length} cameras',
     );
 
     // Medium (480p) is plenty: we send 320 px frames and the preview is
@@ -64,7 +76,8 @@ class NativeFrameSource implements FrameSource {
 
     try {
       await controller.initialize();
-    } on CameraException catch (e) {
+    } on CameraException catch (e, stack) {
+      log.e('Camera init failed: ${e.code}', e, stack);
       await controller.dispose();
       throw CameraUnavailableException(
         e.code == 'CameraAccessDenied'
@@ -74,7 +87,14 @@ class NativeFrameSource implements FrameSource {
     }
 
     _controller = controller;
+    log.i('Camera preview is ${controller.value.previewSize}');
     await controller.startImageStream((image) {
+      if (_latest == null) {
+        log.i(
+          'First camera frame: ${image.width}x${image.height}, '
+          '${image.format.group.name}',
+        );
+      }
       _latest = image;
       _latestTime = _clock.elapsedMicroseconds / 1e6;
     });
@@ -86,6 +106,7 @@ class NativeFrameSource implements FrameSource {
     _controller = null;
     _latest = null;
     if (controller == null) return;
+    log.i('Closing the camera');
     if (controller.value.isStreamingImages) {
       await controller.stopImageStream();
     }

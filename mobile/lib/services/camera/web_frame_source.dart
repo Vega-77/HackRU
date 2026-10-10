@@ -7,6 +7,7 @@ import 'package:flutter/widgets.dart';
 import 'package:web/web.dart' as web;
 
 import '../../core/config/app_config.dart';
+import '../../core/logging/debug_log.dart';
 import '../../models/session_config.dart';
 import 'frame_source.dart';
 
@@ -22,6 +23,9 @@ import 'frame_source.dart';
 /// it in the DOM, which pauses it and freezes both the picture and the frames
 /// sent to the backend.
 class WebFrameSource implements FrameSource {
+  @override
+  String get name => 'browser camera';
+
   WebFrameSource() {
     ui_web.platformViewRegistry.registerViewFactory(_viewType, (int _) {
       final preview = _newVideo();
@@ -68,10 +72,15 @@ class WebFrameSource implements FrameSource {
       }.jsify()!,
     );
 
+    log.i('Asking the browser for the camera');
     try {
       _stream = await devices.getUserMedia(constraints).toDart;
-    } catch (_) {
-      if (!await _hasCamera()) throw const NoCameraException();
+    } catch (error, stack) {
+      log.w('getUserMedia failed', error, stack);
+      if (!await _hasCamera()) {
+        log.w('The browser lists no camera');
+        throw const NoCameraException();
+      }
       throw const CameraUnavailableException(
         'Camera access was blocked. '
         'Allow camera access in the browser and try again.',
@@ -88,6 +97,10 @@ class WebFrameSource implements FrameSource {
     while (_captureVideo.videoWidth == 0) {
       await Future<void>.delayed(const Duration(milliseconds: 30));
     }
+    log.i(
+      'Browser camera is ${_captureVideo.videoWidth}x'
+      '${_captureVideo.videoHeight}, ${_previews.length} previews',
+    );
   }
 
   @override
@@ -95,6 +108,7 @@ class WebFrameSource implements FrameSource {
     final stream = _stream;
     _stream = null;
     if (stream == null) return;
+    log.i('Stopping the browser camera');
     // srcObject goes first, so the pause listener does not restart them.
     for (final video in [..._previews, _captureVideo]) {
       video

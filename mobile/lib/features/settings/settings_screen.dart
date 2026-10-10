@@ -8,10 +8,12 @@ import '../../core/config/app_config.dart';
 import '../../core/routing/router.dart';
 import '../../core/theme/app_icons.dart';
 import '../../core/theme/tokens.dart';
+import '../../core/logging/debug_log.dart';
 import '../../state/experiment_settings.dart';
+import '../debug/copy_debug_log.dart';
 import 'backend_url.dart';
 
-/// Which backend the camera streams to.
+/// Which backend the camera streams to, and the debug log.
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
 
@@ -59,6 +61,8 @@ class SettingsScreen extends StatelessWidget {
                   ),
                 ),
                 const _BackendForm(),
+                const _SectionTitle('Debug log'),
+                const _DebugLog(),
                 const _About(),
               ],
             ),
@@ -308,6 +312,91 @@ class _BackendFormState extends ConsumerState<_BackendForm> {
   }
 }
 
+/// Copy or clear the hidden debug log.
+class _DebugLog extends StatefulWidget {
+  const _DebugLog();
+
+  @override
+  State<_DebugLog> createState() => _DebugLogState();
+}
+
+class _DebugLogState extends State<_DebugLog> {
+  // The log isn't listenable (it takes a line per frame), so the count is
+  // checked once a second while Settings is open.
+  late final Timer _refresh;
+  int _shown = log.entryCount;
+
+  @override
+  void initState() {
+    super.initState();
+    _refresh = Timer.periodic(const Duration(seconds: 1), (_) => _update());
+  }
+
+  @override
+  void dispose() {
+    _refresh.cancel();
+    super.dispose();
+  }
+
+  void _update() {
+    if (mounted && log.entryCount != _shown) {
+      setState(() => _shown = log.entryCount);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final muted = Theme.of(context).colorScheme.onSurfaceVariant;
+    final count = _shown;
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: AppSpace.xs),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Records what the app does during an experiment. Copy it to '
+            'share when something goes wrong.',
+            style: AppType.body.copyWith(color: muted),
+          ),
+          const SizedBox(height: AppSpace.xs),
+          Text(
+            count == 1
+                ? '1 entry so far'
+                : '${groupDigits(count)} entries so far',
+            style: AppType.caption.copyWith(color: muted),
+          ),
+          const SizedBox(height: AppSpace.md),
+          Wrap(
+            spacing: AppSpace.sm,
+            runSpacing: AppSpace.sm,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              FilledButton.tonalIcon(
+                onPressed: () async {
+                  await copyDebugLog(context);
+                  _update();
+                },
+                icon: const Icon(AppIcons.copy, size: 18),
+                label: const Text('Copy debug log'),
+              ),
+              TextButton(
+                onPressed: count == 0
+                    ? null
+                    : () {
+                        log.clear();
+                        log.i('Debug log cleared');
+                        _update();
+                      },
+                child: const Text('Clear'),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 /// Which build this is, for when teammates compare notes.
 class _About extends StatelessWidget {
   const _About();
@@ -317,7 +406,8 @@ class _About extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.fromLTRB(AppSpace.xs, AppSpace.xxxl, 0, 0),
       child: Text(
-        'HandsOn Physics 0.1.0, protocol v0.3',
+        'HandsOn Physics ${AppConfig.appVersion}, '
+        'protocol ${AppConfig.protocolVersion}',
         style: AppType.caption.copyWith(
           color: Theme.of(context).colorScheme.onSurfaceVariant,
         ),

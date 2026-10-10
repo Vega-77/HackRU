@@ -6,6 +6,7 @@ import 'package:flutter/widgets.dart';
 import 'package:image/image.dart' as img;
 
 import '../../core/config/app_config.dart';
+import '../../core/logging/debug_log.dart';
 import '../../core/theme/tokens.dart';
 import '../../models/session_config.dart';
 import '../../models/vec2.dart';
@@ -19,6 +20,9 @@ import 'frame_source.dart';
 /// pendulum swing. The preview draws the same scene at the same moment, so
 /// the overlay lines up with it.
 class TestVideoFrameSource implements FrameSource {
+  @override
+  String get name => 'test video';
+
   /// Portrait, like a phone held upright: height over width.
   static const double aspect = 4 / 3;
 
@@ -39,13 +43,17 @@ class TestVideoFrameSource implements FrameSource {
   @override
   Future<void> start() async {
     if (isRunning) return;
+    log.i('Test video started, frames ${sizeFor(AppConfig.frameWidth)}');
     _clock
       ..reset()
       ..start();
   }
 
   @override
-  Future<void> stop() async => _clock.stop();
+  Future<void> stop() async {
+    if (isRunning) log.i('Test video stopped');
+    _clock.stop();
+  }
 
   @override
   Future<EncodedFrame?> capture({int width = AppConfig.frameWidth}) async {

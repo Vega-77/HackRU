@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hands_on_physics/app.dart';
 import 'package:hands_on_physics/core/config/app_config.dart';
+import 'package:hands_on_physics/core/logging/debug_log.dart';
 import 'package:hands_on_physics/core/routing/router.dart';
 import 'package:hands_on_physics/features/settings/backend_url.dart';
 import 'package:hands_on_physics/models/camera_pose.dart';
@@ -16,6 +18,9 @@ import 'package:hands_on_physics/state/session_controller.dart';
 
 /// Counts how often the app tries to open the camera.
 class _FakeCamera implements FrameSource {
+  @override
+  String get name => 'fake camera';
+
   int starts = 0;
   int stops = 0;
   bool running = false;
@@ -93,6 +98,27 @@ void main() {
     );
     await tester.pump(const Duration(milliseconds: 100));
     return ProviderScope.containerOf(tester.element(find.byType(Scaffold)));
+  }
+
+  /// Catches what the app puts on the clipboard.
+  List<String> mockClipboard(WidgetTester tester) {
+    final copied = <String>[];
+    tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+      SystemChannels.platform,
+      (call) async {
+        if (call.method == 'Clipboard.setData') {
+          copied.add((call.arguments as Map)['text'] as String);
+        }
+        return null;
+      },
+    );
+    addTearDown(
+      () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        SystemChannels.platform,
+        null,
+      ),
+    );
+    return copied;
   }
 
   /// Unmounts the app so its tickers and timers stop before the test ends.
@@ -240,6 +266,55 @@ void main() {
     tester.view.physicalSize = const Size(844, 390) * 3;
     await tester.pump(const Duration(seconds: 1));
 
+    expect(tester.takeException(), isNull);
+    await unmount(tester);
+  });
+
+  testWidgets('experiment screen copies the debug log', (tester) async {
+    final copied = mockClipboard(tester);
+    await pumpApp(tester, at: Routes.experiment);
+
+    await tester.tap(find.byTooltip('Copy debug log'));
+    await tester.pump();
+
+    expect(copied, hasLength(1));
+    expect(
+      copied.single,
+      startsWith('HandsOn Physics ${AppConfig.appVersion}'),
+    );
+    expect(copied.single, contains('======== Session '));
+    expect(copied.single, contains('Config (session start): '));
+    expect(
+      find.textContaining(RegExp(r'^Copied [\d,]+ log lines$')),
+      findsOneWidget,
+    );
+    await unmount(tester);
+  });
+
+  testWidgets('settings copies and clears the debug log', (tester) async {
+    final copied = mockClipboard(tester);
+    log.i('Something worth reading');
+    await pumpApp(tester, at: Routes.settings);
+
+    await tester.scrollUntilVisible(
+      find.text('Copy debug log'),
+      200,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.tap(find.text('Copy debug log'));
+    await tester.pump();
+    expect(copied.single, contains('Something worth reading'));
+
+    log.i('Logged while Settings is open');
+    final shown = find.textContaining('entries so far');
+    final before = tester.widget<Text>(shown).data;
+    await tester.pump(const Duration(seconds: 1));
+    expect(tester.widget<Text>(shown).data, isNot(before));
+
+    await tester.tap(find.text('Clear'));
+    await tester.pump();
+    expect(log.entries.map((e) => e.message), ['Debug log cleared']);
+    expect(find.text('1 entry so far'), findsOneWidget);
     expect(tester.takeException(), isNull);
     await unmount(tester);
   });

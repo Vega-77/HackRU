@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:hands_on_physics/core/logging/debug_log.dart';
 import 'package:hands_on_physics/models/experiment_mode.dart';
 import 'package:hands_on_physics/models/physics_state.dart';
 import 'package:hands_on_physics/models/session_config.dart';
@@ -25,6 +26,10 @@ class _FakeChannel extends Fake implements WebSocketChannel {
   final _ready = Completer<void>();
   @override
   final _FakeSink sink = _FakeSink();
+  @override
+  int? closeCode;
+  @override
+  String? closeReason;
 
   void open() => _ready.complete();
 
@@ -154,10 +159,22 @@ void main() {
   });
 
   test('goes offline when the server closes the connection', () async {
+    log.clear();
+    channel
+      ..closeCode = 1011
+      ..closeReason = 'internal error';
     await channel.server.close();
     await pumpEventQueue();
     expect(socket.status, ConnectionStatus.offline);
     expect(socket.canSendFrame, isFalse);
+    expect(
+      log.entries.map((e) => e.message),
+      contains(
+        startsWith(
+          'Connection closed (code 1011, reason "internal error") after ',
+        ),
+      ),
+    );
   });
 
   group('probe', () {

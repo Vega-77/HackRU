@@ -1,6 +1,7 @@
 import 'package:flutter/widgets.dart';
 
 import '../../core/config/app_config.dart';
+import '../../core/logging/debug_log.dart';
 import '../../models/camera_pose.dart';
 import '../../models/session_config.dart';
 import '../../models/vec2.dart';
@@ -27,12 +28,16 @@ class CameraOrTestVideo implements FrameSource, SurfaceFinder {
   bool get usingTestVideo => identical(_active, _testVideo);
 
   @override
+  String get name => _active.name;
+
+  @override
   Future<void> start() async {
     if (isRunning) return;
     try {
       await _camera.start();
       _active = _camera;
     } on NoCameraException {
+      log.w('No camera, so the test video stands in');
       _active = _testVideo;
       await _testVideo.start();
     }

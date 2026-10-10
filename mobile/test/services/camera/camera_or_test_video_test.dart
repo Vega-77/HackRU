@@ -7,6 +7,9 @@ import 'package:hands_on_physics/services/camera/camera_or_test_video.dart';
 import 'package:hands_on_physics/services/camera/frame_source.dart';
 
 class _ArCamera implements FrameSource, SurfaceFinder {
+  @override
+  String get name => 'fake camera';
+
   bool running = false;
   bool hasCamera = true;
 

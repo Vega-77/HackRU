@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/config/app_config.dart';
+import '../core/logging/debug_log.dart';
 import '../models/experiment_mode.dart';
 
 /// What the user has chosen for the current experiment: mode, mass, which
@@ -43,22 +44,36 @@ class ExperimentSettingsController extends Notifier<ExperimentSettings> {
   @override
   ExperimentSettings build() => const ExperimentSettings();
 
-  void setMode(ExperimentMode mode) => state = state.copyWith(mode: mode);
+  void setMode(ExperimentMode mode) {
+    state = state.copyWith(mode: mode);
+    log.i('Mode set to ${mode.wireName}');
+  }
 
   /// Mass is clamped to a sensible tabletop range: 1 g to 10 kg.
-  void setMass(double kg) =>
-      state = state.copyWith(massKg: kg.clamp(0.001, 10.0));
+  void setMass(double kg) {
+    state = state.copyWith(massKg: kg.clamp(0.001, 10.0));
+    log.i('Mass set to ${state.massKg} kg');
+  }
 
-  void toggleVelocity() =>
-      state = state.copyWith(showVelocity: !state.showVelocity);
+  void toggleVelocity() {
+    state = state.copyWith(showVelocity: !state.showVelocity);
+    log.i('Velocity arrows ${state.showVelocity ? 'on' : 'off'}');
+  }
 
-  void toggleAcceleration() =>
-      state = state.copyWith(showAcceleration: !state.showAcceleration);
+  void toggleAcceleration() {
+    state = state.copyWith(showAcceleration: !state.showAcceleration);
+    log.i('Acceleration arrows ${state.showAcceleration ? 'on' : 'off'}');
+  }
 
-  void toggleForces() => state = state.copyWith(showForces: !state.showForces);
+  void toggleForces() {
+    state = state.copyWith(showForces: !state.showForces);
+    log.i('Force arrows ${state.showForces ? 'on' : 'off'}');
+  }
 
-  void setBackendUrl(String url) =>
-      state = state.copyWith(backendUrl: url.trim());
+  void setBackendUrl(String url) {
+    state = state.copyWith(backendUrl: url.trim());
+    log.i('Backend set to ${state.backendUrl}');
+  }
 }
 
 final experimentSettingsProvider =

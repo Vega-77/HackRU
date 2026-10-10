@@ -25,6 +25,9 @@ Read `README.md` first for how to run it and how the code is laid out.
 - Physics colours are reserved: velocity green, acceleration red, forces
   blue and yellow. Don't use them for anything else.
 - Comments explain why, not what. Keep them short.
+- Log through `log` from `lib/core/logging/debug_log.dart`, not `print`.
+  State changes go at `log.i`, per-frame detail at `log.d`, problems at
+  `log.w` or `log.e` with the error and stack. Never log inside `build`.
 - New logic gets a unit test under the matching `test/` folder. New screens
   get a step in `test/widgets/app_flow_test.dart`.
 
