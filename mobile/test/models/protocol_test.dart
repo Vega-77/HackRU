@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hands_on_physics/models/calibration.dart';
+import 'package:hands_on_physics/models/camera_pose.dart';
 import 'package:hands_on_physics/models/experiment_mode.dart';
 import 'package:hands_on_physics/models/physics_state.dart';
 import 'package:hands_on_physics/models/session_config.dart';
@@ -148,6 +149,7 @@ void main() {
         'px_per_m': 812.5,
         'target_px': {'x': 161.0, 'y': 118.5},
         'frame_size': {'w': 320, 'h': 240},
+        'ar_plane': null,
       });
     });
 
@@ -196,6 +198,93 @@ void main() {
         const Calibration(rulerStart: Vec2(5, 5), rulerEnd: Vec2(5, 5)).pxPerM,
         isNull,
       );
+    });
+  });
+
+  group('ARKit pose', () {
+    const pose = CameraPose(
+      fx: 250,
+      fy: 250,
+      cx: 160,
+      cy: 213.5,
+      cameraToWorld: [1, 0, 0, 0.1, 0, 1, 0, 0.2, 0, 0, 1, 0.8, 0, 0, 0, 1],
+    );
+
+    test('frame metadata carries intrinsics and the camera transform', () {
+      final json = jsonDecode(
+        const FrameMetadata(frameId: 3, timestamp: 1.5, pose: pose).encode(),
+      ) as Map<String, dynamic>;
+      expect(json['frame_id'], 3);
+      expect(json['intrinsics'], {
+        'fx': 250.0,
+        'fy': 250.0,
+        'cx': 160.0,
+        'cy': 213.5,
+      });
+      expect(json['camera_to_world'], hasLength(16));
+      expect(json['camera_to_world'][3], 0.1);
+    });
+
+    test('frame metadata without a pose stays as before', () {
+      final json = jsonDecode(
+        const FrameMetadata(frameId: 3, timestamp: 1.5).encode(),
+      );
+      expect(json, {'frame_id': 3, 'timestamp': 1.5});
+    });
+
+    test('pose parses from the platform channel', () {
+      final parsed = CameraPose.fromMap({
+        'intrinsics': [250, 251, 160, 213.5],
+        'camera_to_world': pose.cameraToWorld,
+      });
+      expect(parsed.fy, 251);
+      expect(parsed.cameraToWorld[11], 0.8);
+    });
+
+    test('config sends the surface as ar_plane', () {
+      const surface = ArSurface(
+        point: [0, 0, -1],
+        normal: [0, 0, 1],
+        vertical: true,
+      );
+      final config = SessionConfig(
+        mode: ExperimentMode.ramp,
+        massKg: 0.1,
+        frameSize: const FrameSize(320, 427),
+        surface: surface.withOffset(0.02),
+      );
+      expect(config.toJson()['ar_plane'], {
+        'point': [0.0, 0.0, -1.0],
+        'normal': [0.0, 0.0, 1.0],
+        'offset_m': 0.02,
+      });
+    });
+
+    test('a calibration with a surface is metric without a ruler', () {
+      const calibration = Calibration(
+        surface: ArSurface(point: [0, 0, 0], normal: [0, 1, 0]),
+      );
+      expect(calibration.hasScale, isFalse);
+      expect(calibration.isMetric, isTrue);
+      expect(calibration.clearTarget().surface, isNotNull);
+      expect(calibration.clearSurface().surface, isNull);
+    });
+
+    test('state and frame reports parse screen axes', () {
+      final state = (ServerMessage.parse('''
+            {"type": "state", "frame_id": 1, "timestamp": 0.1, "tracked": true,
+             "pixel": {"x": 10, "y": 20},
+             "screen_axes": {"x": {"x": 250, "y": 3}, "y": {"x": -2, "y": -248}}}
+          ''') as StateMessage).state;
+      expect(state.screenAxes!.x, const Vec2(250, 3));
+      expect(state.screenAxes!.project(const Vec2(0, 1)), const Vec2(-2, -248));
+
+      final ack = ServerMessage.parse('''
+            {"type": "frame", "frame_id": 2, "timestamp": 0.2, "tracked": true,
+             "objects": [{"id": 1, "target": true, "pixel": {"x": 5, "y": 6},
+               "screen_axes": {"x": {"x": 1, "y": 0}, "y": {"x": 0, "y": -1}}}]}
+          ''') as FrameAckMessage;
+      expect(ack.target!.screenAxes, isNotNull);
     });
   });
 }

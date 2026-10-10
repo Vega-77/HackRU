@@ -20,6 +20,7 @@ class PhysicsState {
     this.forces = const [],
     this.energy,
     this.extras = const {},
+    this.screenAxes,
   });
 
   /// Echo of the `frame_id` the client sent with the frame.
@@ -41,6 +42,10 @@ class PhysicsState {
 
   /// Mode-specific readouts such as `angle_deg` or `mu`.
   final Map<String, double> extras;
+
+  /// How world +x and +y look on screen at the object. Null without a
+  /// metric calibration.
+  final ScreenAxes? screenAxes;
 
   factory PhysicsState.fromJson(Map<String, dynamic> json) {
     final rawForces = json['forces'];
@@ -67,6 +72,7 @@ class PhysicsState {
                 if (e.value is num) '${e.key}': (e.value as num).toDouble(),
             }
           : const {},
+      screenAxes: ScreenAxes.tryParse(json['screen_axes']),
     );
   }
 
@@ -83,7 +89,30 @@ class PhysicsState {
     'forces': [for (final f in forces) f.toJson()],
     if (energy != null) 'energy': energy!.toJson(),
     'extras': extras,
+    if (screenAxes != null) 'screen_axes': screenAxes!.toJson(),
   };
+}
+
+/// Where world +x and +y point in the camera image at the object, in frame
+/// pixels per metre (y down). With a tilted surface or an AR pose these are
+/// not simply right and up, so arrows follow them to lie on the surface.
+class ScreenAxes {
+  const ScreenAxes(this.x, this.y);
+
+  final Vec2 x;
+  final Vec2 y;
+
+  /// A world vector's direction in frame pixels, not normalised.
+  Vec2 project(Vec2 world) => x * world.x + y * world.y;
+
+  static ScreenAxes? tryParse(Object? json) {
+    if (json is! Map) return null;
+    final x = Vec2.tryParse(json['x']);
+    final y = Vec2.tryParse(json['y']);
+    return x == null || y == null ? null : ScreenAxes(x, y);
+  }
+
+  Map<String, dynamic> toJson() => {'x': x.toJson(), 'y': y.toJson()};
 }
 
 /// How a force is drawn: the net force in blue, its components in yellow.
@@ -239,6 +268,7 @@ class FrameAckMessage extends ServerMessage {
               pixel: pixel,
               bbox: PixelRect.tryParse(followed!['bbox']),
               position: Vec2.tryParse(followed['position']),
+              screenAxes: ScreenAxes.tryParse(followed['screen_axes']),
             ),
     );
   }

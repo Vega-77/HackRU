@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/rendering.dart';
 
 import '../../../core/theme/tokens.dart';
+import '../../../models/physics_state.dart';
 import '../../../models/session_config.dart';
 import '../../../models/vec2.dart';
 import 'arrow_scale.dart';
@@ -185,6 +186,7 @@ class VectorOverlayPainter extends CustomPainter {
           length,
           style.color.withValues(alpha: f.visibility),
           unit: u,
+          axes: f.axes,
           width: style.dashed ? 2.2 : 3,
           dashed: style.dashed,
         );
@@ -205,6 +207,7 @@ class VectorOverlayPainter extends CustomPainter {
           length,
           AppColors.acceleration.withValues(alpha: f.visibility),
           unit: u,
+          axes: f.axes,
           width: 3.5,
         );
         if (showLabels) {
@@ -223,6 +226,7 @@ class VectorOverlayPainter extends CustomPainter {
           length,
           AppColors.velocity.withValues(alpha: f.visibility),
           unit: u,
+          axes: f.axes,
           width: 3.5,
         );
         if (showLabels) labels.add('v', '', AppColors.velocity, tip, origin);
@@ -336,9 +340,10 @@ class VectorOverlayPainter extends CustomPainter {
     Color color, {
     required double unit,
     required double width,
+    ScreenAxes? axes,
     bool dashed = false,
   }) {
-    final d = CoordinateMapper.worldToScreenDirection(world.normalized);
+    final d = CoordinateMapper.screenDirection(world, axes);
     final tip = from + d * length;
     final w = width * unit.clamp(0.55, 1.1);
     final head = math.min(11 * unit.clamp(0.55, 1.1) + w, length * 0.45);

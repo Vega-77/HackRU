@@ -91,4 +91,16 @@ class CoordinateMapper {
   /// A world-space direction (y up) as a screen direction (y down).
   /// Arrow lengths are chosen by `ArrowScale`, not by this mapper.
   static Offset worldToScreenDirection(Vec2 world) => Offset(world.x, -world.y);
+
+  /// Unit screen direction of [world], following [axes] when the backend
+  /// sent them (a tilted surface, or the camera pose on iOS). The mapper only
+  /// scales uniformly, so a frame-pixel direction is also a screen direction.
+  static Offset screenDirection(Vec2 world, ScreenAxes? axes) {
+    final projected = axes?.project(world);
+    if (projected != null && projected.length > 1e-9) {
+      final d = projected.normalized;
+      return Offset(d.x, d.y);
+    }
+    return worldToScreenDirection(world.normalized);
+  }
 }

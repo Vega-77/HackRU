@@ -1,7 +1,9 @@
 import 'package:flutter/widgets.dart';
 
 import '../../core/config/app_config.dart';
+import '../../models/camera_pose.dart';
 import '../../models/session_config.dart';
+import '../../models/vec2.dart';
 import 'frame_source.dart';
 import 'test_video_frame_source.dart';
 
@@ -11,7 +13,10 @@ import 'test_video_frame_source.dart';
 ///
 /// Only a missing camera switches to the test video. Any other failure,
 /// like camera access being turned off, is passed on so the user can fix it.
-class CameraOrTestVideo implements FrameSource {
+///
+/// Surface finding is passed through when the camera supports it (ARKit),
+/// so wrapping never hides it from setup.
+class CameraOrTestVideo implements FrameSource, SurfaceFinder {
   CameraOrTestVideo(this._camera, {TestVideoFrameSource? testVideo})
     : _testVideo = testVideo ?? TestVideoFrameSource();
 
@@ -48,4 +53,16 @@ class CameraOrTestVideo implements FrameSource {
 
   @override
   Widget buildPreview(BuildContext context) => _active.buildPreview(context);
+
+  @override
+  bool get canFindSurfaces => switch (_active) {
+    final SurfaceFinder f => f.canFindSurfaces,
+    _ => false,
+  };
+
+  @override
+  Future<ArSurface?> findSurface(Vec2 framePixel) async => switch (_active) {
+    final SurfaceFinder f => f.findSurface(framePixel),
+    _ => null,
+  };
 }

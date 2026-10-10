@@ -9,10 +9,13 @@ from __future__ import annotations
 
 import numpy as np
 
+from cv_engine.ar_plane import ArPlane, CameraPose
 from cv_engine.calibration import ArucoCalibrator, PlaneMapping, rectangle_world_points
 from cv_engine.preprocess import PreprocessedFrame
 
-METHODS = ("none", "aruco", "manual")  # requestable; "scale" is set from the app's px_per_m
+# Requestable with a calibrate message. Two more come from the app's config: "arkit"
+# (ar_plane, re-fit every frame from the camera pose) and "scale" (px_per_m).
+METHODS = ("none", "aruco", "manual")
 
 
 class SpatialMapper:
@@ -24,6 +27,9 @@ class SpatialMapper:
         self.mapping: PlaneMapping | None = None
         self.space = "px"  # "px" = client pixels, "norm" = 0-1 image fractions
         self._aruco: ArucoCalibrator | None = None
+        self.ar_plane: ArPlane | None = None
+        self.pose: CameraPose | None = None  # the current frame's camera, ARKit clients only
+        self.pose_error: str | None = None
         self._frames_since_seen = 0
         self._settings: dict = {}
 
@@ -42,13 +48,14 @@ class SpatialMapper:
                 raise ValueError("aruco calibration needs width_m and height_m")
             aruco = ArucoCalibrator(world, ids)
             self._aruco, self.mapping, self.space = aruco, None, "px"
+            self.ar_plane = None
             self._frames_since_seen = 0
         elif method == "manual":
             space = "norm" if request.get("normalized") else "px"
             self.mapping = PlaneMapping.fit(request.get("image_points", []), world, "manual")
-            self._aruco, self.space = None, space
+            self._aruco, self.space, self.ar_plane = None, space, None
         else:
-            self._aruco = self.mapping = None
+            self._aruco = self.mapping = self.ar_plane = None
         self.method = method
         self._settings = {k: v for k, v in request.items() if k != "type"}
         return self.status()
@@ -70,8 +77,34 @@ class SpatialMapper:
         self.method, self.space = "scale", "px"
         self._settings = {"px_per_m": px_per_m, "frame_size": frame_size}
 
+    def set_ar_plane(self, request: dict | None) -> None:
+        """Plane from the app's ARKit raycast. It beats the ruler scale (it knows depth and
+        tilt), but an explicit ArUco or manual calibration still takes priority. Raises
+        ValueError (old setup kept) if the plane is invalid."""
+        if self.method in ("aruco", "manual"):
+            return
+        if request is None:
+            if self.method == "arkit":
+                self.method, self.mapping, self.ar_plane, self._settings = "none", None, None, {}
+            return
+        if self.method == "arkit" and self._settings == request:
+            return  # same plane re-sent with an unrelated config change: keep its basis
+        plane = ArPlane.from_request(request)
+        self.method, self.ar_plane, self.space = "arkit", plane, "px"
+        self.mapping = None
+        self._settings = dict(request)
+
     def update(self, frame: PreprocessedFrame) -> None:
-        """Re-detect markers on this frame (ArUco mode only)."""
+        """Read this frame's camera pose (ARKit clients) and refresh the mapping: re-fit the
+        ARKit plane to the new pose, or re-detect ArUco markers."""
+        try:
+            self.pose = CameraPose.from_meta(frame.meta)
+            self.pose_error = None
+        except ValueError as e:
+            self.pose, self.pose_error = None, str(e)
+        if self.ar_plane is not None:
+            self.mapping = self.ar_plane.mapping(self.pose) if self.pose is not None else None
+            return
         if self._aruco is None:
             return
         found = self._aruco.detect(frame.gray_sharp())
@@ -84,6 +117,13 @@ class SpatialMapper:
             if self._frames_since_seen > self.aruco_hold_frames:
                 self.mapping = None
 
+    def to_world_3d(self, plane_xy) -> dict | None:
+        """ARKit world coordinates (metres, y up) of a point on the calibrated plane."""
+        if self.ar_plane is None or not self.ar_plane.has_basis or plane_xy is None:
+            return None
+        x, y, z = self.ar_plane.plane_to_world(plane_xy)
+        return {"x": round(float(x), 4), "y": round(float(y), 4), "z": round(float(z), 4)}
+
     def to_world(self, point_px: tuple[float, float], point_norm: tuple[float, float]) -> list[float] | None:
         if self.mapping is None:
             return None
@@ -95,7 +135,7 @@ class SpatialMapper:
         if self.method == "none":
             return {"method": "none", "status": "none"}
         if self.mapping is None:
-            state = "searching" if self.method == "aruco" else "none"
+            state = {"aruco": "searching", "arkit": "no_pose"}.get(self.method, "none")
         elif self.method == "aruco" and self._frames_since_seen > 0:
             state = "held"
         else:
@@ -114,6 +154,10 @@ class SpatialMapper:
             )
         if self.method == "aruco":
             out["frames_since_seen"] = self._frames_since_seen
+        if self.ar_plane is not None:
+            out["plane"] = self.ar_plane.describe()
+            if self.pose_error:
+                out["pose_error"] = self.pose_error
         return out
 
 

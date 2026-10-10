@@ -301,6 +301,7 @@ class SessionController extends Notifier<SessionState> {
       frameSize: state.frameSize ?? fallbackFrameSize,
       pxPerM: calibration.pxPerM,
       targetPx: calibration.target,
+      surface: calibration.surface,
     );
   }
 

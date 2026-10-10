@@ -317,7 +317,7 @@ class _About extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.fromLTRB(AppSpace.xs, AppSpace.xxxl, 0, 0),
       child: Text(
-        'HandsOn Physics 0.1.0, protocol v0.2',
+        'HandsOn Physics 0.1.0, protocol v0.3',
         style: AppType.caption.copyWith(
           color: Theme.of(context).colorScheme.onSurfaceVariant,
         ),
