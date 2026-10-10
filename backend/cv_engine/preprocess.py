@@ -32,6 +32,12 @@ class PreprocessedFrame:
         h, w = self.bgr.shape[:2]
         return w, h
 
+    def gray_sharp(self) -> np.ndarray:
+        """Unblurred grayscale, for marker detection where edge precision matters."""
+        if "_gray_sharp" not in self.__dict__:
+            self.__dict__["_gray_sharp"] = cv2.cvtColor(self.bgr, cv2.COLOR_BGR2GRAY)
+        return self.__dict__["_gray_sharp"]
+
     def to_source_coords(self, x: float, y: float) -> tuple[float, float]:
         """Map a point in working-frame pixels back to the client's original pixels."""
         return x / self.scale, y / self.scale

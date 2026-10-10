@@ -64,3 +64,23 @@ def test_config_message_changes_colors():
         assert ws.receive_json()["objects"] == []  # red ball is no longer tracked
         ws.send_text(json.dumps({"type": "config", "colors": ["chartreuse"]}))
         assert ws.receive_json()["type"] == "error"
+
+
+def test_calibrate_message_adds_world_coordinates():
+    import sys
+    from pathlib import Path
+    sys.path.insert(0, str(Path(__file__).parent))
+    from scenes import BOARD_H, BOARD_W, board_image, camera_view
+
+    view, _ = camera_view(board_image(ball_world=(0.2, 0.1))[0])
+    with TestClient(app).websocket_connect("/ws/frames") as ws:
+        ws.send_text(json.dumps({"type": "calibrate", "method": "aruco", "width_m": BOARD_W, "height_m": BOARD_H}))
+        assert ws.receive_json()["calibration"]["status"] == "searching"
+        for _ in range(2):
+            ws.send_bytes(encode_jpeg(view, 90))
+            out = ws.receive_json()
+        assert out["calibration"]["status"] == "ok"
+        (obj,) = out["objects"]
+        assert abs(obj["world"][0] - 0.2) < 0.006 and abs(obj["world"][1] - 0.1) < 0.006
+        ws.send_text(json.dumps({"type": "calibrate", "method": "aruco"}))
+        assert ws.receive_json()["type"] == "error"

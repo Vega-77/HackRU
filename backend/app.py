@@ -8,13 +8,20 @@ Protocol on ws://<host>:8000/ws/frames
     text   (any time) tracking settings, applied from the next frame:
            {"type": "config", "mode": "color", "colors": ["red", "blue"], ...}
            answered with {"type": "config", "config": {...}}
+    text   (any time) plane calibration for metric coordinates:
+           {"type": "calibrate", "method": "aruco", "width_m": 0.6, "height_m": 0.4}
+           {"type": "calibrate", "method": "manual", "image_points": [[x, y] x4],
+            "width_m": 0.6, "height_m": 0.4}
+           answered with {"type": "calibration", "calibration": {...}}
   server -> client
     text   JSON result for each frame that was processed:
            {"type": "frame", "frame_id", "timestamp", "size": [w, h],
             "source_size": [w, h], "scale", "latency_ms", "process_ms",
             "stats": {"received", "processed", "dropped", "decode_errors"},
             "objects": [{"id", "label", "source", "score", "centroid", "bbox",
-                         "centroid_norm", "bbox_norm", "area", "hits"}]}
+                         "centroid_norm", "bbox_norm", "area", "hits",
+                         "world", "world_width"}],
+            "calibration": {"method", "status", "world_to_image", ...}}
            or {"type": "error", "message": ...} for a bad message.
 
 Frames that arrive while the engine is busy are dropped in favour of the newest
@@ -39,8 +46,8 @@ from cv_engine.preprocess import PreprocessedFrame, decode_jpeg, preprocess_fram
 
 WORKING_WIDTH = int(os.environ.get("CV_WORKING_WIDTH", "640"))
 
-# Takes a preprocessed frame and returns the tracked objects in it.
-FrameAnalyzer = Callable[[PreprocessedFrame], list[dict]]
+# Takes a preprocessed frame and returns result fields ("objects", "calibration").
+FrameAnalyzer = Callable[[PreprocessedFrame], dict]
 
 
 def default_config() -> PipelineConfig:
@@ -93,6 +100,8 @@ async def frames_ws(ws: WebSocket) -> None:
                         continue
                     if data.get("type") == "config":
                         await apply_config({k: v for k, v in data.items() if k != "type"})
+                    elif data.get("type") == "calibrate":
+                        await apply_calibration(data)
                     else:
                         pending_meta = data
                 elif msg.get("bytes") is not None:
@@ -116,6 +125,15 @@ async def frames_ws(ws: WebSocket) -> None:
             await ws.send_json({"type": "error", "message": f"bad config: {e}"})
             return
         await ws.send_json({"type": "config", "config": pipeline.config.__dict__})
+
+    async def apply_calibration(request: dict) -> None:
+        try:
+            async with pipeline_lock:
+                status = pipeline.calibrate(request)
+        except (TypeError, ValueError) as e:
+            await ws.send_json({"type": "error", "message": f"bad calibration: {e}"})
+            return
+        await ws.send_json({"type": "calibration", "calibration": status})
 
     async def process_loop() -> None:
         while (frame := await slot.get()) is not None:
@@ -162,5 +180,5 @@ def _process(frame: IncomingFrame, analyzer: FrameAnalyzer) -> dict:
         "size": list(pf.size),
         "source_size": list(pf.source_size),
         "scale": round(pf.scale, 5),
-        "objects": analyzer(pf),
+        **analyzer(pf),
     }

@@ -1,7 +1,7 @@
-"""Per-connection tracking pipeline: detectors + tracker -> JSON-ready objects.
+"""Per-connection tracking pipeline: detectors + tracker + spatial mapping -> JSON.
 
 Each WebSocket connection gets its own TrackingPipeline so tracker state (IDs,
-history) never leaks between phones.
+history) and calibration never leak between phones.
 """
 
 from __future__ import annotations
@@ -9,8 +9,11 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass, field
 
+import numpy as np
+
 from cv_engine.detect import DEFAULT_COLORS, ColorDetector, Detection, MediaPipeDetector
 from cv_engine.preprocess import PreprocessedFrame
+from cv_engine.spatial import SpatialMapper
 from cv_engine.tracker import CentroidTracker, Track
 
 log = logging.getLogger(__name__)
@@ -42,6 +45,7 @@ class PipelineConfig:
 class TrackingPipeline:
     def __init__(self, config: PipelineConfig | None = None) -> None:
         self._mediapipe: MediaPipeDetector | None = None
+        self.spatial = SpatialMapper()
         self.configure(config or PipelineConfig())
 
     def configure(self, config: PipelineConfig) -> None:
@@ -73,8 +77,17 @@ class TrackingPipeline:
             dets += self._mediapipe.detect(frame)
         return dets
 
-    def __call__(self, frame: PreprocessedFrame) -> list[dict]:
-        return [track_to_json(t, frame) for t in self.tracker.update(self.detect(frame))]
+    def __call__(self, frame: PreprocessedFrame) -> dict:
+        """Process one frame; returns the "objects" and "calibration" parts of the result."""
+        self.spatial.update(frame)
+        tracks = self.tracker.update(self.detect(frame))
+        return {
+            "objects": [track_to_json(t, frame, self.spatial) for t in tracks],
+            "calibration": self.spatial.status(),
+        }
+
+    def calibrate(self, request: dict) -> dict:
+        return self.spatial.calibrate(request)
 
     def close(self) -> None:
         if self._mediapipe:
@@ -82,12 +95,20 @@ class TrackingPipeline:
             self._mediapipe = None
 
 
-def track_to_json(t: Track, frame: PreprocessedFrame) -> dict:
-    """Report positions in the client's own pixel space plus normalized 0-1 coords."""
+def track_to_json(t: Track, frame: PreprocessedFrame, spatial: SpatialMapper | None = None) -> dict:
+    """Report positions in the client's own pixel space, normalized 0-1 coords and,
+    when the plane is calibrated, meters on that plane ("world")."""
     s = frame.scale
     w, h = frame.size
     x, y, bw, bh = t.bbox
     cx, cy = t.centroid
+    world = world_width = None
+    if spatial is not None and spatial.mapping is not None:
+        world = spatial.to_world((cx / s, cy / s), (cx / w, cy / h))
+        # Object width on the plane, from the left and right edges at centroid height.
+        left = spatial.to_world((x / s, cy / s), (x / w, cy / h))
+        right = spatial.to_world(((x + bw) / s, cy / s), ((x + bw) / w, cy / h))
+        world_width = round(float(np.hypot(right[0] - left[0], right[1] - left[1])), 4)
     return {
         "id": t.id,
         "label": t.label,
@@ -99,4 +120,6 @@ def track_to_json(t: Track, frame: PreprocessedFrame) -> dict:
         "bbox_norm": [round(x / w, 5), round(y / h, 5), round(bw / w, 5), round(bh / h, 5)],
         "area": round(t.area / (s * s), 1),
         "hits": t.hits,
+        "world": world,
+        "world_width": world_width,
     }

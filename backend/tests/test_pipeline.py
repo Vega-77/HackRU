@@ -14,14 +14,15 @@ def frame(x, frame_id):
 
 def test_reports_tracks_in_source_pixels_and_normalized():
     pipe = TrackingPipeline()
-    assert pipe(frame(300, 0)) == []  # not confirmed yet (min_hits=2)
-    objs = pipe(frame(320, 1))
+    assert pipe(frame(300, 0))["objects"] == []  # not confirmed yet (min_hits=2)
+    objs = pipe(frame(320, 1))["objects"]
     assert len(objs) == 1
     o = objs[0]
     assert o["label"] == "red" and o["id"] == 1
     assert o["centroid"] == pytest.approx([320, 400], abs=2)
     assert o["centroid_norm"] == pytest.approx([0.25, 0.5556], abs=0.005)
     assert o["bbox"][2] == pytest.approx(80, abs=5)
+    assert o["world"] is None  # no calibration yet
 
 
 def test_config_validation_and_update():

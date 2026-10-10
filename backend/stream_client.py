@@ -44,6 +44,9 @@ async def run(args: argparse.Namespace) -> None:
         frames = iter_frames(args.source, max_fps=args.fps, loop=args.loop)
 
     async with websockets.connect(args.url, max_size=None) as ws:
+        if args.aruco:
+            w, h = args.aruco
+            await ws.send(json.dumps({"type": "calibrate", "method": "aruco", "width_m": w, "height_m": h}))
         sent = 0
         bytes_sent = 0
         results: list[dict] = []
@@ -54,7 +57,7 @@ async def run(args: argparse.Namespace) -> None:
                 data = json.loads(msg)
                 if data.get("type") == "error":
                     print("server error:", data["message"])
-                else:
+                elif data.get("type") == "frame":
                     results.append(data)
 
         reader_task = asyncio.create_task(reader())
@@ -90,8 +93,12 @@ def _report(sent: int, bytes_sent: int, results: list[dict], elapsed: float) -> 
         f"{bytes_sent / sent / 1024:.1f} KB/frame) | processed {last['stats']['processed']} "
         f"dropped {last['stats']['dropped']} | latency {lat:.1f} ms, process {proc:.1f} ms"
     )
+    cal = last.get("calibration", {})
+    if cal.get("method", "none") != "none":
+        print(f"    plane: {cal['method']} {cal['status']}")
     for o in last.get("objects", []):
-        print(f"    #{o['id']} {o['label']:<12} centroid {o['centroid']}  bbox {o['bbox']}")
+        world = f"  world {o['world']} m" if o.get("world") else ""
+        print(f"    #{o['id']} {o['label']:<12} centroid {o['centroid']}  bbox {o['bbox']}{world}")
 
 
 def main() -> None:
@@ -103,6 +110,8 @@ def main() -> None:
     p.add_argument("--quality", type=int, default=70, help="JPEG quality 1-100")
     p.add_argument("--max-frames", type=int, default=0, help="stop after N frames (0 = run until source ends)")
     p.add_argument("--loop", action="store_true", help="restart a video file when it ends")
+    p.add_argument("--aruco", type=float, nargs=2, metavar=("WIDTH_M", "HEIGHT_M"),
+                   help="calibrate with ArUco markers 0-3 on a rectangle of this size (center to center)")
     asyncio.run(run(p.parse_args()))
 
 
