@@ -7,6 +7,9 @@ import 'package:hands_on_physics/services/camera/arkit_frame_source.dart';
 import 'package:hands_on_physics/services/camera/frame_source.dart';
 
 class _FallbackCamera implements FrameSource {
+  @override
+  String get name => 'fake camera';
+
   int starts = 0;
 
   @override

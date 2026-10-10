@@ -21,6 +21,7 @@ abstract final class AppIcons {
   static const check = IconData(0xe182, fontFamily: _family);
   static const checkCircle = IconData(0xe184, fontFamily: _family);
   static const circle = IconData(0xe18a, fontFamily: _family);
+  static const copy = IconData(0xe1ca, fontFamily: _family);
   static const crosshair = IconData(0xe1d6, fontFamily: _family);
   static const gear = IconData(0xe270, fontFamily: _family);
   static const info = IconData(0xe2ce, fontFamily: _family);

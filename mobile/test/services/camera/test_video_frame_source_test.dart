@@ -8,6 +8,9 @@ import 'package:image/image.dart' as img;
 
 /// A camera that fails to open with [error].
 class _BrokenCamera implements FrameSource {
+  @override
+  String get name => 'fake camera';
+
   _BrokenCamera(this.error);
 
   final CameraUnavailableException error;

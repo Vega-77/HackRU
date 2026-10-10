@@ -10,6 +10,7 @@ import '../../models/experiment_mode.dart';
 import '../../services/network/physics_socket.dart';
 import '../../state/experiment_settings.dart';
 import '../../state/session_controller.dart';
+import '../debug/copy_debug_log.dart';
 import '../settings/backend_url.dart';
 import 'server_error_text.dart';
 import 'widgets/experiment_stage.dart';
@@ -243,6 +244,12 @@ class _TopBar extends ConsumerWidget {
         ),
         const SizedBox(width: AppSpace.sm),
         _GlassIconButton(
+          icon: AppIcons.copy,
+          tooltip: 'Copy debug log',
+          onPressed: () => copyDebugLog(context),
+        ),
+        const SizedBox(width: AppSpace.sm),
+        _GlassIconButton(
           icon: paused ? AppIcons.play : AppIcons.pause,
           tooltip: paused ? 'Resume' : 'Pause',
           onPressed: switch (phase) {
@@ -377,15 +384,16 @@ class _Banners extends ConsumerWidget {
               ? "Can't reach the hosted backend yet. If it was asleep, it "
                     'takes up to a minute to wake. Retrying.'
               : "Can't reach the backend at $url. Retrying every few seconds.",
-          action: 'Settings',
-          onAction: () => context.push(Routes.settings),
+          actions: [('Settings', () => context.push(Routes.settings))],
         ),
       if (serverError != null)
         _Banner(
           icon: AppIcons.warning,
           message: describeServerError(serverError, count: errorCount),
-          action: 'Dismiss',
-          onAction: ref.read(sessionProvider.notifier).dismissServerError,
+          actions: [
+            ('Copy log', () => copyDebugLog(context)),
+            ('Dismiss', ref.read(sessionProvider.notifier).dismissServerError),
+          ],
         ),
     ];
 
@@ -411,14 +419,14 @@ class _Banner extends StatelessWidget {
   const _Banner({
     required this.icon,
     required this.message,
-    required this.action,
-    required this.onAction,
+    required this.actions,
   });
 
   final IconData icon;
   final String message;
-  final String action;
-  final VoidCallback onAction;
+
+  /// Button labels and what they do, shown after the message.
+  final List<(String, VoidCallback)> actions;
 
   @override
   Widget build(BuildContext context) {
@@ -437,26 +445,46 @@ class _Banner extends StatelessWidget {
             AppSpace.xs,
             AppSpace.xs,
           ),
-          child: Row(
-            children: [
-              Icon(icon, size: 18, color: AppColors.vellum),
-              const SizedBox(width: AppSpace.sm),
-              Expanded(
-                child: Text(
-                  message,
-                  style: AppType.caption.copyWith(
-                    color: AppColors.vellum,
-                    fontSize: 13,
-                  ),
+          // One action fits beside the message; more go under it, so the
+          // message keeps its width on a phone.
+          child: actions.length == 1
+              ? Row(children: [..._message(), ..._buttons()])
+              : Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.only(
+                        top: AppSpace.sm,
+                        right: AppSpace.sm,
+                      ),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: _message(),
+                      ),
+                    ),
+                    Row(mainAxisSize: MainAxisSize.min, children: _buttons()),
+                  ],
                 ),
-              ),
-              TextButton(onPressed: onAction, child: Text(action)),
-            ],
-          ),
         ),
       ),
     );
   }
+
+  List<Widget> _message() => [
+    Icon(icon, size: 18, color: AppColors.vellum),
+    const SizedBox(width: AppSpace.sm),
+    Expanded(
+      child: Text(
+        message,
+        style: AppType.caption.copyWith(color: AppColors.vellum, fontSize: 13),
+      ),
+    ),
+  ];
+
+  List<Widget> _buttons() => [
+    for (final (label, onPressed) in actions)
+      TextButton(onPressed: onPressed, child: Text(label)),
+  ];
 }
 
 /// A centred note when the picture alone would be confusing: starting up,

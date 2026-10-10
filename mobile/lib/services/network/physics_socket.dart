@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:web_socket_channel/web_socket_channel.dart';
 
 import '../../core/config/app_config.dart';
+import '../../core/logging/debug_log.dart';
 import '../../models/physics_state.dart';
 import '../../models/session_config.dart';
 
@@ -62,6 +63,17 @@ class PhysicsSocket {
   double? get latencyMs => _latencyMs;
   double? _latencyMs;
 
+  /// Round trip of the newest reply, unsmoothed. Null when that reply was
+  /// for a frame already settled (the backend sends two messages a frame).
+  double? get lastRttMs => _lastRttMs;
+  double? _lastRttMs;
+
+  /// The id of the newest frame sent, or null before the first.
+  int? get lastFrameId => _nextFrameId == 0 ? null : _nextFrameId - 1;
+
+  /// When the current connection attempt began, for the handshake time.
+  final _opening = Stopwatch();
+
   int get framesInFlight {
     _expireStaleFrames();
     return _inFlight.length;
@@ -79,6 +91,7 @@ class PhysicsSocket {
   }
 
   void disconnect() {
+    if (_wanted) log.i('Disconnecting from $url');
     _wanted = false;
     _reconnectTimer?.cancel();
     _closeChannel();
@@ -141,30 +154,48 @@ class PhysicsSocket {
     final Uri uri;
     try {
       uri = Uri.parse(url);
-    } on FormatException {
+    } on FormatException catch (e) {
+      log.e('Not a valid WebSocket address: "$url"', e);
       _messages.add(ErrorMessage('"$url" is not a valid WebSocket address.'));
       _scheduleReconnect();
       return;
     }
 
+    log.i('Connecting to $uri');
+    _opening
+      ..reset()
+      ..start();
     final channel = _connector(uri);
     _channel = channel;
     _subscription = channel.stream.listen(
       _onData,
-      onError: (_) => _onClosed(channel),
+      onError: (Object error, StackTrace stack) =>
+          _onClosed(channel, error, stack),
       onDone: () => _onClosed(channel),
     );
-    channel.ready.then((_) {
-      if (_channel != channel) return;
-      _inFlight.clear();
-      _setStatus(ConnectionStatus.live);
-      final config = _lastConfig;
-      if (config != null) channel.sink.add(config.encode());
-    }, onError: (_) => _onClosed(channel));
+    channel.ready.then(
+      (_) {
+        if (_channel != channel) return;
+        _inFlight.clear();
+        log.i('Connected in ${_opening.elapsedMilliseconds} ms');
+        _setStatus(ConnectionStatus.live);
+        final config = _lastConfig;
+        if (config != null) {
+          log.d('Config re-sent on connect');
+          channel.sink.add(config.encode());
+        }
+      },
+      onError: (Object error, StackTrace stack) =>
+          _onClosed(channel, error, stack),
+    );
   }
 
   void _onData(dynamic data) {
-    if (data is! String) return; // The server only sends text.
+    // The server only sends text.
+    if (data is! String) {
+      log.w('Ignored a ${data.runtimeType} message: the backend sends text');
+      return;
+    }
     final message = ServerMessage.parse(data);
     final frameId = message.frameId;
     if (frameId != null) _recordReply(frameId);
@@ -175,19 +206,46 @@ class PhysicsSocket {
     final sentAt = _inFlight[frameId];
     // Older frames were dropped by the backend in favour of this one.
     _inFlight.removeWhere((id, _) => id <= frameId);
+    _lastRttMs = null;
     if (sentAt == null) return;
     final rttMs = (_clock() - sentAt).inMicroseconds / 1000;
+    _lastRttMs = rttMs;
     // Exponential moving average so the latency chip doesn't flicker.
     _latencyMs = _latencyMs == null ? rttMs : _latencyMs! * 0.8 + rttMs * 0.2;
   }
 
   void _expireStaleFrames() {
     final now = _clock();
-    _inFlight.removeWhere((_, sentAt) => now - sentAt > AppConfig.frameTimeout);
+    final stale = [
+      for (final MapEntry(key: id, value: sentAt) in _inFlight.entries)
+        if (now - sentAt > AppConfig.frameTimeout) id,
+    ];
+    if (stale.isEmpty) return;
+    stale.forEach(_inFlight.remove);
+    log.w(
+      'No reply within ${AppConfig.frameTimeout.inMilliseconds} ms for '
+      'frame${stale.length == 1 ? '' : 's'} ${stale.join(', ')}, '
+      'forgotten so frames keep flowing',
+    );
   }
 
-  void _onClosed(WebSocketChannel channel) {
+  void _onClosed(WebSocketChannel channel, [Object? error, StackTrace? stack]) {
     if (_channel != channel) return; // An old channel we already replaced.
+    final code = channel.closeCode;
+    final reason = channel.closeReason;
+    final how = [
+      if (code != null) 'code $code',
+      if (reason != null && reason.isNotEmpty) 'reason "$reason"',
+    ].join(', ');
+    final message =
+        '${error == null ? 'Connection closed' : 'Connection failed'}'
+        '${how.isEmpty ? '' : ' ($how)'}'
+        ' after ${_opening.elapsedMilliseconds} ms';
+    if (error == null) {
+      log.w(message);
+    } else {
+      log.e(message, error, stack);
+    }
     _closeChannel();
     if (_wanted) {
       _setStatus(ConnectionStatus.offline);
@@ -197,6 +255,7 @@ class PhysicsSocket {
 
   void _scheduleReconnect() {
     _reconnectTimer?.cancel();
+    log.i('Reconnecting in ${AppConfig.reconnectDelay.inMilliseconds} ms');
     _reconnectTimer = Timer(AppConfig.reconnectDelay, () {
       if (_wanted && _channel == null) _open();
     });

@@ -4,12 +4,16 @@ import 'dart:io';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:hands_on_physics/core/logging/debug_log.dart';
 import 'package:hands_on_physics/models/session_config.dart';
 import 'package:hands_on_physics/services/camera/frame_source.dart';
 import 'package:hands_on_physics/state/experiment_settings.dart';
 import 'package:hands_on_physics/state/session_controller.dart';
 
 class _FakeCamera implements FrameSource {
+  @override
+  String get name => 'fake camera';
+
   @override
   bool isRunning = false;
 
@@ -76,6 +80,7 @@ void main() {
       String error(String message) =>
           jsonEncode({'type': 'error', 'message': message});
       ws
+        ..add(jsonEncode({'type': 'frame', 'frame_id': 0, 'process_ms': 4.2}))
         ..add(error('could not process frame: ValueError: x'))
         ..add(error('could not process frame: ValueError: x'))
         ..add(error('could not process frame: ValueError: x'))
@@ -85,6 +90,7 @@ void main() {
         .read(experimentSettingsProvider.notifier)
         .setBackendUrl('ws://127.0.0.1:${server.port}/ws/frames');
 
+    log.clear();
     final counts = <int>[];
     container.listen(
       sessionProvider.select((s) => s.serverErrorCount),
@@ -101,5 +107,20 @@ void main() {
       'could not decode image bytes',
     );
     await session().stop();
+
+    final logged = log.entries.map((e) => e.message).join('\n');
+    expect(logged, contains('======== Session 1: '));
+    expect(logged, contains('Config (session start): {"type":"config"'));
+    expect(logged, contains('Connected in '));
+    expect(logged, contains('Frame 0 report: 4.2 ms on the backend'));
+    expect(
+      logged,
+      contains('(3 in a row): could not process frame: ValueError: x'),
+    );
+    expect(logged, contains('frames sent, 1 replies, 4 errors'));
+    expect(
+      log.entries.firstWhere((e) => e.message.startsWith('Config')).caller,
+      startsWith('SessionController._sendConfig (state/session_controller'),
+    );
   });
 }

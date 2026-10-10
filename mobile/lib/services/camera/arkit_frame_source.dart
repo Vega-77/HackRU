@@ -2,6 +2,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 
 import '../../core/config/app_config.dart';
+import '../../core/logging/debug_log.dart';
 import '../../models/camera_pose.dart';
 import '../../models/session_config.dart';
 import '../../models/vec2.dart';
@@ -30,6 +31,9 @@ class ArKitFrameSource implements FrameSource, SurfaceFinder {
   bool get _useFallback => _supported == false;
 
   @override
+  String get name => _useFallback ? fallback.name : 'ARKit camera';
+
+  @override
   bool get isRunning => _useFallback ? fallback.isRunning : _running;
 
   @override
@@ -40,7 +44,14 @@ class ArKitFrameSource implements FrameSource, SurfaceFinder {
 
   @override
   Future<void> start() async {
-    _supported ??= await _isSupported();
+    if (_supported == null) {
+      _supported = await _isSupported();
+      log.i(
+        _supported!
+            ? 'ARKit world tracking is available'
+            : 'No ARKit world tracking, using the ${fallback.name}',
+      );
+    }
     if (_useFallback) return fallback.start();
     if (_running) return;
     try {
@@ -49,7 +60,9 @@ class ArKitFrameSource implements FrameSource, SurfaceFinder {
       });
       _frameSize = FrameSize(size!['width']! as int, size['height']! as int);
       _running = true;
-    } on PlatformException catch (e) {
+      log.i('ARKit session started, frames $_frameSize');
+    } on PlatformException catch (e, stack) {
+      log.e('ARKit session failed to start: ${e.code}', e, stack);
       throw CameraUnavailableException(
         e.code == 'denied'
             ? 'Camera access is off. Turn it on in Settings, then try again.'
@@ -63,6 +76,7 @@ class ArKitFrameSource implements FrameSource, SurfaceFinder {
     if (_useFallback) return fallback.stop();
     if (!_running) return;
     _running = false;
+    log.i('Stopping the ARKit session');
     await _channel.invokeMethod<void>('stop');
   }
 
@@ -91,7 +105,15 @@ class ArKitFrameSource implements FrameSource, SurfaceFinder {
       'y': framePixel.y,
       'width': _frameSize!.width,
     });
-    return hit == null ? null : ArSurface.fromMap(hit);
+    final surface = hit == null ? null : ArSurface.fromMap(hit);
+    log.i(
+      surface == null
+          ? 'No AR surface at $framePixel'
+          : 'AR surface at $framePixel: '
+                '${surface.vertical ? 'vertical' : 'horizontal'}, '
+                'point ${surface.point}, normal ${surface.normal}',
+    );
+    return surface;
   }
 
   @override

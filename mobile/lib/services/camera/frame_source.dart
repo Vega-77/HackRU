@@ -18,6 +18,10 @@ import '../../models/vec2.dart';
 ///   has no ARKit world tracking.
 /// * `TestVideoFrameSource`: a drawn ball, for devices with no camera.
 abstract class FrameSource {
+  /// What the debug log calls this camera. Not `runtimeType`, which is
+  /// minified in web release builds.
+  String get name;
+
   /// Opens the camera. Throws [NoCameraException] if the device has no
   /// camera, or [CameraUnavailableException] if it could not be opened.
   Future<void> start();

@@ -119,6 +119,35 @@ LIVE_BACKEND_URL=ws://localhost:8000/ws/frames flutter test test/integration
 Against the mock server, add `LIVE_BACKEND_MOCK=1`. The mock ignores the
 image, so only the connection checks run.
 
+## Debug log
+
+The app keeps a hidden log of what it does, so you can see what happened
+when an experiment goes wrong. To get it, press the copy button in the
+experiment screen's top bar, or "Copy log" on a backend error banner, or
+"Copy debug log" in Settings. Then paste it into chat or an issue. Settings
+also shows how many entries there are, and "Clear" empties it.
+
+Each line has the time, the seconds since the experiment started, a level
+(`D` detail, `I` info, `W` warning, `E` error), the method and `file:line`
+that logged it, then the message:
+
+```text
+14:02:07.415 +3.204s I SessionController._sendConfig (state/session_controller.dart:512) Config (session start): {"type":"config",...}
+```
+
+A web release build minifies method names, so there the caller shows as
+`?`. Debug builds and the iPhone show it in full.
+
+The copy starts with the app and protocol versions, the platform, and the
+current backend, mode, mass and calibration. Each experiment starts with a
+`======== Session N ========` line. It logs the camera and connection
+opening and closing, every config sent, every frame sent and every reply
+(with round trip and backend time), backend errors with where they
+happened, tracking found and lost, setup and settings changes, screens
+opened, uncaught errors and anything printed. It keeps the last 20,000
+lines, about eleven minutes of an experiment. In `flutter run` and the
+Xcode console the same lines are printed as they happen.
+
 ## How the code is laid out
 
 Each layer only uses the layers below it in this list, so you can read the

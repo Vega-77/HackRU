@@ -1,6 +1,9 @@
 /// App-wide constants. Values the user can change at runtime (backend URL,
 /// mass) start from here and live in `state/experiment_settings.dart`.
 abstract final class AppConfig {
+  static const String appVersion = '0.1.0';
+  static const String protocolVersion = 'v0.3';
+
   /// Default backend WebSocket URL: the team's backend on Render (see
   /// `render.yaml` at the repo root). Override at build time with
   /// `flutter run --dart-define=BACKEND_URL=ws://192.168.1.20:8000/ws/frames`.

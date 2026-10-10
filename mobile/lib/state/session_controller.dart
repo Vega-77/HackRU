@@ -1,8 +1,10 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/config/app_config.dart';
+import '../core/logging/debug_log.dart';
 import '../models/physics_state.dart';
 import '../models/session_config.dart';
 import '../services/camera/frame_source_factory.dart';
@@ -96,10 +98,15 @@ final frameSourceProvider = Provider<FrameSource>((ref) {
 ///
 /// Incoming states update [SessionState.latest] and feed [telemetry].
 /// Changing settings or calibration mid-session re-sends the config.
+/// Every step goes to the debug log, one line per frame sent and received.
 class SessionController extends Notifier<SessionState> {
   /// A 4:3 frame at the streaming width, assumed until the camera reports
   /// its real size.
   static const fallbackFrameSize = FrameSize(AppConfig.frameWidth, 240);
+
+  /// Repeated camera problems are logged the first time and every this
+  /// many times after, so a dead camera doesn't fill the log.
+  static const _repeatLogEvery = 30;
 
   final TelemetryBuffer telemetry = TelemetryBuffer();
 
@@ -123,39 +130,87 @@ class SessionController extends Notifier<SessionState> {
   /// leave it running then.
   bool _ownsCamera = false;
 
+  // Counters for the debug log only.
+  final _sessionClock = Stopwatch();
+  int _framesSent = 0;
+  int _replies = 0;
+  int _errors = 0;
+  int _missingFrames = 0;
+  int _failedCaptures = 0;
+  int _waitingTicks = 0;
+  int _encodingTicks = 0;
+  bool? _tracking;
+  bool _foundOnce = false;
+  String? _notSendingBecause;
+
   FrameSource get _camera => ref.read(frameSourceProvider);
 
   @override
   SessionState build() {
     ref.onDispose(_teardown);
+    log.context = _logContext;
+    ref.onDispose(() {
+      if (log.context == _logContext) log.context = null;
+    });
 
     ref.listen(experimentSettingsProvider, (previous, next) {
       if (!state.isActive || previous == null) return;
       if (previous.backendUrl != next.backendUrl) {
+        log.i('Backend changed mid-session to ${next.backendUrl}');
         _startSocket(next.backendUrl);
       } else if (previous.mode != next.mode || previous.massKg != next.massKg) {
         telemetry.clear();
-        _socket?.sendConfig(_config());
+        _sendConfig('mode or mass changed');
       }
     });
-    ref.listen(calibrationProvider, (_, _) => _socket?.sendConfig(_config()));
+    ref.listen(calibrationProvider, (_, _) {
+      if (_socket != null) _sendConfig('calibration changed');
+    });
 
     return const SessionState();
   }
 
   Future<void> start() async {
     final stopping = _stopInProgress;
-    if (stopping != null) await stopping;
+    if (stopping != null) {
+      log.d('Start waits for the previous session to stop');
+      await stopping;
+    }
     if (!ref.mounted) return;
-    if (state.phase == SessionPhase.starting || state.isActive) return;
+    if (state.phase == SessionPhase.starting || state.isActive) {
+      log.d('Start ignored: the session is already ${state.phase.name}');
+      return;
+    }
     _sessionEpoch++;
+    _resetCounters();
+    final settings = ref.read(experimentSettingsProvider);
+    final calibration = ref.read(calibrationProvider);
+    log.markSession('Session $_sessionEpoch: ${settings.mode.label}');
+    log.i(
+      'Starting: mode ${settings.mode.wireName}, mass ${settings.massKg} kg, '
+      'backend ${settings.backendUrl}',
+    );
+    log.i(
+      'Calibration: '
+      '${calibration.pxPerM?.toStringAsFixed(1) ?? 'no'} px/m, '
+      'ruler ${calibration.rulerStart} to ${calibration.rulerEnd} '
+      '(${calibration.rulerLengthM} m), target ${calibration.target}, '
+      'surface ${calibration.surface == null ? 'none' : 'set'}',
+    );
     state = state.copyWith(phase: SessionPhase.starting, clearErrors: true);
     telemetry.clear();
 
     _ownsCamera = !_camera.isRunning;
+    log.i(
+      _ownsCamera
+          ? 'Opening the ${_camera.name}'
+          : 'Reusing the ${_camera.name} that setup opened',
+    );
+    final opening = Stopwatch()..start();
     try {
       await _camera.start();
-    } on CameraUnavailableException catch (e) {
+    } on CameraUnavailableException catch (e, stack) {
+      log.e('Camera did not start', e, stack);
       if (ref.mounted) {
         state = state.copyWith(
           phase: SessionPhase.failed,
@@ -163,12 +218,23 @@ class SessionController extends Notifier<SessionState> {
         );
       }
       return;
+    } catch (e, stack) {
+      log.e('Camera start threw', e, stack);
+      rethrow;
     }
-    if (!ref.mounted) return;
+    if (!ref.mounted) {
+      log.w('The session closed while the camera was opening');
+      return;
+    }
 
+    final frameSize = _camera.frameSize;
+    log.i(
+      'Camera ready in ${opening.elapsedMilliseconds} ms, frames '
+      '${frameSize ?? '$fallbackFrameSize (assumed, none reported yet)'}',
+    );
     state = state.copyWith(
       phase: SessionPhase.running,
-      frameSize: _camera.frameSize ?? fallbackFrameSize,
+      frameSize: frameSize ?? fallbackFrameSize,
     );
     _startSocket(ref.read(experimentSettingsProvider).backendUrl);
     _statsTimer = Timer.periodic(
@@ -180,12 +246,14 @@ class SessionController extends Notifier<SessionState> {
   /// Freezes the overlay and stops sending frames. The camera keeps running.
   void pause() {
     if (state.phase == SessionPhase.running) {
+      log.i('Paused');
       state = state.copyWith(phase: SessionPhase.paused);
     }
   }
 
   void resume() {
     if (state.phase == SessionPhase.paused) {
+      log.i('Resumed');
       state = state.copyWith(phase: SessionPhase.running);
     }
   }
@@ -193,6 +261,7 @@ class SessionController extends Notifier<SessionState> {
   /// Hides the last backend error banner until a new error arrives.
   void dismissServerError() {
     if (state.serverError == null) return;
+    log.d('Backend error banner dismissed');
     state = SessionState(
       phase: state.phase,
       connection: state.connection,
@@ -206,13 +275,19 @@ class SessionController extends Notifier<SessionState> {
   }
 
   Future<void> stop({int? onlyIfEpoch}) {
+    if (!ref.mounted) return Future.value();
     // A screen from an older route transition must not stop a newer session.
-    if (!ref.mounted || (onlyIfEpoch != null && onlyIfEpoch != _sessionEpoch)) {
+    if (onlyIfEpoch != null && onlyIfEpoch != _sessionEpoch) {
+      log.d(
+        'Stop skipped: it was for session $onlyIfEpoch, '
+        'session $_sessionEpoch is running',
+      );
       return Future.value();
     }
     if (_stopInProgress != null) return _stopInProgress!;
     // Setup may already have restarted the shared camera after this session.
     if (state.phase == SessionPhase.idle) return Future.value();
+    log.i('Stopping session $_sessionEpoch (${state.phase.name})');
     return _stopInProgress = _stopSession().whenComplete(() {
       _stopInProgress = null;
     });
@@ -223,7 +298,15 @@ class SessionController extends Notifier<SessionState> {
     if (_ownsCamera) {
       _ownsCamera = false;
       await _camera.stop();
+      log.i('Camera closed');
+    } else {
+      log.i('Camera left on for setup');
     }
+    log.i(
+      'Session $_sessionEpoch ended after '
+      '${(_sessionClock.elapsedMilliseconds / 1000).toStringAsFixed(1)} s: '
+      '$_framesSent frames sent, $_replies replies, $_errors errors',
+    );
     if (ref.mounted) state = const SessionState();
   }
 
@@ -231,6 +314,8 @@ class SessionController extends Notifier<SessionState> {
   void _startSocket(String url) {
     _stopSocket();
     _hasPhysics = false;
+    _tracking = null;
+    _foundOnce = false;
     final socket = PhysicsSocket(url);
     _socket = socket;
     _subscriptions
@@ -243,26 +328,25 @@ class SessionController extends Notifier<SessionState> {
         socket.messages.listen((message) {
           switch (message) {
             case StateMessage(state: final physics):
+              _logState(physics, socket.lastRttMs);
               _hasPhysics = true;
               _onState(physics);
             // Until the physics stage answers, the CV report still says
             // where the object is, so the marker and x(t) chart work.
-            case FrameAckMessage(:final target?) when !_hasPhysics:
-              _onState(target);
+            case FrameAckMessage():
+              _logReport(message, socket.lastRttMs);
+              if (message.target case final target? when !_hasPhysics) {
+                _onState(target);
+              }
             case final ErrorMessage error:
-              final repeat = error.message == state.serverError?.message;
-              state = state.copyWith(
-                serverError: error,
-                serverErrorCount: repeat ? state.serverErrorCount + 1 : 1,
-              );
-            case FrameAckMessage() || UnknownMessage():
-              break;
+              _onServerError(error);
+            case UnknownMessage(:final raw):
+              log.w('Unrecognised message from the backend: ${_clip(raw)}');
           }
         }),
       );
-    socket
-      ..sendConfig(_config())
-      ..connect();
+    _sendConfig('session start');
+    socket.connect();
     _frameTimer = Timer.periodic(
       Duration(microseconds: 1000000 ~/ AppConfig.targetFps),
       (_) => _pumpFrame(),
@@ -272,16 +356,51 @@ class SessionController extends Notifier<SessionState> {
   /// Sends one frame if the socket has room. Called at the target FPS.
   Future<void> _pumpFrame() async {
     final socket = _socket;
-    if (socket == null ||
-        _capturing ||
-        state.phase != SessionPhase.running ||
-        !socket.canSendFrame) {
+    if (socket == null) return;
+    if (state.phase != SessionPhase.running) {
+      return _noteNotSending('the session is ${state.phase.name}');
+    }
+    if (socket.status != ConnectionStatus.live) {
+      return _noteNotSending('the backend is ${socket.status.name}');
+    }
+    _noteNotSending(null);
+    // Both are normal: the encoder or the backend is still busy. They are
+    // counted into the once-a-second summary instead.
+    if (_capturing) {
+      _encodingTicks++;
+      return;
+    }
+    if (!socket.canSendFrame) {
+      _waitingTicks++;
       return;
     }
     _capturing = true;
+    final capturing = Stopwatch()..start();
     try {
       final frame = await _camera.capture();
-      if (frame != null && socket.sendFrame(frame)) _framesSentThisSecond++;
+      if (frame == null) {
+        _missingFrames++;
+        if (_missingFrames % _repeatLogEvery == 1) {
+          log.w('The camera had no frame to send ($_missingFrames so far)');
+        }
+      } else if (socket.sendFrame(frame)) {
+        _framesSentThisSecond++;
+        _framesSent++;
+        log.d(
+          'Frame ${socket.lastFrameId} sent: '
+          '${(frame.jpeg.length / 1024).toStringAsFixed(1)} KB, ${frame.size}, '
+          'captured in ${capturing.elapsedMilliseconds} ms, '
+          '${socket.framesInFlight} in flight'
+          '${frame.pose == null ? '' : ', with ARKit pose'}',
+        );
+      } else {
+        log.d('Frame dropped: the backend got busy while it was captured');
+      }
+    } catch (e, stack) {
+      _failedCaptures++;
+      if (_failedCaptures % _repeatLogEvery == 1) {
+        log.e('Capturing a frame failed ($_failedCaptures so far)', e, stack);
+      }
     } finally {
       _capturing = false;
     }
@@ -296,13 +415,44 @@ class SessionController extends Notifier<SessionState> {
     );
   }
 
+  void _onServerError(ErrorMessage error) {
+    _errors++;
+    final repeat = error.message == state.serverError?.message;
+    state = state.copyWith(
+      serverError: error,
+      serverErrorCount: repeat ? state.serverErrorCount + 1 : 1,
+    );
+    log.e(
+      'Backend error'
+      '${error.frameId == null ? '' : ' on frame ${error.frameId}'}'
+      ' (${state.serverErrorCount} in a row): ${error.message}'
+      '${error.where == null ? '' : ', at ${error.where}'}'
+      '${error.serverVersion == null ? '' : ', backend ${error.serverVersion}'}',
+    );
+  }
+
   void _tickStats() {
     if (!ref.mounted) return;
     state = state.copyWith(
       sendFps: _framesSentThisSecond.toDouble(),
       latencyMs: _socket?.latencyMs,
     );
+    log.d(
+      'Last second: $_framesSentThisSecond frames sent, latency '
+      '${_socket?.latencyMs?.toStringAsFixed(0) ?? '?'} ms, '
+      '${_socket?.framesInFlight ?? 0} in flight, waited $_waitingTicks '
+      'ticks for replies and $_encodingTicks for the encoder, '
+      '${state.phase.name}, ${state.connection.name}',
+    );
     _framesSentThisSecond = 0;
+    _waitingTicks = 0;
+    _encodingTicks = 0;
+  }
+
+  void _sendConfig(String why) {
+    final config = _config();
+    log.i('Config ($why): ${config.encode()}');
+    _socket?.sendConfig(config);
   }
 
   SessionConfig _config() {
@@ -317,6 +467,91 @@ class SessionController extends Notifier<SessionState> {
       surface: calibration.surface,
     );
   }
+
+  void _logState(PhysicsState s, double? rttMs) {
+    _replies++;
+    log.d(
+      'Frame ${s.frameId} state${_rtt(rttMs)}: '
+      '${s.tracked ? 'tracked' : 'not tracked'}, '
+      't ${s.t.toStringAsFixed(3)} s, pixel ${s.pixel}, '
+      'position ${s.position}, v ${s.velocity}, a ${s.acceleration}, '
+      '${s.forces.length} forces',
+    );
+    _noteTracking(s.tracked, s.frameId);
+  }
+
+  void _logReport(FrameAckMessage report, double? rttMs) {
+    _replies++;
+    log.d(
+      'Frame ${report.frameId} report${_rtt(rttMs)}: '
+      '${report.processMs?.toStringAsFixed(1) ?? '?'} ms on the backend, '
+      'target ${report.target?.pixel}, '
+      'objects ${_clip(jsonEncode(report.objects))}',
+    );
+    if (!_hasPhysics) _noteTracking(report.target != null, report.frameId);
+  }
+
+  /// Logs only when the target is found or lost, not on every frame.
+  void _noteTracking(bool tracked, int frameId) {
+    if (tracked == _tracking) return;
+    final first = _tracking == null;
+    _tracking = tracked;
+    if (tracked) {
+      log.i('Target ${_foundOnce ? 'found again' : 'found'} at frame $frameId');
+      _foundOnce = true;
+    } else {
+      log.w(
+        first
+            ? 'The first reply (frame $frameId) has no target'
+            : 'Target lost at frame $frameId',
+      );
+    }
+  }
+
+  /// Logs only when the reason frames aren't going out changes.
+  void _noteNotSending(String? because) {
+    if (because == _notSendingBecause) return;
+    _notSendingBecause = because;
+    log.d(because == null ? 'Sending frames' : 'Not sending frames: $because');
+  }
+
+  void _resetCounters() {
+    _sessionClock
+      ..reset()
+      ..start();
+    _framesSent = 0;
+    _replies = 0;
+    _errors = 0;
+    _missingFrames = 0;
+    _failedCaptures = 0;
+    _waitingTicks = 0;
+    _encodingTicks = 0;
+    _notSendingBecause = null;
+  }
+
+  /// The top of a copied log: what the session is set up to do right now.
+  Map<String, Object?> _logContext() {
+    final settings = ref.read(experimentSettingsProvider);
+    final calibration = ref.read(calibrationProvider);
+    return {
+      'backend': settings.backendUrl,
+      'mode': settings.mode.wireName,
+      'mass_kg': settings.massKg,
+      'px_per_m': calibration.pxPerM?.toStringAsFixed(1),
+      'target_px': calibration.target,
+      'ar_surface': calibration.surface != null,
+      'camera': _camera.name,
+      'session':
+          '$_sessionEpoch, ${state.phase.name}, ${state.connection.name}',
+      'frame_size': state.frameSize,
+    };
+  }
+
+  static String _rtt(double? ms) =>
+      ms == null ? '' : ' after ${ms.toStringAsFixed(0)} ms';
+
+  static String _clip(String text) =>
+      text.length <= 300 ? text : '${text.substring(0, 300)}...';
 
   void _stopSocket() {
     _frameTimer?.cancel();
