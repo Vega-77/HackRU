@@ -1,5 +1,8 @@
 # HackRU
 
+HandsOn Physics: an AR physics assistant. The Python CV backend lives in
+[`backend/`](backend/README.md).
+
 ## Physics engine
 
 `physics_engine.KinematicsEngine` converts timestamped visual-tracking
