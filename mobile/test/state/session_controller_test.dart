@@ -1,3 +1,6 @@
+import 'dart:convert';
+import 'dart:io';
+
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -64,5 +67,39 @@ void main() {
     await session().stop();
 
     expect(camera.isRunning, isFalse);
+  });
+
+  test('counts the same backend error on frames in a row', () async {
+    final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+    addTearDown(() => server.close(force: true));
+    server.transform(WebSocketTransformer()).listen((ws) {
+      String error(String message) =>
+          jsonEncode({'type': 'error', 'message': message});
+      ws
+        ..add(error('could not process frame: ValueError: x'))
+        ..add(error('could not process frame: ValueError: x'))
+        ..add(error('could not process frame: ValueError: x'))
+        ..add(error('could not decode image bytes'));
+    });
+    container
+        .read(experimentSettingsProvider.notifier)
+        .setBackendUrl('ws://127.0.0.1:${server.port}/ws/frames');
+
+    final counts = <int>[];
+    container.listen(
+      sessionProvider.select((s) => s.serverErrorCount),
+      (_, count) => counts.add(count),
+    );
+    await session().start();
+    for (var i = 0; i < 50 && counts.length < 4; i++) {
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+    }
+
+    expect(counts, [1, 2, 3, 1], reason: 'a different error starts again');
+    expect(
+      container.read(sessionProvider).serverError?.message,
+      'could not decode image bytes',
+    );
+    await session().stop();
   });
 }

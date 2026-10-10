@@ -189,6 +189,33 @@ Extra fields (`process_ms`, `stats`, ...) are allowed and ignored.
 `frame_id` is present when the error is about one frame; the app then counts
 that frame as answered.
 
+When processing a frame crashes, the error also carries an `error` object so
+the cause can be found from a screenshot of the app:
+
+```json
+{
+  "type": "error",
+  "message": "could not process frame: ValueError: operands could not be broadcast",
+  "frame_id": 12,
+  "error": {
+    "kind": "ValueError",
+    "detail": "operands could not be broadcast",
+    "where": "backend/cv_engine/universal.py:69 in detect",
+    "server": "209bcec"
+  }
+}
+```
+
+- `kind`: the exception class. `detail`: its message, at most 300 characters.
+- `where`: the innermost line of `backend/` or `physics_engine/` code the
+  crash went through, or null if there is none.
+- `server`: the first 7 characters of the deployed commit, or `local` when
+  the backend runs outside Render. `GET /health` reports the same value as
+  `commit`.
+
+The app shows all of it in its error banner, plus how many frames in a row
+gave the same error.
+
 ## Open questions
 
 1. Is a 320 px JPEG at quality 0.7 and about 15 fps enough for tracking a
@@ -200,6 +227,8 @@ that frame as answered.
 
 ## Changelog
 
+- **v0.3, later**: crash errors carry an `error` object (`kind`, `detail`,
+  `where`, `server`) and `/health` reports `commit`. Both are additions.
 - **v0.3**: iOS ARKit support. Frame metadata may carry `intrinsics` and
   `camera_to_world`; `config` may carry `ar_plane`; replies add
   `screen_axes`, `position_3d` and the other `*_3d` vectors. Clients that send

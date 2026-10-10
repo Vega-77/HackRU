@@ -202,10 +202,7 @@ sealed class ServerMessage {
       return switch (json['type']) {
         'state' => StateMessage(PhysicsState.fromJson(json)),
         'frame' => FrameAckMessage.fromJson(json),
-        'error' => ErrorMessage(
-          '${json['message'] ?? 'Unknown server error'}',
-          frameId: (json['frame_id'] as num?)?.toInt(),
-        ),
+        'error' => ErrorMessage.fromJson(json),
         _ => UnknownMessage(raw),
       };
     } on FormatException {
@@ -275,12 +272,37 @@ class FrameAckMessage extends ServerMessage {
 }
 
 class ErrorMessage extends ServerMessage {
-  const ErrorMessage(this.message, {this.frameId});
+  const ErrorMessage(
+    this.message, {
+    this.frameId,
+    this.where,
+    this.serverVersion,
+  });
+
+  /// The `error` object only comes with a frame that crashed the backend.
+  factory ErrorMessage.fromJson(Map<String, dynamic> json) {
+    final error = json['error'];
+    final details = error is Map<String, dynamic> ? error : const {};
+    return ErrorMessage(
+      '${json['message'] ?? 'Unknown server error'}',
+      frameId: (json['frame_id'] as num?)?.toInt(),
+      where: details['where'] as String?,
+      serverVersion: details['server'] as String?,
+    );
+  }
+
   final String message;
 
   /// Set when the error is about one frame (for example, it failed to decode).
   @override
   final int? frameId;
+
+  /// The backend code that crashed, like `backend/cv_engine/universal.py:69
+  /// in detect`.
+  final String? where;
+
+  /// The deployed backend commit, so you can tell whether a fix is live.
+  final String? serverVersion;
 }
 
 class UnknownMessage extends ServerMessage {

@@ -6,6 +6,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app import app, default_config
+from cv_engine.pipeline import TrackingPipeline
 from cv_engine.preprocess import encode_jpeg
 
 
@@ -130,3 +131,22 @@ def test_debug_page():
 def test_default_detector_is_motion(monkeypatch):
     monkeypatch.delenv("CV_DETECTOR", raising=False)
     assert default_config().detector == "motion"
+
+
+def test_crashing_frame_reports_what_and_where(monkeypatch):
+    class CrashingPipeline(TrackingPipeline):
+        def __call__(self, frame):
+            raise ValueError("shapes (41,41) (48,48) differ")
+
+    monkeypatch.setattr(app.state, "pipeline_factory", lambda: CrashingPipeline(default_config()))
+    with TestClient(app).websocket_connect("/ws/frames") as ws:
+        ws.send_text(json.dumps({"frame_id": 3, "timestamp": 1.0}))
+        ws.send_bytes(frame_bytes())
+        error = ws.receive_json()
+    assert error["type"] == "error" and error["frame_id"] == 3
+    assert error["message"] == "could not process frame: ValueError: shapes (41,41) (48,48) differ"
+    assert error["error"]["kind"] == "ValueError"
+    assert error["error"]["where"].startswith("backend/tests/test_app.py:")
+    assert error["error"]["where"].endswith(" in __call__")
+    assert error["error"]["server"] == "local"
+    assert TestClient(app).get("/health").json()["commit"] == "local"
