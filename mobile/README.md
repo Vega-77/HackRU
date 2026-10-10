@@ -9,9 +9,17 @@ The message format between app and backend is in
 [`../docs/protocol.md`](../docs/protocol.md). Change it there first, then in
 `lib/models/`.
 
+## Open it
+
+**[vega-77.github.io/HackRU](https://vega-77.github.io/HackRU/)** runs the
+latest `main` in any browser, nothing to install. On a phone it can use the
+real camera: open the link, choose **Live backend** in Settings, and allow
+camera access. It is rebuilt each time `main` changes
+(`../.github/workflows/deploy-web.yml`).
+
 ## Run it
 
-You need Flutter 3.47 or newer on the stable channel (`flutter --version`;
+To work on the app, you need Flutter 3.47 or newer on the stable channel (`flutter --version`;
 update with `flutter upgrade`). Then, from `mobile/`:
 
 ```bash
