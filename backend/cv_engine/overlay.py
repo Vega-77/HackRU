@@ -113,7 +113,7 @@ def draw_overlay(img: np.ndarray, result: dict, trail_map: dict[int, deque] | No
         cx, cy = int(round(o["pixel"]["x"])), int(round(o["pixel"]["y"]))
         cv2.rectangle(out, (x, y), (x + w, y + h), color, 4 if o.get("target") else 2, cv2.LINE_AA)
         cv2.drawMarker(out, (cx, cy), (255, 255, 255), cv2.MARKER_CROSS, 12, 2, cv2.LINE_AA)
-        label = f"#{o['id']} {o['label']}" + (" [target]" if o.get("target") else "")
+        label = f"#{o['id']} {o['label']} {o.get('tracking_status', 'detected')}" + (" [target]" if o.get("target") else "")
         if o.get("position"):
             label += f"  ({o['position']['x']:.3f}, {o['position']['y']:.3f}) m"
         _text_box(out, label, (x, max(14, y - 6)), color)

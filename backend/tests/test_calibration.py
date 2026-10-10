@@ -3,7 +3,7 @@ import numpy as np
 import pytest
 
 from cv_engine.calibration import ArucoCalibrator, PlaneMapping, rectangle_world_points
-from cv_engine.pipeline import TrackingPipeline
+from cv_engine.pipeline import PipelineConfig, TrackingPipeline
 from cv_engine.preprocess import encode_jpeg, preprocess_frame
 from cv_engine.spatial import SpatialMapper
 from scenes import BOARD_H, BOARD_W, board_image, camera_view
@@ -45,7 +45,7 @@ def test_aruco_markers_found_in_tilted_view():
 def test_ball_world_position_from_aruco(ball):
     board, _ = board_image(ball_world=ball)
     view, _ = camera_view(board)
-    pipe = TrackingPipeline()
+    pipe = TrackingPipeline(PipelineConfig(detector="color"))
     pipe.calibrate({"method": "aruco", "width_m": BOARD_W, "height_m": BOARD_H})
     for i in range(2):
         out = pipe(preprocess_frame(view, i, i / 30))
@@ -64,7 +64,7 @@ def test_manual_calibration_in_client_and_normalized_pixels():
 
     for normalized in (False, True):
         pts = corners_view / [1280, 720] if normalized else corners_view
-        pipe = TrackingPipeline()
+        pipe = TrackingPipeline(PipelineConfig(detector="color"))
         status = pipe.calibrate(
             {"method": "manual", "image_points": pts.tolist(), "normalized": normalized,
              "width_m": BOARD_W, "height_m": BOARD_H}

@@ -31,7 +31,7 @@ def test_configured_mode_emits_state_with_metric_vectors() -> None:
     config = {
         "type": "config", "mode": "ramp", "mass_kg": 0.2,
         "px_per_m": 1000.0, "frame_size": {"w": 320, "h": 240},
-        "ramp_angle_deg": 0.0,
+        "ramp_angle_deg": 0.0, "detector": "color",
     }
     with TestClient(app).websocket_connect("/ws/frames") as ws:
         ws.send_text(json.dumps(config))
@@ -50,7 +50,7 @@ def test_configured_mode_emits_state_with_metric_vectors() -> None:
 
 def test_no_calibration_keeps_pixel_tracking_without_false_physics() -> None:
     with TestClient(app).websocket_connect("/ws/frames") as ws:
-        ws.send_text(json.dumps({"type": "config", "mode": "free_fall", "mass_kg": 0.1}))
+        ws.send_text(json.dumps({"type": "config", "mode": "free_fall", "mass_kg": 0.1, "detector": "color"}))
         send_ball(ws, 0, 80)
         state = send_ball(ws, 1, 90)
 

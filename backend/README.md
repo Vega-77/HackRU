@@ -83,8 +83,9 @@ true positions from the physics simulation, and `run_clip.py` scores against it:
 | `pendulum.mp4` | blue bob, L = 0.28 m, from 30 degrees | 119/120 | 0 | 0.3 mm |
 | `carts.mp4` | red cart hits resting green cart (elastic) | 89/90 each | 0 | 0.5 / 0.3 mm |
 
-The one missed frame per object is the first one, since new tracks are confirmed on their
-second frame. These are clean synthetic videos, so expect larger errors on real footage
+These historical results used `--detector color`. The one missed frame per object is the
+first one, since new tracks are confirmed on their second frame. These are clean synthetic
+videos, so expect larger errors on real footage
 (lighting, motion blur, the ball sitting slightly in front of the board).
 Regenerate them with `python samples/generate_samples.py`.
 
@@ -94,8 +95,8 @@ Detectors, picked with `CV_DETECTOR` (or `"detector"` in a config message, see b
 
 | detector | what it runs | cost on a laptop CPU |
 |---|---|---|
-| `motion` (app default) | background subtraction (MOG2): anything that moves against the still scene, any color | ~20 ms/frame |
-| `color` | HSV thresholding + contours for colored objects (`red`, `orange`, `yellow`, `green`, `blue`, `purple`) | ~2-3 ms/frame |
+| `motion` (default) | Camera stabilized background subtraction (MOG2): anything that moves against the scene, any color | ~20 ms/frame |
+| `color` (legacy opt-in) | HSV thresholding + contours for colored objects (`red`, `orange`, `yellow`, `green`, `blue`, `purple`) | ~2-3 ms/frame |
 | `mediapipe` | MediaPipe EfficientDet-Lite0, 80 COCO classes (`sports ball`, `bottle`, `cup`, ...) | ~25-30 ms/frame |
 | `both` | `color` + `mediapipe` | ~30 ms/frame |
 
@@ -111,9 +112,16 @@ too far to align, or most of it changes at once, the background is relearned. Th
   detector keeps them apart, so use it with colored carts.
 - Its labels carry no color: every object is `"object"`.
 
-The color detector is the fastest and most precise choice when objects are brightly colored:
-use a colored ball, or stick colored tape on carts and pendulum bobs. `CV_COLORS=red,blue`
-limits which colors are tracked (default red, green, blue, yellow).
+The color detector remains available for existing clients and controlled lab setups.
+`CV_COLORS=red,blue` limits only that mode. The default requires no named colors.
+For an arbitrary object, send `target_px` to start grayscale template tracking. For
+precise bounds, also send `target_bbox` (`x`, `y`, `w`, `h`) in the sent image's pixels.
+The box must include the tap and be at least 8 pixels wide and tall. A tap without a
+box uses a 48 pixel square at working resolution. Selection also works for stationary
+objects with enough texture or contrast. A selected object is reported immediately;
+automatic proposals still need two matches. Matching loss reports `tracking_status: lost`
+without claiming a predicted position is an observation. A reacquired object keeps its
+ID for up to `max_missed` processed frames.
 The MediaPipe model (4.6 MB) downloads to `models/` on first use.
 On a headless Linux server MediaPipe also needs `libegl1` and `libgles2` from apt.
 
@@ -204,14 +212,22 @@ The app sends a `config` message on connect and whenever a setting changes
 - `px_per_m` turns on scale calibration (see Spatial mapping); `null` turns it off.
 - `target_px` is where the user tapped the object, in frame pixels. The nearest tracked object
   (within 20% of the frame width) becomes the target and is followed by ID from then on,
-  re-acquired near its last position if lost. `null` means auto: the object that is moving most (a still
-  object never wins over a moving one, whatever its color).
+  re-acquired near its last position if lost. It also starts manual tracking when no
+  automatic detection exists. `null` means auto: the object that is moving most.
+- `target_bbox` optionally gives the selected object's box in the same pixel space as `target_px`.
 - `mode` (`free_fall`, `ramp`, `pendulum`, `collision`) and `mass_kg` drive the physics stage.
 - Optional tracking keys can ride along: `detector`, `colors`, `min_area`, `mediapipe_labels`,
   `mediapipe_score`, `max_distance`, `max_missed`, `min_hits`.
 
 A valid config gets no reply (the app treats unknown message types as errors). An invalid one
 gets an `error` message and changes nothing.
+
+Each object adds `timestamp`, `confidence` (the same value as `score`), and
+`tracking_status` (`detected` or `low_confidence`). The top level adds
+`tracking_status` (`detected`, `low_confidence`, `searching`, or `lost`). Existing
+position, bounding box, calibration, and physics fields keep their meanings.
+There are no predicted or simulated objects in `objects`. The physics stage clears
+motion history when a track disappears, preventing a stale velocity arrow on return.
 
 Server to client, per processed frame without a configured experiment mode:
 
