@@ -67,6 +67,7 @@ the app receives, so if it looks right here, the app is getting the right data.
 ```bash
 python run_clip.py samples/pendulum.mp4 --aruco 0.60 0.40           # writes samples/pendulum_debug.mp4
 python run_clip.py my_clip.mp4 --aruco 0.30 0.20 --show              # also a live window (desktop only)
+python run_clip.py samples/ramp.mp4 --aruco 0.60 0.40 --detector motion # background subtraction instead of color
 ```
 
 It writes an annotated video and a `<clip>_tracks.csv` with every tracked position (pixels
@@ -89,16 +90,30 @@ Regenerate them with `python samples/generate_samples.py`.
 
 ## Detection and tracking
 
-Two detectors, picked with `CV_DETECTOR` (or `"detector"` in a config message, see below):
+Detectors, picked with `CV_DETECTOR` (or `"detector"` in a config message, see below):
 
 | detector | what it runs | cost on a laptop CPU |
 |---|---|---|
-| `color` (default) | HSV thresholding + contours for colored objects (`red`, `orange`, `yellow`, `green`, `blue`, `purple`) | ~2-3 ms/frame |
+| `motion` (app default) | background subtraction (MOG2): anything that moves against the still scene, any color | ~20 ms/frame |
+| `color` | HSV thresholding + contours for colored objects (`red`, `orange`, `yellow`, `green`, `blue`, `purple`) | ~2-3 ms/frame |
 | `mediapipe` | MediaPipe EfficientDet-Lite0, 80 COCO classes (`sports ball`, `bottle`, `cup`, ...) | ~25-30 ms/frame |
-| `both` | both of the above | ~30 ms/frame |
+| `both` | `color` + `mediapipe` | ~30 ms/frame |
 
-The color detector is the reliable choice for lab setups: use a brightly colored ball, or stick
-colored tape on carts and pendulum bobs. `CV_COLORS=red,blue` limits which colors are tracked.
+The motion detector learns what the scene looks like and reports whatever differs from it, so
+the ball can be any color. Every frame is first aligned to the view the background was learned
+from (ORB features + homography), so a slightly wobbly handheld phone is fine; if the view moves
+too far to align, or most of it changes at once, the background is relearned. Things to know:
+
+- An object is found once it moves. A ball resting before it is released is part of the
+  background until then; the "ghost" it leaves behind is detected and dropped.
+- An object that stops fades into the background after about 7 s.
+- Objects that touch (carts colliding) merge into one blob while they touch. The color
+  detector keeps them apart, so use it with colored carts.
+- Its labels carry no color: every object is `"object"`.
+
+The color detector is the fastest and most precise choice when objects are brightly colored:
+use a colored ball, or stick colored tape on carts and pendulum bobs. `CV_COLORS=red,blue`
+limits which colors are tracked (default red, green, blue, yellow).
 The MediaPipe model (4.6 MB) downloads to `models/` on first use.
 On a headless Linux server MediaPipe also needs `libegl1` and `libgles2` from apt.
 
@@ -167,7 +182,8 @@ The app sends a `config` message on connect and whenever a setting changes
 - `px_per_m` turns on scale calibration (see Spatial mapping); `null` turns it off.
 - `target_px` is where the user tapped the object, in frame pixels. The nearest tracked object
   (within 20% of the frame width) becomes the target and is followed by ID from then on,
-  re-acquired near its last position if lost. `null` means auto: the longest-tracked object.
+  re-acquired near its last position if lost. `null` means auto: the object that is moving most (a still
+  object never wins over a moving one, whatever its color).
 - `mode` (`free_fall`, `ramp`, `pendulum`, `collision`) and `mass_kg` drive the physics stage.
 - Optional tracking keys can ride along: `detector`, `colors`, `min_area`, `mediapipe_labels`,
   `mediapipe_score`, `max_distance`, `max_missed`, `min_hits`.
