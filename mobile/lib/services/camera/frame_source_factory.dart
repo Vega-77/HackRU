@@ -3,6 +3,7 @@
 // The web build imports web_frame_source.dart (package:web, dart:ui_web);
 // the iOS build imports native_frame_source.dart (camera plugin, isolates).
 // Neither file is ever compiled for the other platform.
+import 'camera_or_test_video.dart';
 import 'frame_source.dart';
 import 'frame_source_stub.dart'
     if (dart.library.js_interop) 'web_frame_source.dart'
@@ -10,4 +11,6 @@ import 'frame_source_stub.dart'
 
 export 'frame_source.dart';
 
-FrameSource createFrameSource() => createPlatformFrameSource();
+/// The platform camera, falling back to a test video when there is none.
+FrameSource createFrameSource() =>
+    CameraOrTestVideo(createPlatformFrameSource());

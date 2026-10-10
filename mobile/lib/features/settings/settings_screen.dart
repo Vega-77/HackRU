@@ -4,10 +4,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../core/config/app_config.dart';
 import '../../core/routing/router.dart';
 import '../../core/theme/app_icons.dart';
 import '../../core/theme/tokens.dart';
-import '../../services/network/physics_socket.dart';
 import '../../state/experiment_settings.dart';
 import 'backend_url.dart';
 
@@ -47,6 +47,20 @@ class SettingsScreen extends ConsumerWidget {
               ),
               children: [
                 const _SectionTitle('Data source'),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(
+                    AppSpace.xs,
+                    0,
+                    AppSpace.xs,
+                    AppSpace.md,
+                  ),
+                  child: Text(
+                    'Choose a simulation for demos or connect a live camera stream.',
+                    style: AppType.body.copyWith(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ),
                 RadioGroup<bool>(
                   groupValue: demo,
                   onChanged: (value) {
@@ -67,7 +81,8 @@ class SettingsScreen extends ConsumerWidget {
                         title: 'Live backend',
                         body:
                             'Your camera streams to the backend, which '
-                            'tracks the object and sends the physics back.',
+                            'tracks the object and sends the physics back. '
+                            'With no camera, a test video stands in.',
                       ),
                     ],
                   ),
@@ -189,6 +204,11 @@ class _BackendFormState extends ConsumerState<_BackendForm> {
   void initState() {
     super.initState();
     _settings = ref.read(experimentSettingsProvider.notifier);
+    // Choosing Live backend checks it straight away. For the hosted server
+    // that also wakes it up while the user sets up the experiment.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _runTest();
+    });
   }
 
   @override
@@ -221,6 +241,12 @@ class _BackendFormState extends ConsumerState<_BackendForm> {
     }
   }
 
+  void _useDefault() {
+    _text.text = AppConfig.defaultBackendUrl;
+    _onChanged(_text.text);
+    _runTest();
+  }
+
   Future<void> _runTest() async {
     final error = validateBackendUrl(_text.text);
     if (error != null) {
@@ -231,7 +257,7 @@ class _BackendFormState extends ConsumerState<_BackendForm> {
     final edit = _edit;
     setState(() => _test = _Test.running);
     try {
-      final time = await PhysicsSocket.probe(_text.text.trim());
+      final time = await ref.read(backendTestProvider)(_text.text.trim());
       if (!mounted || edit != _edit) return;
       setState(() {
         _test = _Test.passed;
@@ -267,19 +293,31 @@ class _BackendFormState extends ConsumerState<_BackendForm> {
               errorMaxLines: 2,
               // Break before the example so the address never wraps.
               helperText:
-                  "On the same Wi-Fi, use the laptop's IP address, like\n"
-                  'ws://192.168.1.20:8000/ws/frames',
+                  'Starts on the hosted backend. For a laptop on the\n'
+                  'same Wi-Fi, use ws://192.168.1.20:8000/ws/frames',
               helperMaxLines: 2,
             ),
           ),
           const SizedBox(height: AppSpace.lg),
-          Align(
-            alignment: Alignment.centerLeft,
-            child: OutlinedButton.icon(
-              onPressed: _test == _Test.running ? null : _runTest,
-              icon: const Icon(AppIcons.plugs, size: 18),
-              label: const Text('Test connection'),
-            ),
+          Wrap(
+            spacing: AppSpace.sm,
+            runSpacing: AppSpace.sm,
+            children: [
+              OutlinedButton.icon(
+                onPressed: _test == _Test.running ? null : _runTest,
+                icon: const Icon(AppIcons.plugs, size: 18),
+                label: const Text('Test connection'),
+              ),
+              if (_text.text.trim() != AppConfig.defaultBackendUrl)
+                TextButton(
+                  onPressed: _useDefault,
+                  child: Text(
+                    isHostedBackend(AppConfig.defaultBackendUrl)
+                        ? 'Use the hosted backend'
+                        : 'Use the default address',
+                  ),
+                ),
+            ],
           ),
           // The result gets its own full-width line, so a failure reads as
           // a sentence instead of a narrow column beside the button.
@@ -299,13 +337,29 @@ class _BackendFormState extends ConsumerState<_BackendForm> {
     );
   }
 
+  /// Milliseconds for a quick answer, seconds after a server woke up.
+  String _took() {
+    final time = _testTime!;
+    return time < const Duration(seconds: 2)
+        ? '${time.inMilliseconds} ms'
+        : '${time.inSeconds} s';
+  }
+
   Widget _result(ColorScheme scheme) {
+    final hosted = isHostedBackend(_text.text);
     final (IconData? icon, String text) = switch (_test) {
       _Test.idle => (null, ''),
+      _Test.running when hosted => (
+        AppIcons.arrowClockwise,
+        'Connecting. If nobody has used the hosted backend for a while, '
+            'it takes up to a minute to wake up.',
+      ),
       _Test.running => (AppIcons.arrowClockwise, 'Connecting'),
-      _Test.passed => (
-        AppIcons.checkCircle,
-        'Connected in ${_testTime!.inMilliseconds} ms',
+      _Test.passed => (AppIcons.checkCircle, 'Connected in ${_took()}'),
+      _Test.failed when hosted => (
+        AppIcons.warning,
+        "Couldn't reach the hosted backend. Check that this device is "
+            'online, then test again.',
       ),
       _Test.failed => (
         AppIcons.warning,

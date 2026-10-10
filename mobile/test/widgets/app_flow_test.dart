@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hands_on_physics/app.dart';
+import 'package:hands_on_physics/core/config/app_config.dart';
 import 'package:hands_on_physics/core/routing/router.dart';
+import 'package:hands_on_physics/features/settings/backend_url.dart';
 import 'package:hands_on_physics/models/experiment_mode.dart';
 import 'package:hands_on_physics/models/session_config.dart';
 import 'package:hands_on_physics/services/camera/frame_source.dart';
@@ -59,7 +61,12 @@ void main() {
 
     await tester.pumpWidget(
       ProviderScope(
-        overrides: [frameSourceProvider.overrideWithValue(camera)],
+        overrides: [
+          frameSourceProvider.overrideWithValue(camera),
+          backendTestProvider.overrideWithValue(
+            (url) async => const Duration(milliseconds: 12),
+          ),
+        ],
         child: HandsOnPhysicsApp(router: buildAppRouter(initialLocation: at)),
       ),
     );
@@ -126,6 +133,14 @@ void main() {
     await tester.pump(const Duration(milliseconds: 400));
     expect(container.read(experimentSettingsProvider).demoMode, isFalse);
     expect(find.text('Backend address'), findsOneWidget);
+    // The form tests the address after its first frame.
+    await tester.pump(const Duration(milliseconds: 400));
+    expect(
+      find.text('Connected in 12 ms'),
+      findsOneWidget,
+      reason: 'choosing live checks the hosted backend straight away',
+    );
+    expect(find.text('Use the hosted backend'), findsNothing);
 
     await tester.enterText(find.byType(TextField), 'http://10.0.0.5:8000');
     await tester.pump(const Duration(seconds: 1));
@@ -141,6 +156,13 @@ void main() {
     expect(
       container.read(experimentSettingsProvider).backendUrl,
       'ws://10.0.0.5:8000/ws',
+    );
+
+    await tester.tap(find.text('Use the hosted backend'));
+    await tester.pump(const Duration(seconds: 1));
+    expect(
+      container.read(experimentSettingsProvider).backendUrl,
+      AppConfig.defaultBackendUrl,
     );
 
     await unmount(tester);
@@ -179,9 +201,10 @@ void main() {
 
     await tester.tap(find.byTooltip('Back'));
     await tester.pump(const Duration(milliseconds: 600));
+    // Setup opened the camera, so the session leaves it running throughout.
     expect(camera.isRunning, isTrue);
-    expect(camera.starts, 2);
-    expect(camera.stops, 1);
+    expect(camera.starts, 1);
+    expect(camera.stops, 0);
 
     await unmount(tester);
   });

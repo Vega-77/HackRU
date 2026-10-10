@@ -13,18 +13,36 @@ import 'frame_source.dart';
 /// Browser camera for development in Chrome.
 ///
 /// The `camera` plugin cannot stream frames on web, so this talks to
-/// getUserMedia directly. A dedicated video feeds [capture], while each
-/// [HtmlElementView] gets its own preview element. Reusing one DOM element in
-/// two views makes the preview freeze when navigating between screens.
+/// getUserMedia directly. [capture] draws from a private `<video>` that is
+/// never put on screen, and every [buildPreview] gets its own `<video>` on the
+/// same stream.
+///
+/// The previews must not share an element: calibration stays mounted under
+/// the experiment route, and handing one element to two platform views moves
+/// it in the DOM, which pauses it and freezes both the picture and the frames
+/// sent to the backend.
 class WebFrameSource implements FrameSource {
+  WebFrameSource() {
+    ui_web.platformViewRegistry.registerViewFactory(_viewType, (int _) {
+      final preview = _newVideo();
+      preview.style
+        ..width = '100%'
+        ..height = '100%'
+        ..objectFit = 'cover'
+        ..pointerEvents = 'none';
+      _previews.add(preview);
+      _attach(preview);
+      return preview;
+    });
+  }
+
   static int _nextViewId = 0;
 
   final String _viewType = 'hands-on-camera-${_nextViewId++}';
-  final web.HTMLVideoElement _captureVideo = web.HTMLVideoElement();
+  final web.HTMLVideoElement _captureVideo = _newVideo();
   final Set<web.HTMLVideoElement> _previews = {};
   final web.HTMLCanvasElement _canvas = web.HTMLCanvasElement();
   web.MediaStream? _stream;
-  bool _registered = false;
 
   @override
   bool get isRunning => _stream != null;
@@ -52,38 +70,20 @@ class WebFrameSource implements FrameSource {
 
     try {
       _stream = await devices.getUserMedia(constraints).toDart;
-    } catch (e) {
-      throw CameraUnavailableException(
-        'Camera access was blocked or no camera was found. '
+    } catch (_) {
+      if (!await _hasCamera()) throw const NoCameraException();
+      throw const CameraUnavailableException(
+        'Camera access was blocked. '
         'Allow camera access in the browser and try again.',
       );
     }
 
-    _captureVideo
-      ..autoplay = true
-      ..muted = true
-      ..setAttribute('playsinline', 'true')
-      ..srcObject = _stream;
-
-    if (!_registered) {
-      ui_web.platformViewRegistry.registerViewFactory(_viewType, (int _) {
-        final preview = web.HTMLVideoElement()
-          ..autoplay = true
-          ..muted = true
-          ..setAttribute('playsinline', 'true')
-          ..srcObject = _stream;
-        preview.style
-          ..width = '100%'
-          ..height = '100%'
-          ..objectFit = 'cover'
-          ..pointerEvents = 'none';
-        _previews.add(preview);
-        return preview;
-      });
-      _registered = true;
-    }
-
-    await _captureVideo.play().toDart;
+    // Previews from closed screens have left the page; the ones still on
+    // screen (calibration, back from an experiment) need the new stream.
+    _previews
+      ..removeWhere((preview) => !preview.isConnected)
+      ..forEach(_attach);
+    _attach(_captureVideo);
     // videoWidth is 0 until the first frame's metadata arrives.
     while (_captureVideo.videoWidth == 0) {
       await Future<void>.delayed(const Duration(milliseconds: 30));
@@ -95,13 +95,12 @@ class WebFrameSource implements FrameSource {
     final stream = _stream;
     _stream = null;
     if (stream == null) return;
-    for (final preview in _previews) {
-      preview.pause();
-      preview.srcObject = null;
+    // srcObject goes first, so the pause listener does not restart them.
+    for (final video in [..._previews, _captureVideo]) {
+      video
+        ..srcObject = null
+        ..pause();
     }
-    _previews.clear();
-    _captureVideo.pause();
-    _captureVideo.srcObject = null;
     for (final track in stream.getTracks().toDart) {
       track.stop();
     }
@@ -133,10 +132,54 @@ class WebFrameSource implements FrameSource {
   Widget buildPreview(BuildContext context) =>
       HtmlElementView(viewType: _viewType);
 
+  /// Plays the camera stream in [video], if the camera is running.
+  void _attach(web.HTMLVideoElement video) {
+    final stream = _stream;
+    if (stream == null) return;
+    video.srcObject = stream;
+    _play(video);
+  }
+
+  /// Whether the browser knows of any camera. Only asked after getUserMedia
+  /// fails: before permission some browsers list devices sparsely, but a
+  /// list with no camera at all is reliable.
+  static Future<bool> _hasCamera() async {
+    try {
+      final devices = await web.window.navigator.mediaDevices
+          .enumerateDevices()
+          .toDart;
+      return devices.toDart.any((device) => device.kind == 'videoinput');
+    } catch (_) {
+      return true; // Can't tell, so don't hide a real problem.
+    }
+  }
+
   FrameSize _sizeForWidth(int width) {
     final height =
         (width * _captureVideo.videoHeight / _captureVideo.videoWidth).round();
     return FrameSize(width, height);
+  }
+
+  static web.HTMLVideoElement _newVideo() {
+    final video = web.HTMLVideoElement()
+      ..autoplay = true
+      ..muted = true
+      ..setAttribute('playsinline', 'true');
+    // Browsers pause a video when it leaves the document, and autoplay does
+    // not restart it, so a preview Flutter re-parents would stay frozen.
+    video.addEventListener(
+      'pause',
+      ((web.Event _) {
+        if (video.srcObject != null) _play(video);
+      }).toJS,
+    );
+    return video;
+  }
+
+  /// play() rejects if the element is removed again before it starts; the
+  /// pause listener retries, so the rejection is not an error.
+  static void _play(web.HTMLVideoElement video) {
+    unawaited(video.play().toDart.catchError((Object _) => null));
   }
 }
 

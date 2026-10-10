@@ -1,0 +1,66 @@
+# Builds the Flutter app for the web and publishes it on GitHub Pages, so
+# anyone can open it from a link instead of running it on localhost:
+#
+#   https://vega-77.github.io/HackRU/
+#
+# Pages serves over https, which phone browsers require before a page may use
+# the camera, so the link also works on an iPhone with its real camera.
+#
+# Pull requests only build and test; publishing happens when main changes.
+name: Web app
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+    paths: [mobile/**, .github/workflows/deploy-web.yml]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: mobile
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: 3.47.7
+          channel: stable
+          cache: true
+
+      - run: flutter pub get
+      - run: dart format --output=none --set-exit-if-changed lib test
+      - run: flutter analyze
+      - run: flutter test
+
+      # Pages serves the site under /HackRU/, not the domain root.
+      - run: flutter build web --release --base-href /HackRU/
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: mobile/build/web
+
+  deploy:
+    if: github.event_name != 'pull_request'
+    needs: build
+    runs-on: ubuntu-latest
+    # One publish at a time; a newer push replaces one still waiting.
+    concurrency:
+      group: pages
+      cancel-in-progress: true
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

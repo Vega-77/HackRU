@@ -43,9 +43,7 @@ class NativeFrameSource implements FrameSource {
     } on CameraException catch (e) {
       throw CameraUnavailableException(e.description ?? e.code);
     }
-    if (cameras.isEmpty) {
-      throw const CameraUnavailableException('No camera found on this device.');
-    }
+    if (cameras.isEmpty) throw const NoCameraException();
 
     final back = cameras.firstWhere(
       (c) => c.lensDirection == CameraLensDirection.back,

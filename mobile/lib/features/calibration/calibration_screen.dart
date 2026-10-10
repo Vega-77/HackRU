@@ -118,7 +118,8 @@ class _CalibrationScreenState extends ConsumerState<CalibrationScreen> {
     await context.push(Routes.experiment);
     if (!mounted) return;
     // A popped route can finish disposing after this Future completes. Stop
-    // its session before setup takes the shared camera back.
+    // its session before setup takes the shared camera back, and open the
+    // camera again if the experiment stopped it (a switch to demo data).
     await ref.read(sessionProvider.notifier).stop();
     if (mounted && !_demo) await _startCamera();
   }
@@ -332,6 +333,44 @@ class _Steps extends ConsumerWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(
+              AppSpace.xs,
+              AppSpace.xs,
+              AppSpace.xs,
+              AppSpace.lg,
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'CALIBRATION',
+                        style: AppType.label.copyWith(
+                          color: scheme.primary,
+                          fontSize: 12,
+                        ),
+                      ),
+                      const SizedBox(height: AppSpace.xs),
+                      Text(
+                        'Prepare the measurement',
+                        style: Theme.of(context).textTheme.titleLarge,
+                      ),
+                    ],
+                  ),
+                ),
+                Text(
+                  '3 steps',
+                  style: AppType.readoutSmall.copyWith(
+                    color: scheme.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ),
+          ),
           _Step(
             number: 1,
             title: 'Set the scale',

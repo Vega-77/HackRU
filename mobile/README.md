@@ -9,9 +9,17 @@ The message format between app and backend is in
 [`../docs/protocol.md`](../docs/protocol.md). Change it there first, then in
 `lib/models/`.
 
+## Open it
+
+**[vega-77.github.io/HackRU](https://vega-77.github.io/HackRU/)** runs the
+latest `main` in any browser, nothing to install. On a phone it can use the
+real camera: open the link, choose **Live backend** in Settings, and allow
+camera access. It is rebuilt each time `main` changes
+(`../.github/workflows/deploy-web.yml`).
+
 ## Run it
 
-You need Flutter 3.47 or newer on the stable channel (`flutter --version`;
+To work on the app, you need Flutter 3.47 or newer on the stable channel (`flutter --version`;
 update with `flutter upgrade`). Then, from `mobile/`:
 
 ```bash
@@ -47,11 +55,30 @@ toolbar (iPhone 12/13/14 is 390 x 844).
 
 ### Against the backend
 
+The backend is hosted on Render (`../render.yaml`), and the app points at it
+by default. In the app, open Settings and choose **Live backend**. It tests
+the connection straight away. Nothing to run on a laptop.
+
+- If nobody has used it for 15 minutes the server is asleep, and the first
+  connection takes up to a minute. The app waits and says so.
+- The iOS Simulator and laptops without a webcam have no camera. Live mode
+  then streams a test video instead: a red ball swinging on a string, which
+  the backend tracks like a real one.
+
+To deploy it the first time (one teammate, once): sign in to
+[render.com](https://render.com) with GitHub, choose New > Blueprint, and
+pick this repo. If the URL Render gives is not
+`handson-physics-backend.onrender.com`, update `defaultBackendUrl` in
+`lib/core/config/app_config.dart`.
+
+To use a backend on a laptop instead:
+
 1. Put the laptop running the backend and the phone on the **same Wi-Fi**.
 2. Find the laptop's IP (`ipconfig` on Windows, `ipconfig getifaddr en0` on
    a Mac).
-3. In the app, open Settings, choose **Live backend**, and enter
-   `ws://<that IP>:8000/ws/frames`. Press **Test connection**.
+3. In Settings, choose **Live backend**, and enter
+   `ws://<that IP>:8000/ws/frames`. Press **Test connection**. **Use the
+   hosted backend** switches back.
 
 To set the address at build time instead:
 
@@ -59,8 +86,9 @@ To set the address at build time instead:
 flutter run --dart-define=BACKEND_URL=ws://192.168.1.20:8000/ws/frames --dart-define=DEMO_MODE=false
 ```
 
-No backend yet? `tool/mock_server.py` speaks the same protocol on the same
-port and path and sends back a made-up trajectory:
+The backend's own README (`../backend/README.md`) says how to start it. To
+try the app without it, `tool/mock_server.py` speaks the same protocol on the
+same port and path and sends back a made-up trajectory:
 
 ```bash
 pip install websockets
@@ -81,12 +109,16 @@ flutter analyze
 flutter test
 ```
 
-The live test talks to a running backend (or the mock server) and is skipped
-unless you give it an address:
+The live test streams a drawn red ball to a running backend, and checks that
+it finds the ball and measures its speed. It is skipped unless you give it an
+address:
 
 ```bash
 LIVE_BACKEND_URL=ws://localhost:8000/ws/frames flutter test test/integration
 ```
+
+Against the mock server, add `LIVE_BACKEND_MOCK=1`. The mock ignores the
+image, so only the connection checks run.
 
 ## How the code is laid out
 
@@ -96,7 +128,7 @@ app from the bottom up.
 | Folder | What lives there |
 |---|---|
 | `lib/models/` | Plain Dart types that mirror `docs/protocol.md`: `PhysicsState`, `SessionConfig`, `Calibration`, `Vec2`. No Flutter. |
-| `lib/services/camera/` | `FrameSource`: start the camera, grab a JPEG frame, show a preview. One version for iOS (`native_`), one for Chrome (`web_`). |
+| `lib/services/camera/` | `FrameSource`: start the camera, grab a JPEG frame, show a preview. One version for iOS (`native_`), one for Chrome (`web_`), and a drawn test video (`test_video_`) for devices with no camera. |
 | `lib/services/network/` | `PhysicsSocket` (the WebSocket client, with reconnect and flow control) and `MockPhysics` (the demo data). |
 | `lib/state/` | Riverpod controllers: experiment settings, calibration, the running session, and the rolling telemetry buffer for charts. |
 | `lib/features/` | One folder per screen: `home`, `calibration`, `experiment`, `settings`. Screen-only widgets sit in each `widgets/`. |

@@ -1,0 +1,27 @@
+# Hosts the backend on Render's free tier, so the app's "Live backend"
+# works from any phone or simulator without running Python locally.
+#
+# Deploy once: render.com > New > Blueprint > pick this repo. Render builds
+# backend/Dockerfile and redeploys on every push to main. The app's default
+# address (mobile/lib/core/config/app_config.dart) points at the URL below;
+# if Render gives the service a different one, update it there.
+#
+#   wss://handson-physics-backend.onrender.com/ws/frames
+#
+# Free services sleep after 15 minutes without traffic and take about a
+# minute to wake. The app waits for that, so the first connection is slow.
+services:
+  - type: web
+    name: handson-physics-backend
+    runtime: docker
+    plan: free
+    branch: main
+    # The Dockerfile copies backend/ and physics_engine/, so it builds from
+    # the repo root.
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: .
+    healthCheckPath: /health
+    envVars:
+      # The port uvicorn listens on in the Dockerfile.
+      - key: PORT
+        value: "8000"
