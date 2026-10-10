@@ -34,10 +34,16 @@ abstract final class AppTheme {
     required Color inkMuted,
     required Color rule,
   }) {
+    final accent = brightness == Brightness.dark
+        ? AppColors.instrumentAccentDark
+        : AppColors.instrumentAccent;
+    final onAccent = brightness == Brightness.dark
+        ? AppColors.graphiteDeep
+        : Colors.white;
     final scheme = ColorScheme(
       brightness: brightness,
-      primary: ink,
-      onPrimary: background,
+      primary: accent,
+      onPrimary: onAccent,
       secondary: inkMuted,
       onSecondary: background,
       error: ink,
@@ -94,9 +100,11 @@ abstract final class AppTheme {
       ),
       filledButtonTheme: FilledButtonThemeData(
         style: FilledButton.styleFrom(
-          backgroundColor: ink,
-          foregroundColor: background,
-          shape: AppRadii.pill,
+          backgroundColor: AppColors.instrumentAccent,
+          foregroundColor: Colors.white,
+          shape: const RoundedRectangleBorder(
+            borderRadius: AppRadii.controlAll,
+          ),
           padding: buttonPadding,
           textStyle: AppType.label.copyWith(fontSize: 15),
         ),
@@ -105,7 +113,9 @@ abstract final class AppTheme {
         style: OutlinedButton.styleFrom(
           foregroundColor: ink,
           side: BorderSide(color: rule, width: 1.5),
-          shape: AppRadii.pill,
+          shape: const RoundedRectangleBorder(
+            borderRadius: AppRadii.controlAll,
+          ),
           padding: buttonPadding,
           textStyle: AppType.label.copyWith(fontSize: 15),
         ),
@@ -113,7 +123,9 @@ abstract final class AppTheme {
       textButtonTheme: TextButtonThemeData(
         style: TextButton.styleFrom(
           foregroundColor: ink,
-          shape: AppRadii.pill,
+          shape: const RoundedRectangleBorder(
+            borderRadius: AppRadii.controlAll,
+          ),
           textStyle: AppType.label.copyWith(fontSize: 15),
         ),
       ),
@@ -155,7 +167,10 @@ abstract final class AppTheme {
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: AppRadii.panelAll,
-          borderSide: BorderSide(color: ink, width: 1.5),
+          borderSide: const BorderSide(
+            color: AppColors.instrumentAccent,
+            width: 1.5,
+          ),
         ),
       ),
       switchTheme: SwitchThemeData(
