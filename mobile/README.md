@@ -59,8 +59,9 @@ To set the address at build time instead:
 flutter run --dart-define=BACKEND_URL=ws://192.168.1.20:8000/ws/frames --dart-define=DEMO_MODE=false
 ```
 
-No backend yet? `tool/mock_server.py` speaks the same protocol on the same
-port and path and sends back a made-up trajectory:
+The backend's own README (`../backend/README.md`) says how to start it. To
+try the app without it, `tool/mock_server.py` speaks the same protocol on the
+same port and path and sends back a made-up trajectory:
 
 ```bash
 pip install websockets
@@ -81,12 +82,16 @@ flutter analyze
 flutter test
 ```
 
-The live test talks to a running backend (or the mock server) and is skipped
-unless you give it an address:
+The live test streams a drawn red ball to a running backend, and checks that
+it finds the ball and measures its speed. It is skipped unless you give it an
+address:
 
 ```bash
 LIVE_BACKEND_URL=ws://localhost:8000/ws/frames flutter test test/integration
 ```
+
+Against the mock server, add `LIVE_BACKEND_MOCK=1`. The mock ignores the
+image, so only the connection checks run.
 
 ## How the code is laid out
 
