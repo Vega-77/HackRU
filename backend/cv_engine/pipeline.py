@@ -12,14 +12,18 @@ from dataclasses import dataclass, field
 
 import numpy as np
 
-from cv_engine.detect import DEFAULT_COLORS, ColorDetector, Detection, MediaPipeDetector
+from cv_engine.detect import DEFAULT_COLORS, ColorDetector, Detection, MediaPipeDetector, MotionDetector
 from cv_engine.preprocess import PreprocessedFrame
 from cv_engine.spatial import SpatialMapper
 from cv_engine.tracker import CentroidTracker, Track
 
 log = logging.getLogger(__name__)
 
-DETECTORS = ("color", "mediapipe", "both")
+DETECTORS = ("color", "motion", "mediapipe", "both")
+# Auto-target (no tap): a track must move this far (working px) over its recent history
+# to count as moving, and a rival must move twice as much as the current target to take over.
+AUTO_TARGET_WINDOW = 15
+AUTO_TARGET_MIN_MOTION = 10.0
 EXPERIMENT_MODES = ("free_fall", "ramp", "pendulum", "collision")
 # Settings the app sends in its config message (docs/protocol.md). The CV engine uses
 # px_per_m (calibration fallback) and target_px (which object to follow); the rest is
@@ -29,7 +33,7 @@ SESSION_DEFAULTS = {"mode": None, "mass_kg": 0.1, "px_per_m": None, "target_px":
 
 @dataclass
 class PipelineConfig:
-    detector: str = "color"  # which detectors to run: color, mediapipe or both
+    detector: str = "color"  # which detectors to run: color, motion, mediapipe or both
     colors: list[str] = field(default_factory=lambda: list(DEFAULT_COLORS))
     min_area: float = 80.0
     mediapipe_labels: list[str] | None = None  # e.g. ["sports ball"]; None = all COCO classes
@@ -100,16 +104,18 @@ class TrackingPipeline:
             config.mediapipe_labels,
             config.mediapipe_score,
         )
+        motion = MotionDetector(min_area=config.min_area) if config.detector == "motion" else None
         mediapipe = self._mediapipe
-        if config.detector != "color" and (mediapipe is None or mp_settings_changed):
+        if config.detector in ("mediapipe", "both") and (mediapipe is None or mp_settings_changed):
             mediapipe = MediaPipeDetector(score_threshold=config.mediapipe_score, allow_labels=config.mediapipe_labels)
-        elif config.detector == "color":
+        elif config.detector not in ("mediapipe", "both"):
             mediapipe = None
         if self._mediapipe is not None and self._mediapipe is not mediapipe:
             self._mediapipe.close()
 
         self.config = config
         self.color = color
+        self.motion = motion
         self._mediapipe = mediapipe
         self.tracker = CentroidTracker(config.max_distance, config.max_missed, config.min_hits)
         self._target_id = None
@@ -141,6 +147,8 @@ class TrackingPipeline:
         dets: list[Detection] = []
         if self.config.detector in ("color", "both"):
             dets += self.color.detect(frame)
+        if self.config.detector == "motion" and self.motion:
+            dets += self.motion.detect(frame)
         if self.config.detector in ("mediapipe", "both") and self._mediapipe:
             dets += self._mediapipe.detect(frame)
         return dets
@@ -163,12 +171,14 @@ class TrackingPipeline:
     def _pick_target(self, tracks: list[Track], frame: PreprocessedFrame) -> Track | None:
         """The object the app cares about: the one the user tapped (target_px), followed by
         ID from then on and re-acquired near its last position if lost; with no tap, the
-        longest-tracked object."""
+        object that is moving most (see _auto_target)."""
         if not tracks:
             return None
         scale = frame.scale
         by_id = {t.id: t for t in tracks}
-        if self._target_id in by_id:
+        if self.session["target_px"] is None:
+            chosen = self._auto_target(tracks, by_id.get(self._target_id))
+        elif self._target_id in by_id:
             chosen = by_id[self._target_id]
         elif self._target_last is not None:
             lx, ly = self._target_last
@@ -177,11 +187,28 @@ class TrackingPipeline:
             if dist[chosen.id] > 0.2 * frame.source_size[0]:
                 return None  # nothing near where the user tapped (or where it was last seen)
         else:
-            chosen = max(tracks, key=lambda t: t.hits)
+            return None
         self._target_id = chosen.id
         if self.session["target_px"] is not None:
             self._target_last = (chosen.centroid[0] / scale, chosen.centroid[1] / scale)
         return chosen
+
+    @staticmethod
+    def _auto_target(tracks: list[Track], current: Track | None) -> Track:
+        """Prefer the object that is moving: a still red box (or a background ghost) should
+        never beat a rolling ball just because it was seen first. Sticks with the current
+        target unless a rival moves clearly more, so the target doesn't flicker."""
+
+        def motion(t: Track) -> float:
+            pts = list(t.history)[-AUTO_TARGET_WINDOW:]
+            return sum(math.dist(a, b) for a, b in zip(pts, pts[1:]))
+
+        best = max(tracks, key=motion)
+        if current is not None and (best is current or motion(best) < max(2 * motion(current), AUTO_TARGET_MIN_MOTION)):
+            return current
+        if motion(best) < AUTO_TARGET_MIN_MOTION:
+            return max(tracks, key=lambda t: (t.hits, t.area))
+        return best
 
     def calibrate(self, request: dict) -> dict:
         return self.spatial.calibrate(request)

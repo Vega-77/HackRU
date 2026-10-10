@@ -9,7 +9,7 @@ Protocol on ws://<host>:8000/ws/frames
            plus optional tracking settings, applied from the next frame:
            {"type": "config", "mode": "ramp", "mass_kg": 0.1, "px_per_m": 812.5,
             "target_px": {"x": 161, "y": 118}, "frame_size": {"w": 320, "h": 240},
-            "detector": "color", "colors": ["red", "blue"], ...}
+            "detector": "motion", ...}  (or "color" with "colors": ["red", "blue"])
            No reply on success (the app treats unknown message types as errors);
            an invalid config gets {"type": "error"} and changes nothing.
     text   (any time) plane calibration for metric coordinates:
@@ -77,7 +77,7 @@ FrameAnalyzer = Callable[[PreprocessedFrame], dict]
 
 
 def default_config() -> PipelineConfig:
-    config = PipelineConfig(detector=os.environ.get("CV_DETECTOR", "color"))
+    config = PipelineConfig(detector=os.environ.get("CV_DETECTOR", "motion"))
     if colors := os.environ.get("CV_COLORS"):
         config.colors = [c.strip() for c in colors.split(",") if c.strip()]
     return config

@@ -1,6 +1,8 @@
 """Object detection on preprocessed frames.
 
-Two detectors share one output type:
+Three detectors share one output type:
+  * MotionDetector - background subtraction (MOG2). Finds whatever moves against a still
+                     background, whatever its color. Needs a steady camera.
   * ColorDetector  - HSV thresholding + contours. Fast (~1 ms) and very reliable for
                      brightly colored lab objects: balls, cart markers, pendulum bobs.
   * MediaPipeDetector - EfficientDet-Lite0 via MediaPipe Tasks, for everyday objects
@@ -31,7 +33,7 @@ class Detection:
     bbox: tuple[int, int, int, int]  # (x, y, w, h)
     area: float  # pixel area of the mask/contour (bbox area for MediaPipe)
     score: float  # 0-1 confidence
-    source: str  # "color" or "mediapipe"
+    source: str  # "color", "motion" or "mediapipe"
 
 
 # OpenCV HSV ranges: H 0-179, S 0-255, V 0-255. Red wraps around 0, so it has two ranges.
@@ -92,6 +94,159 @@ class ColorDetector:
             found.sort(key=lambda d: d.area, reverse=True)
             out.extend(found[: self.max_per_color])
         return out
+
+
+MIN_ALIGN_FEATURES = 20
+
+
+class MotionDetector:
+    """Background subtraction: learns what the still scene looks like and reports blobs
+    that differ from it, whatever their color. Stateful, so each connection needs its own.
+
+    Handheld phones wobble, so every frame is first aligned to the frame the background was
+    learned from (ORB features + a RANSAC homography) and subtraction runs in that fixed
+    view; detections are mapped back to the current frame. If the view moves too far to
+    align, the background is relearned from scratch.
+
+    An object that stops moving fades into the background over roughly `history` frames.
+    A ball that sat still while the background was learned leaves a "ghost" when it moves
+    off; ghosts are dropped because their outline is an edge in the background model but
+    not in the live frame.
+    """
+
+    def __init__(
+        self,
+        min_area: float = 80.0,
+        max_results: int = 5,
+        history: int = 300,
+        var_threshold: float = 25.0,
+        max_foreground: float = 0.4,
+        stabilize: bool = True,
+    ) -> None:
+        """max_foreground: if more than this fraction of the view changes at once (the
+        camera jumped, the lights changed), the background is relearned and nothing reported."""
+        self.min_area = min_area
+        self.max_results = max_results
+        self.history = history
+        self.var_threshold = var_threshold
+        self.max_foreground = max_foreground
+        self.stabilize = stabilize
+        self._kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5))
+        self._orb = cv2.ORB_create(nfeatures=800)
+        self._matcher = cv2.BFMatcher(cv2.NORM_HAMMING, crossCheck=True)
+        self.reset()
+
+    def reset(self) -> None:
+        self._subtractor = cv2.createBackgroundSubtractorMOG2(
+            history=self.history, varThreshold=self.var_threshold, detectShadows=True
+        )
+        # OpenCV's 0.9 lets a new color join the background once it holds 10% of the pixel's
+        # weight, about 1 s at this learning rate: a cart that stops vanishes almost at once.
+        # At 0.5 it takes about history * 0.7 frames.
+        self._subtractor.setBackgroundRatio(0.5)
+        self._frames = 0
+        self._ref: tuple | None = None  # ORB keypoints + descriptors of the reference view
+
+    def _align(self, frame: PreprocessedFrame) -> np.ndarray | None:
+        """Homography mapping the current frame onto the reference view, or None if the
+        two views don't share enough features. A reference view with too little texture to
+        align against (a blank table) is assumed to be filmed from a steady camera."""
+        kp, des = self._orb.detectAndCompute(frame.gray_sharp(), None)
+        if self._ref is None:
+            self._ref = (kp, des)
+            return np.eye(3)
+        ref_kp, ref_des = self._ref
+        if ref_des is None or len(ref_kp) < MIN_ALIGN_FEATURES:
+            return np.eye(3)
+        if des is None or len(kp) < MIN_ALIGN_FEATURES:
+            return None
+        matches = self._matcher.match(des, ref_des)
+        if len(matches) < MIN_ALIGN_FEATURES:
+            return None
+        src = np.float32([kp[m.queryIdx].pt for m in matches])
+        dst = np.float32([ref_kp[m.trainIdx].pt for m in matches])
+        H, inliers = cv2.findHomography(src, dst, cv2.RANSAC, 2.0)
+        if H is None or int(inliers.sum()) < MIN_ALIGN_FEATURES:
+            return None
+        return H
+
+    def detect(self, frame: PreprocessedFrame) -> list[Detection]:
+        w, h = frame.size
+        H = self._align(frame) if self.stabilize else np.eye(3)
+        if H is None:
+            log.debug("camera moved too far to align; relearning the background")
+            self.reset()
+            H = self._align(frame)
+        first = self._frames == 0
+        if first or not self.stabilize:
+            view, valid = frame.bgr, None
+        else:
+            view = cv2.warpPerspective(frame.bgr, H, (w, h), borderMode=cv2.BORDER_REPLICATE)
+            valid = cv2.warpPerspective(np.full((h, w), 255, np.uint8), H, (w, h))
+            valid = cv2.erode(valid, self._kernel, iterations=2)
+
+        # A fixed learning rate (OpenCV's default starts near 1 and decays) so a ball that
+        # stops for a moment early in a session is not absorbed into the background at once.
+        view = cv2.GaussianBlur(view, (5, 5), 0)
+        fg = self._subtractor.apply(view, learningRate=1.0 if first else 1.0 / self.history)
+        self._frames += 1
+        if first:
+            return []  # the first frame only seeds the background model
+        # MOG2 marks shadows 127 and foreground 255; keep only real foreground.
+        _, fg = cv2.threshold(fg, 254, 255, cv2.THRESH_BINARY)
+        if valid is not None:
+            fg &= valid  # parts of the view the reference frame never saw
+        fg = cv2.morphologyEx(fg, cv2.MORPH_OPEN, self._kernel)
+        fg = cv2.morphologyEx(fg, cv2.MORPH_CLOSE, self._kernel, iterations=2)
+        if np.count_nonzero(fg) > self.max_foreground * fg.size:
+            log.debug("most of the view changed; relearning the background")
+            self.reset()
+            return []
+
+        contours, _ = cv2.findContours(fg, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
+        contours = [c for c in contours if cv2.contourArea(c) >= self.min_area]
+        if not contours:
+            return []
+        view_gray = cv2.cvtColor(view, cv2.COLOR_BGR2GRAY)
+        bg_gray = cv2.GaussianBlur(cv2.cvtColor(self._subtractor.getBackgroundImage(), cv2.COLOR_BGR2GRAY), (5, 5), 0)
+        to_frame = np.linalg.inv(H)
+        found = []
+        for c in contours:
+            if _is_ghost(c, view_gray, bg_gray):
+                continue
+            # Back to current-frame pixels; a pure translation for a steady camera.
+            c_frame = cv2.perspectiveTransform(c.astype(np.float32), to_frame)
+            area = cv2.contourArea(c_frame)
+            m = cv2.moments(c_frame)
+            if m["m00"] == 0:
+                continue
+            cx, cy = m["m10"] / m["m00"], m["m01"] / m["m00"]
+            x, y, bw, bh = cv2.boundingRect(c_frame)
+            hull_area = cv2.contourArea(cv2.convexHull(c_frame)) or area
+            found.append(Detection("object", (cx, cy), (x, y, bw, bh), area, min(1.0, area / hull_area), "motion"))
+        found.sort(key=lambda d: d.area, reverse=True)
+        return found[: self.max_results]
+
+
+def _is_ghost(contour: np.ndarray, view_gray: np.ndarray, bg_gray: np.ndarray) -> bool:
+    """True if the blob's outline is an edge in the background model but not in the live
+    view: the hole an object leaves where it sat while the background was learned."""
+    x, y, w, h = cv2.boundingRect(contour)
+    pad = 4
+    x0, y0 = max(0, x - pad), max(0, y - pad)
+    x1, y1 = min(view_gray.shape[1], x + w + pad), min(view_gray.shape[0], y + h + pad)
+    pts = contour[:, 0, :] - (x0, y0)
+    here = _gradient(view_gray[y0:y1, x0:x1])[pts[:, 1], pts[:, 0]].mean()
+    there = _gradient(bg_gray[y0:y1, x0:x1])[pts[:, 1], pts[:, 0]].mean()
+    return here < 0.5 * there
+
+
+def _gradient(gray: np.ndarray) -> np.ndarray:
+    gx = cv2.Sobel(gray, cv2.CV_32F, 1, 0, ksize=3)
+    gy = cv2.Sobel(gray, cv2.CV_32F, 0, 1, ksize=3)
+    # Widen edges a little: contours sit on the mask boundary, which can be a pixel or
+    # two off the true edge after the morphology.
+    return cv2.dilate(cv2.magnitude(gx, gy), np.ones((5, 5), np.uint8))
 
 
 MODEL_URL = "https://storage.googleapis.com/mediapipe-models/object_detector/efficientdet_lite0/int8/1/efficientdet_lite0.tflite"

@@ -2,10 +2,18 @@ import json
 
 import cv2
 import numpy as np
+import pytest
 from fastapi.testclient import TestClient
 
-from app import app
+from app import app, default_config
 from cv_engine.preprocess import encode_jpeg
+
+
+@pytest.fixture(autouse=True)
+def color_detector(monkeypatch):
+    # These tests check the protocol with red/blue test objects, so pin the color detector
+    # (the app default is motion, which needs a moving object against a learned background).
+    monkeypatch.setenv("CV_DETECTOR", "color")
 
 
 def frame_bytes(x=200):
@@ -115,3 +123,8 @@ def test_calibrate_message_adds_world_coordinates():
 
 def test_debug_page():
     assert "/debug/stream" in TestClient(app).get("/debug").text
+
+
+def test_default_detector_is_motion(monkeypatch):
+    monkeypatch.delenv("CV_DETECTOR", raising=False)
+    assert default_config().detector == "motion"
