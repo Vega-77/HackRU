@@ -24,7 +24,7 @@ abstract final class MockPhysics {
     double t, {
     FrameSize frameSize = const FrameSize(320, 240),
     double massKg = 0.1,
-    int seq = 0,
+    int frameId = 0,
   }) {
     final m = massKg;
     final world = switch (mode) {
@@ -43,7 +43,7 @@ abstract final class MockPhysics {
     const half = 9.0;
 
     return PhysicsState(
-      seq: seq,
+      frameId: frameId,
       t: t,
       tracked: true,
       pixel: pixel,
@@ -327,7 +327,7 @@ Stream<PhysicsState> mockPhysicsStream({
   int hz = 30,
 }) {
   final clock = Stopwatch()..start();
-  var seq = 0;
+  var frameId = 0;
   return Stream<PhysicsState>.periodic(
     Duration(microseconds: 1000000 ~/ hz),
     (_) => MockPhysics.sample(
@@ -335,7 +335,7 @@ Stream<PhysicsState> mockPhysicsStream({
       clock.elapsedMicroseconds / 1e6,
       frameSize: frameSize,
       massKg: massKg,
-      seq: seq++,
+      frameId: frameId++,
     ),
   );
 }

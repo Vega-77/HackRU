@@ -4,7 +4,7 @@ import 'package:hands_on_physics/models/vec2.dart';
 import 'package:hands_on_physics/state/telemetry_buffer.dart';
 
 PhysicsState _at(double t, {bool tracked = true}) => PhysicsState(
-      seq: 0,
+      frameId: 0,
       t: t,
       tracked: tracked,
       position: tracked ? Vec2(t, 0) : null,

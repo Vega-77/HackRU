@@ -5,25 +5,26 @@ trajectory, so the app's live mode (camera -> socket -> overlay) can be
 tested before the real backend exists.
 
     pip install websockets
-    python mobile/tool/mock_server.py              # ws://0.0.0.0:8000/ws
+    python mobile/tool/mock_server.py              # ws://0.0.0.0:8000/ws/frames
     python mobile/tool/mock_server.py --delay 0.08 # simulate 80 ms of CV work
 
 Then run the app with demo mode off and the backend URL set to
-ws://<this machine's LAN IP>:8000/ws (or ws://localhost:8000/ws in Chrome).
+ws://<this machine's LAN IP>:8000/ws/frames (or ws://localhost:8000/ws/frames
+in Chrome). Same port and path as the real backend, so stop one before
+starting the other.
 """
 
 import argparse
 import asyncio
 import json
 import math
-import struct
 import sys
 import time
 
 import websockets
 
 G = 9.81
-HEADER = struct.Struct(">Id")  # uint32 seq, float64 capture time (s)
+PATH = "/ws/frames"
 
 
 def ramp(t, m):
@@ -79,7 +80,7 @@ def pendulum(t, m):
 MODES = {"ramp": ramp, "free_fall": free_fall, "pendulum": pendulum, "collision": ramp}
 
 
-def state_for(config, seq, capture_t, sim_t):
+def state_for(config, frame_id, capture_t, sim_t):
     m = config.get("mass_kg", 0.1)
     fw, fh = config["frame_size"]["w"], config["frame_size"]["h"]
     pos, vel, acc, forces, energy, extras = MODES.get(config.get("mode"), ramp)(sim_t, m)
@@ -87,8 +88,8 @@ def state_for(config, seq, capture_t, sim_t):
     px, py = pos[0] * px_per_m, fh - pos[1] * px_per_m
     return {
         "type": "state",
-        "seq": seq,
-        "t": capture_t,
+        "frame_id": frame_id,
+        "timestamp": capture_t,
         "tracked": True,
         "pixel": {"x": px, "y": py},
         "bbox": {"x": px - 9, "y": py - 9, "w": 18, "h": 18},
@@ -108,6 +109,7 @@ async def handle(ws, delay):
     config = {"mode": "ramp", "mass_kg": 0.1, "frame_size": {"w": 320, "h": 240}}
     start = time.monotonic()
     frames, window_start, last_bytes = 0, time.monotonic(), 0
+    meta, next_id = {}, 0  # metadata text that precedes the next JPEG
     try:
         async for message in ws:
             if isinstance(message, str):
@@ -116,20 +118,24 @@ async def handle(ws, delay):
                     config = data
                     start = time.monotonic()
                     print(f"config: {json.dumps(data)}")
+                else:
+                    meta = data
                 continue
 
-            seq, capture_t = HEADER.unpack_from(message)
-            last_bytes = len(message) - HEADER.size
+            frame_id = int(meta.get("frame_id", next_id))
+            capture_t = meta.get("timestamp", time.monotonic())
+            meta, next_id = {}, frame_id + 1
+            last_bytes = len(message)
             if delay:
                 await asyncio.sleep(delay)
-            await ws.send(json.dumps(state_for(config, seq, capture_t, time.monotonic() - start)))
+            await ws.send(json.dumps(state_for(config, frame_id, capture_t, time.monotonic() - start)))
 
             frames += 1
             now = time.monotonic()
             if now - window_start >= 2:
                 fs = config["frame_size"]
                 print(f"{frames / (now - window_start):5.1f} fps  "
-                      f"{fs['w']}x{fs['h']}  jpeg {last_bytes / 1024:.1f} KB  seq {seq}")
+                      f"{fs['w']}x{fs['h']}  jpeg {last_bytes / 1024:.1f} KB  frame {frame_id}")
                 frames, window_start = 0, now
     except websockets.ConnectionClosed:
         pass
@@ -145,13 +151,13 @@ async def main():
     sys.stdout.reconfigure(line_buffering=True)  # show logs live when piped
 
     async def router(ws):
-        if ws.request.path != "/ws":
-            await ws.close(code=1008, reason="use /ws")
+        if ws.request.path != PATH:
+            await ws.close(code=1008, reason=f"use {PATH}")
             return
         await handle(ws, args.delay)
 
     async with websockets.serve(router, args.host, args.port, max_size=2**22):
-        print(f"mock physics server on ws://{args.host}:{args.port}/ws")
+        print(f"mock physics server on ws://{args.host}:{args.port}{PATH}")
         await asyncio.Future()
 
 

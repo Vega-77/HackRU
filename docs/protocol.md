@@ -1,17 +1,19 @@
-# HandsOn Physics WebSocket protocol (draft v0.1)
+# HandsOn Physics WebSocket protocol (draft v0.2)
 
 This is the contract between the Flutter app (Dev 1) and the FastAPI backend
-(Devs 2-4). The app is written against exactly this document; if the backend
-needs a change, edit this file in the same commit as the code so both sides
-stay in sync.
+(Devs 2-4). If either side needs a change, edit this file in the same commit
+as the code so both sides stay in sync.
 
-Status: **draft, owned by Dev 1 + Dev 4**. Open questions are listed at the end.
+Status: **draft**. v0.2 adopts the frame transport Dev 2 built in
+`backend/app.py` (branch `Dev2`). The app and `mobile/tool/mock_server.py`
+speak it, and `mobile/test/integration/live_backend_test.dart` checks a running
+backend against it. Open questions are listed at the end.
 
 ## Connection
 
-- Endpoint: `ws://<host>:8000/ws` (default port 8000, path `/ws`).
+- Endpoint: `ws://<host>:8000/ws/frames`. Health check: `GET /health`.
 - One WebSocket per phone. The server keeps one tracking session per socket.
-- The client sends a `config` message first, then starts streaming frames.
+- The client sends a `config` message first, then streams frames.
 
 ## Units and coordinate systems
 
@@ -23,11 +25,17 @@ Status: **draft, owned by Dev 1 + Dev 4**. Open questions are listed at the end.
 The app maps frame pixels to screen pixels itself (it knows how the preview is
 scaled), so the backend never needs to know the phone's screen size.
 
+The backend may process frames at a different width (`CV_WORKING_WIDTH`), but
+every pixel coordinate it sends back must be in the **client's** frame pixels
+(`PreprocessedFrame.to_source_coords`). The app sends 320 px wide frames, so
+with the default working width of 640 no scaling happens.
+
 ## Client to server
 
 ### `config` (text, JSON)
 
-Sent once after connecting and again whenever the user changes a setting.
+Sent once after connecting, after every reconnect, and whenever the user
+changes a setting.
 
 ```json
 {
@@ -48,32 +56,63 @@ Sent once after connecting and again whenever the user changes a setting.
 | `target_px` | `{x,y}` or null | where the user tapped the object, frame pixels; null means "auto-detect" |
 | `frame_size` | `{w,h}` | size of the JPEGs that follow |
 
-### Video frame (binary)
+> Backend today: `app.py` treats every text message as metadata for the next
+> image, so a `config` is currently overwritten by the next frame's metadata
+> and ignored (harmless). It should be handled separately when the physics
+> stage needs it: `if meta.get("type") == "config": ...`.
 
-```
-offset  size  type             meaning
-0       4     uint32 BE        seq (frame counter, starts at 0)
-4       8     float64 BE       capture time, seconds (monotonic clock on the phone)
-12      ...   bytes            JPEG image, frame_size.w x frame_size.h
-```
+### Video frame (two messages)
 
-Python: `seq, t = struct.unpack(">Id", data[:12]); jpeg = data[12:]`
-then `cv2.imdecode(np.frombuffer(jpeg, np.uint8), cv2.IMREAD_COLOR)`.
+1. Text, JSON metadata for the image that follows:
 
-The client keeps **at most 2 frames in flight**: it sends the next frame only
-after a `state` with a recent `seq` arrives. So the server should reply to
-every frame (with `"tracked": false` if nothing was found), or the client will
-stall for up to 1 second before it gives up waiting.
+   ```json
+   { "frame_id": 12, "timestamp": 41.237 }
+   ```
+
+   | Field | Notes |
+   |---|---|
+   | `frame_id` | counter starting at 0 for each connection, +1 per frame |
+   | `timestamp` | capture time in seconds on the phone's **monotonic** clock. Only differences are meaningful (use it for dt); it is not Unix time |
+
+2. Binary: the JPEG bytes, `frame_size.w` x `frame_size.h`, quality 0.7.
+
+### Flow control
+
+The client keeps **at most 2 frames in flight**: it sends a new frame only when
+fewer than 2 are awaiting a reply. The server keeps only the newest frame and
+drops older ones while busy, so a reply to frame N tells the client that every
+frame up to N is settled. A frame with no reply after 1 s is forgotten.
+
+So the server must reply to **every frame it processes**, even when nothing is
+tracked (`"tracked": false`). Otherwise the client sends at most 2 frames per
+second.
 
 ## Server to client
 
-### `state` (text, JSON), one per received frame
+Every reply to a frame carries that frame's `frame_id`. The client uses it for
+flow control and to measure round-trip latency.
+
+### `frame` (text, JSON): CV engine report
+
+What `backend/app.py` sends today, before tracking and physics exist. The app
+uses it for flow control and latency, and ignores the rest for now.
+
+```json
+{"type": "frame", "frame_id": 12, "timestamp": 41.237,
+ "size": [640, 360], "source_size": [320, 180], "scale": 1.0,
+ "objects": [], "process_ms": 4.4, "latency_ms": 4.6,
+ "stats": {"received": 13, "dropped": 0, "processed": 13, "decode_errors": 0}}
+```
+
+### `state` (text, JSON): physics result, one per processed frame
+
+Replaces `frame` once the kinematics stage is in. This is what the app draws.
 
 ```json
 {
   "type": "state",
-  "seq": 42,
-  "t": 1.4,
+  "frame_id": 42,
+  "timestamp": 1.4,
   "tracked": true,
   "pixel": { "x": 172.3, "y": 96.1 },
   "bbox": { "x": 160.0, "y": 84.0, "w": 24.0, "h": 24.0 },
@@ -93,23 +132,40 @@ stall for up to 1 second before it gives up waiting.
 
 | Field | Notes |
 |---|---|
-| `seq` | echo of the frame's `seq`, used for latency and flow control |
-| `t` | echo of the frame's capture time (s) |
+| `frame_id` | echo of the frame's `frame_id` |
+| `timestamp` | echo of the frame's capture `timestamp` (s) |
 | `tracked` | false means everything below may be missing or null |
-| `pixel`, `bbox` | frame pixels |
+| `pixel`, `bbox` | client frame pixels |
 | `position`, `velocity`, `acceleration` | world space, SI, already smoothed |
 | `forces` | list; known names: `gravity`, `normal`, `friction`, `tension`, `gravity_parallel`, `gravity_perpendicular`, `net`. Unknown names are drawn in a neutral colour |
 | `energy` | joules; any key may be omitted |
 | `extras` | mode-specific values the app shows as readouts (`angle_deg`, `mu`, `theta_deg`, `momentum`, `restitution`, ...) |
 
+Extra fields (`process_ms`, `stats`, ...) are allowed and ignored.
+
 ### `error` (text, JSON)
 
 ```json
-{ "type": "error", "message": "px_per_m is required for ramp mode" }
+{ "type": "error", "message": "could not decode image bytes", "frame_id": 12 }
 ```
 
-## Open questions for Dev 4
+`frame_id` is present when the error is about one frame; the app then counts
+that frame as answered.
 
-1. Port and path OK (`:8000/ws`)?
-2. Frame size: the client sends 320 px wide JPEGs at quality 0.7, about 15 fps. Is that enough for tracking a tennis ball?
-3. Collision mode needs two objects: proposal is `objects: [state, state]` in a later version.
+## Open questions
+
+1. Is a 320 px JPEG at quality 0.7 and about 15 fps enough for tracking a
+   tennis ball? The app can send wider frames if needed (`AppConfig.frameWidth`).
+2. Shape of the entries in `objects` (Dev 2 to propose). The app would like
+   `{"pixel": {x,y}, "bbox": {x,y,w,h}}` in client frame pixels, so it can
+   show detections before the physics stage lands.
+3. Collision mode needs two objects: proposal is `"objects": [state, state]` in
+   a later version.
+
+## Changelog
+
+- **v0.2**: endpoint `/ws/frames`; per-frame metadata text + raw JPEG instead
+  of a 12-byte binary header; `seq`/`t` renamed to `frame_id`/`timestamp`;
+  added the `frame` report; replies settle all older frames; `error` may carry
+  `frame_id`.
+- **v0.1**: first draft.

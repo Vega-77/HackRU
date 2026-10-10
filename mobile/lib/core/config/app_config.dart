@@ -2,10 +2,10 @@
 /// demo mode) start from here and live in `state/experiment_settings.dart`.
 abstract final class AppConfig {
   /// Default backend WebSocket URL. Override at build time with
-  /// `flutter run --dart-define=BACKEND_URL=ws://192.168.1.20:8000/ws`.
+  /// `flutter run --dart-define=BACKEND_URL=ws://192.168.1.20:8000/ws/frames`.
   static const String defaultBackendUrl = String.fromEnvironment(
     'BACKEND_URL',
-    defaultValue: 'ws://localhost:8000/ws',
+    defaultValue: 'ws://localhost:8000/ws/frames',
   );
 
   /// Start in demo mode (synthetic data, no backend) unless told otherwise.

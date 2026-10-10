@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hands_on_physics/models/calibration.dart';
@@ -15,7 +14,7 @@ void main() {
     test('parses a full state message', () {
       const raw = '''
       {
-        "type": "state", "seq": 42, "t": 12.345, "tracked": true,
+        "type": "state", "frame_id": 42, "timestamp": 12.345, "tracked": true,
         "pixel": {"x": 161.0, "y": 118.5},
         "bbox": {"x": 150, "y": 108, "w": 22, "h": 21},
         "position": {"x": 0.21, "y": 0.35},
@@ -33,7 +32,7 @@ void main() {
       expect(message, isA<StateMessage>());
       final state = (message as StateMessage).state;
 
-      expect(state.seq, 42);
+      expect(state.frameId, 42);
       expect(state.t, closeTo(12.345, 1e-9));
       expect(state.tracked, isTrue);
       expect(state.pixel, const Vec2(161, 118.5));
@@ -48,7 +47,7 @@ void main() {
 
     test('an untracked frame with no vectors still parses', () {
       final message = ServerMessage.parse(
-        '{"type":"state","seq":7,"t":1.0,"tracked":false}',
+        '{"type":"state","frame_id":7,"timestamp":1.0,"tracked":false}',
       );
       final state = (message as StateMessage).state;
       expect(state.tracked, isFalse);
@@ -59,7 +58,7 @@ void main() {
 
     test('malformed fields are dropped instead of throwing', () {
       final message = ServerMessage.parse(
-        '{"type":"state","seq":1,"t":0,"tracked":true,'
+        '{"type":"state","frame_id":1,"timestamp":0,"tracked":true,'
         '"velocity":{"x":"fast"},"forces":[{"x":1},{"name":"normal","x":0,"y":1}]}',
       );
       final state = (message as StateMessage).state;
@@ -72,6 +71,28 @@ void main() {
         '{"type":"error","message":"No object found"}',
       );
       expect((message as ErrorMessage).message, 'No object found');
+      expect(message.frameId, isNull);
+    });
+
+    test('a frame decode error names the frame', () {
+      final message = ServerMessage.parse(
+        '{"type":"error","message":"could not decode image bytes","frame_id":9}',
+      );
+      expect(message.frameId, 9);
+    });
+
+    test("parses the CV engine's frame report", () {
+      // Shape taken from backend/app.py (Dev 2).
+      const raw = '''
+      {"type": "frame", "frame_id": 12, "timestamp": 1728575000.12,
+       "size": [640, 360], "source_size": [960, 540], "scale": 0.66667,
+       "objects": [], "process_ms": 4.4, "latency_ms": 4.6,
+       "stats": {"received": 13, "dropped": 0, "processed": 13, "decode_errors": 0}}''';
+      final message = ServerMessage.parse(raw);
+      expect(message, isA<FrameAckMessage>());
+      expect(message.frameId, 12);
+      expect((message as FrameAckMessage).processMs, 4.4);
+      expect(message.objects, isEmpty);
     });
 
     test('garbage becomes UnknownMessage', () {
@@ -114,21 +135,10 @@ void main() {
     });
   });
 
-  group('FramePacket', () {
-    test('header is 12 bytes big-endian and round-trips', () {
-      final jpeg = Uint8List.fromList([0xFF, 0xD8, 0xFF, 0xD9]);
-      final packet = FramePacket.encode(258, 3.5, jpeg);
-
-      expect(packet.length, 16);
-      // seq = 258 = 0x00000102, big-endian.
-      expect(packet.sublist(0, 4), [0, 0, 1, 2]);
-      // 3.5 as a big-endian IEEE 754 double is 0x400C000000000000.
-      expect(packet.sublist(4, 12), [0x40, 0x0C, 0, 0, 0, 0, 0, 0]);
-
-      final decoded = FramePacket.decode(packet);
-      expect(decoded.seq, 258);
-      expect(decoded.captureTime, 3.5);
-      expect(decoded.jpeg, jpeg);
+  group('FrameMetadata', () {
+    test('encodes the text message sent before each JPEG', () {
+      const meta = FrameMetadata(frameId: 258, timestamp: 3.5);
+      expect(jsonDecode(meta.encode()), {'frame_id': 258, 'timestamp': 3.5});
     });
   });
 

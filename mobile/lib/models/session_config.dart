@@ -73,34 +73,17 @@ class EncodedFrame {
   final double captureTime;
 }
 
-/// Binary frame packet: 12-byte big-endian header + JPEG.
-///
-/// ```
-/// offset 0  uint32  seq
-/// offset 4  float64 capture time (s)
-/// offset 12 bytes   JPEG
-/// ```
-abstract final class FramePacket {
-  static const int headerLength = 12;
+/// The text message sent just before each JPEG, so the backend knows which
+/// frame it is and when it was captured.
+class FrameMetadata {
+  const FrameMetadata({required this.frameId, required this.timestamp});
 
-  static Uint8List encode(int seq, double captureTime, Uint8List jpeg) {
-    final packet = Uint8List(headerLength + jpeg.length);
-    ByteData.sublistView(packet)
-      ..setUint32(0, seq, Endian.big)
-      ..setFloat64(4, captureTime, Endian.big);
-    packet.setRange(headerLength, packet.length, jpeg);
-    return packet;
-  }
+  final int frameId;
 
-  /// Splits a packet back into its parts (used by tests and the mock server).
-  static ({int seq, double captureTime, Uint8List jpeg}) decode(
-    Uint8List packet,
-  ) {
-    final header = ByteData.sublistView(packet, 0, headerLength);
-    return (
-      seq: header.getUint32(0, Endian.big),
-      captureTime: header.getFloat64(4, Endian.big),
-      jpeg: Uint8List.sublistView(packet, headerLength),
-    );
-  }
+  /// Capture time in seconds on the phone's monotonic clock.
+  final double timestamp;
+
+  Map<String, dynamic> toJson() => {'frame_id': frameId, 'timestamp': timestamp};
+
+  String encode() => jsonEncode(toJson());
 }

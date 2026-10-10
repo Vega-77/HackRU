@@ -19,10 +19,13 @@ enum ConnectionStatus {
 /// WebSocket client for the physics backend (see docs/protocol.md).
 ///
 /// * Reconnects automatically and re-sends the last config.
+/// * Each frame goes out as two messages: a [FrameMetadata] text, then the
+///   JPEG bytes.
 /// * Flow control: at most [AppConfig.maxFramesInFlight] frames awaiting a
-///   reply. A frame with no reply after [AppConfig.frameTimeout] is
-///   forgotten, so a dropped reply can never stall the stream.
-/// * Measures round-trip latency from the echoed `seq`.
+///   reply. The backend only processes the newest frame it has, so a reply
+///   to frame N also settles every older frame. A frame with no reply after
+///   [AppConfig.frameTimeout] is forgotten, so the stream can never stall.
+/// * Measures round-trip latency from the echoed `frame_id`.
 class PhysicsSocket {
   PhysicsSocket(
     this.url, {
@@ -43,9 +46,9 @@ class PhysicsSocket {
   Timer? _reconnectTimer;
   SessionConfig? _lastConfig;
   bool _wanted = false;
-  int _nextSeq = 0;
+  int _nextFrameId = 0;
 
-  /// seq → time it was sent, for frames still awaiting a reply.
+  /// frame_id → time it was sent, for frames still awaiting a reply.
   final Map<int, Duration> _inFlight = {};
 
   ConnectionStatus _currentStatus = ConnectionStatus.idle;
@@ -94,10 +97,13 @@ class PhysicsSocket {
   /// says the backend is still busy.
   bool sendFrame(EncodedFrame frame) {
     if (!canSendFrame) return false;
-    final seq = _nextSeq;
-    _nextSeq = (_nextSeq + 1) & 0xFFFFFFFF; // uint32 on the wire
-    _inFlight[seq] = _clock();
-    _channel!.sink.add(FramePacket.encode(seq, frame.captureTime, frame.jpeg));
+    final frameId = _nextFrameId++;
+    _inFlight[frameId] = _clock();
+    final sink = _channel!.sink;
+    sink.add(
+      FrameMetadata(frameId: frameId, timestamp: frame.captureTime).encode(),
+    );
+    sink.add(frame.jpeg);
     return true;
   }
 
@@ -137,12 +143,15 @@ class PhysicsSocket {
   void _onData(dynamic data) {
     if (data is! String) return; // The server only sends text.
     final message = ServerMessage.parse(data);
-    if (message is StateMessage) _recordReply(message.state.seq);
+    final frameId = message.frameId;
+    if (frameId != null) _recordReply(frameId);
     _messages.add(message);
   }
 
-  void _recordReply(int seq) {
-    final sentAt = _inFlight.remove(seq);
+  void _recordReply(int frameId) {
+    final sentAt = _inFlight[frameId];
+    // Older frames were dropped by the backend in favour of this one.
+    _inFlight.removeWhere((id, _) => id <= frameId);
     if (sentAt == null) return;
     final rttMs = (_clock() - sentAt).inMicroseconds / 1000;
     // Exponential moving average so the latency chip doesn't flicker.

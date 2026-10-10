@@ -9,7 +9,7 @@ import 'vec2.dart';
 /// (y down).
 class PhysicsState {
   const PhysicsState({
-    required this.seq,
+    required this.frameId,
     required this.t,
     required this.tracked,
     this.pixel,
@@ -22,10 +22,10 @@ class PhysicsState {
     this.extras = const {},
   });
 
-  /// Echo of the frame's sequence number.
-  final int seq;
+  /// Echo of the `frame_id` the client sent with the frame.
+  final int frameId;
 
-  /// Echo of the frame's capture time, in seconds.
+  /// Echo of the frame's capture `timestamp`, in seconds.
   final double t;
 
   /// False when the backend could not find the object in this frame.
@@ -46,8 +46,8 @@ class PhysicsState {
     final rawForces = json['forces'];
     final rawExtras = json['extras'];
     return PhysicsState(
-      seq: (json['seq'] as num?)?.toInt() ?? -1,
-      t: (json['t'] as num?)?.toDouble() ?? 0,
+      frameId: (json['frame_id'] as num?)?.toInt() ?? -1,
+      t: (json['timestamp'] as num?)?.toDouble() ?? 0,
       tracked: json['tracked'] == true,
       pixel: Vec2.tryParse(json['pixel']),
       bbox: PixelRect.tryParse(json['bbox']),
@@ -69,8 +69,8 @@ class PhysicsState {
 
   Map<String, dynamic> toJson() => {
         'type': 'state',
-        'seq': seq,
-        't': t,
+        'frame_id': frameId,
+        'timestamp': t,
         'tracked': tracked,
         if (pixel != null) 'pixel': pixel!.toJson(),
         if (bbox != null) 'bbox': bbox!.toJson(),
@@ -158,6 +158,10 @@ class PixelRect {
 sealed class ServerMessage {
   const ServerMessage();
 
+  /// The `frame_id` this message answers, or null if it isn't a reply to
+  /// a frame. The socket uses it for flow control and latency.
+  int? get frameId => null;
+
   /// Never throws: malformed input becomes an [UnknownMessage].
   static ServerMessage parse(String raw) {
     try {
@@ -165,7 +169,11 @@ sealed class ServerMessage {
       if (json is! Map<String, dynamic>) return UnknownMessage(raw);
       return switch (json['type']) {
         'state' => StateMessage(PhysicsState.fromJson(json)),
-        'error' => ErrorMessage('${json['message'] ?? 'Unknown server error'}'),
+        'frame' => FrameAckMessage.fromJson(json),
+        'error' => ErrorMessage(
+            '${json['message'] ?? 'Unknown server error'}',
+            frameId: (json['frame_id'] as num?)?.toInt(),
+          ),
         _ => UnknownMessage(raw),
       };
     } on FormatException {
@@ -177,11 +185,48 @@ sealed class ServerMessage {
 class StateMessage extends ServerMessage {
   const StateMessage(this.state);
   final PhysicsState state;
+
+  @override
+  int get frameId => state.frameId;
+}
+
+/// The CV engine's per-frame report (`type: frame`). It arrives before the
+/// physics stage exists, and carries detected objects in frame pixels.
+class FrameAckMessage extends ServerMessage {
+  const FrameAckMessage({
+    required this.frameId,
+    this.processMs,
+    this.objects = const [],
+  });
+
+  @override
+  final int frameId;
+
+  /// Time the backend spent on this frame.
+  final double? processMs;
+
+  /// Raw detections; their shape is still being designed by the backend.
+  final List<Map<String, dynamic>> objects;
+
+  factory FrameAckMessage.fromJson(Map<String, dynamic> json) {
+    final rawObjects = json['objects'];
+    return FrameAckMessage(
+      frameId: (json['frame_id'] as num?)?.toInt() ?? -1,
+      processMs: (json['process_ms'] as num?)?.toDouble(),
+      objects: rawObjects is List
+          ? rawObjects.whereType<Map<String, dynamic>>().toList()
+          : const [],
+    );
+  }
 }
 
 class ErrorMessage extends ServerMessage {
-  const ErrorMessage(this.message);
+  const ErrorMessage(this.message, {this.frameId});
   final String message;
+
+  /// Set when the error is about one frame (for example, it failed to decode).
+  @override
+  final int? frameId;
 }
 
 class UnknownMessage extends ServerMessage {

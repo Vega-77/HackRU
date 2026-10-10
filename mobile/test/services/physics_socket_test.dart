@@ -51,14 +51,15 @@ void main() {
     captureTime: 1.0,
   );
 
-  String reply(int seq) =>
-      jsonEncode({'type': 'state', 'seq': seq, 't': 1.0, 'tracked': true});
+  String reply(int frameId) => jsonEncode(
+        {'type': 'state', 'frame_id': frameId, 'timestamp': 1.0, 'tracked': true},
+      );
 
   setUp(() async {
     now = Duration.zero;
     channel = _FakeChannel();
     socket = PhysicsSocket(
-      'ws://test:8000/ws',
+      'ws://test:8000/ws/frames',
       connector: (_) => channel,
       clock: () => now,
     );
@@ -81,9 +82,32 @@ void main() {
     expect(socket.sendFrame(frame), isTrue);
     expect(socket.sendFrame(frame), isFalse);
     expect(socket.framesInFlight, 2);
+  });
 
-    final packet = channel.sink.sent[1] as Uint8List;
-    expect(FramePacket.decode(packet).seq, 0);
+  test('each frame is a metadata text followed by the JPEG bytes', () {
+    socket.sendFrame(frame);
+    final [_, meta, jpeg] = channel.sink.sent;
+    expect(jsonDecode(meta as String), {'frame_id': 0, 'timestamp': 1.0});
+    expect(jpeg, frame.jpeg);
+  });
+
+  test('a reply to a newer frame settles the older ones', () async {
+    socket
+      ..sendFrame(frame)
+      ..sendFrame(frame);
+    channel.server.add(reply(1)); // the backend dropped frame 0
+    await pumpEventQueue();
+    expect(socket.framesInFlight, 0);
+  });
+
+  test('a CV frame report or a frame error also frees a slot', () async {
+    socket
+      ..sendFrame(frame)
+      ..sendFrame(frame);
+    channel.server.add('{"type":"frame","frame_id":0,"objects":[]}');
+    channel.server.add('{"type":"error","message":"bad jpeg","frame_id":1}');
+    await pumpEventQueue();
+    expect(socket.framesInFlight, 0);
   });
 
   test('a reply frees a slot and measures latency', () async {
@@ -116,7 +140,7 @@ void main() {
     await pumpEventQueue();
     await sub.cancel();
 
-    expect((received[0] as StateMessage).state.seq, 5);
+    expect((received[0] as StateMessage).state.frameId, 5);
     expect((received[1] as ErrorMessage).message, 'lost the ball');
   });
 

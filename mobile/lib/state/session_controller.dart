@@ -207,7 +207,9 @@ class SessionController extends Notifier<SessionState> {
             _onState(physics);
           case ErrorMessage(:final message):
             state = state.copyWith(serverError: message);
-          case UnknownMessage():
+          // CV-only reports carry no physics yet; the socket already used
+          // them for flow control and latency.
+          case FrameAckMessage() || UnknownMessage():
             break;
         }
       }));
