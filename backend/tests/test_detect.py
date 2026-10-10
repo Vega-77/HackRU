@@ -114,3 +114,12 @@ def test_motion_detector_keeps_a_released_ball_apart_from_where_it_sat():
         x = 300 + 30 * step  # rolls off, still overlapping the spot it left at first
         (d,) = det.detect(table([((x, 400), 40, (0, 0, 255))], frame_id=10 + step))
         assert d.centroid == pytest.approx((x / 2, 200), abs=1.5)
+
+
+@pytest.mark.parametrize("gray", [30, 60, 128, 190, 235])
+def test_motion_detector_finds_gray_balls_on_a_gray_table(gray):
+    det = MotionDetector()
+    for i in range(10):
+        det.detect(table(frame_id=i))  # table is mid gray (110)
+    (d,) = det.detect(table([((700, 400), 40, (gray, gray, gray))], frame_id=10))
+    assert d.centroid == pytest.approx((350, 200), abs=2)
