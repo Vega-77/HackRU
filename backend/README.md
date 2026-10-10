@@ -28,6 +28,16 @@ python stream_client.py --source clip.mp4 --fps 30
 The client prints send rate, bandwidth, frames dropped by the server, and latency.
 Use `--send-width` and `--quality` to tune how much the phone downsamples and compresses.
 `CV_WORKING_WIDTH` (default 640) sets the resolution the server processes at.
+The server accepts frames up to 512 KiB and control messages up to 4096 characters.
+`GET /health` reports the number of active WebSocket sessions. Run one Uvicorn
+worker because tracking and calibration state live in each server process.
+
+To run the same backend in Docker:
+
+```bash
+docker build -t handson-backend backend
+docker run --rm -p 8000:8000 handson-backend
+```
 
 ## Debug view and sample clips
 

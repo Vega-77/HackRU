@@ -1,39 +1,12 @@
-# HackRU
-
-HandsOn Physics: an AR physics assistant. The Python CV backend lives in [`backend/`](backend/README.md).
 # HandsOn Physics
 
-HackRU prototype: a Flutter camera client streams experiment frames to a Python
-backend, which returns tracked object coordinates and physics telemetry for
-live vector overlays.
+HackRU prototype for tracking physical experiments and displaying physics
+telemetry over a live camera view.
 
-The Dev 4 server foundation is in [`backend/`](backend/). Its wire contract is
-documented in [`docs/websocket-protocol.md`](docs/websocket-protocol.md).
+The single Python backend is in [`backend/`](backend/README.md). It provides
+the `/ws/frames` WebSocket used by the mobile client, object tracking,
+calibration, a browser debug view, and sample clips. See the backend README for
+setup, the wire protocol, and tests.
 
-## Run the backend
-
-With Python 3.9 or newer:
-
-```sh
-cd backend
-python3 -m venv .venv
-.venv/bin/python -m pip install '.[test]'
-.venv/bin/python -m uvicorn handson_backend.server:app --host 0.0.0.0 --port 8000 --ws-max-size 524288
-```
-
-Then request `http://localhost:8000/health`. The default server accepts frames
-but reports `tracking_unavailable` until Dev 2's tracker is connected. It does
-not claim to measure motion yet.
-
-To run tests from `backend/`:
-
-```sh
-.venv/bin/python -m pytest
-```
-
-Docker is also supported:
-
-```sh
-docker build -t handson-bßackend backend
-docker run --rm -p 8000:8000 handson-backend
-```
+The CV pipeline currently reports tracked positions. Kinematics and force
+calculations still need Dev 3's engine to be connected.
