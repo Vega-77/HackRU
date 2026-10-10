@@ -14,9 +14,12 @@ abstract final class Routes {
 }
 
 /// Flow: home (pick an experiment) → calibrate → experiment.
-/// Settings is reachable from home.
-final appRouter = GoRouter(
-  initialLocation: Routes.home,
+/// Settings is reachable from home and from the experiment's banners.
+final appRouter = buildAppRouter();
+
+/// A fresh router; tests build their own so each starts at [initialLocation].
+GoRouter buildAppRouter({String initialLocation = Routes.home}) => GoRouter(
+  initialLocation: initialLocation,
   routes: [
     GoRoute(path: Routes.home, builder: (_, _) => const HomeScreen()),
     GoRoute(
