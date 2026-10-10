@@ -77,6 +77,9 @@ apply from the next frame without an acknowledgement; invalid settings get an
 
 The backend accepts binary frames up to 512 KiB. An oversized frame receives
 an `error` response, including its `frame_id` when metadata supplied one.
+Frame IDs must be increasing nonnegative integers and capture timestamps must
+be finite numbers. Invalid frame metadata gets an `error` without ending the
+WebSocket session.
 
 ### Flow control
 

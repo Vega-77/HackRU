@@ -16,7 +16,7 @@ python -m pip install -r requirements.txt
 ## Run
 
 ```bash
-uvicorn app:app --host 0.0.0.0 --port 8000
+uvicorn app:app --host 0.0.0.0 --port 8000 --ws-max-size 1048576
 ```
 
 Then, in another terminal, stream frames to it the way the app will:
@@ -31,8 +31,21 @@ The client prints send rate, bandwidth, frames dropped by the server, and latenc
 Use `--send-width` and `--quality` to tune how much the phone downsamples and compresses.
 `CV_WORKING_WIDTH` (default 640) sets the resolution the server processes at.
 The server accepts frames up to 512 KiB and control messages up to 4096 characters.
+The Uvicorn WebSocket limit is 1 MiB so the app can reply with an error for
+oversized frames between 512 KiB and 1 MiB.
 `GET /health` reports the number of active WebSocket sessions. Run one Uvicorn
 worker because tracking and calibration state live in each server process.
+
+For a repeatable local streaming check that includes the physics stage:
+
+```bash
+python stream_client.py --source synthetic --fps 15 --send-width 320 \
+  --mode ramp --px-per-m 800 --ramp-angle-deg 0 --max-frames 60 --max-p95-ms 50
+```
+
+The client reports WebSocket round-trip p50/p95 and exits nonzero if p95 exceeds
+the supplied limit. The 800 px/m scale is illustrative. Localhost timing does
+not establish phone-to-server latency; measure again on the demonstration network.
 
 To run the same backend in Docker:
 
