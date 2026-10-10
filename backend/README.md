@@ -151,6 +151,28 @@ Use `world_points` instead of `width_m`/`height_m` for a non-rectangular layout,
  "width_m": 0.60, "height_m": 0.40}
 ```
 
+**ARKit on iOS (`ar_plane`, 3D).** The iOS app runs an ARKit session. Each frame's metadata
+carries the camera intrinsics (in the pixels of the JPEG sent) and its camera-to-world pose, and
+the config carries the surface the user picked with an ARKit raycast:
+
+```json
+{"frame_id": 12, "timestamp": 41.237,
+ "intrinsics": {"fx": 250.1, "fy": 250.1, "cx": 160.0, "cy": 213.4},
+ "camera_to_world": [1, 0, 0, 0.1,  0, 1, 0, 0.2,  0, 0, 1, 0.8,  0, 0, 0, 1]}
+{"type": "config", ..., "ar_plane": {"point": [0.0, 0.1, -0.9], "normal": [0, 0, 1], "offset_m": 0.0}}
+```
+
+Every frame the server builds the plane's homography from that pose
+(`cv_engine/ar_plane.py`), which is the same as casting a ray from the camera through the
+centroid and intersecting it with the plane. The phone can move freely and no markers or ruler
+are needed. Plane axes are fixed from the first pose: on a vertical board +X is right and +Y is
+straight up (gravity is exactly -Y); on a table +X is right and +Y points away from the camera.
+`offset_m` lifts the plane towards the camera, e.g. by a ball's radius, so positions are its
+centre. Objects then also report `position_3d` in ARKit world coordinates (metres, +Y up), and
+`state` replies add `position_3d`, `velocity_3d`, `acceleration_3d` and `forces_3d`. The
+status is `no_pose` while frames arrive without a pose. ArUco or manual calibration, when set,
+takes priority; `ar_plane` takes priority over `px_per_m`.
+
 **From the app's ruler (`px_per_m`).** If the app's config message has `px_per_m`, the server
 uses a plain scale: `x = px / px_per_m`, `y = (frame_h - py) / px_per_m`, origin at the frame's
 bottom-left. That assumes the phone faces the plane of motion squarely; ArUco or manual

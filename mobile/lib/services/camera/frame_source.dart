@@ -1,7 +1,9 @@
 import 'package:flutter/widgets.dart';
 
 import '../../core/config/app_config.dart';
+import '../../models/camera_pose.dart';
 import '../../models/session_config.dart';
+import '../../models/vec2.dart';
 
 /// A camera that can show a live preview and hand out JPEG frames on demand.
 ///
@@ -10,7 +12,10 @@ import '../../models/session_config.dart';
 ///
 /// Implementations:
 /// * `WebFrameSource`: browser getUserMedia, used for development in Chrome.
-/// * `NativeFrameSource`: the `camera` plugin on iOS.
+/// * `ArKitFrameSource`: an ARKit session on iOS, which also reports the
+///   camera pose with every frame ([SurfaceFinder]).
+/// * `NativeFrameSource`: the `camera` plugin on iOS, used when the device
+///   has no ARKit world tracking.
 abstract class FrameSource {
   /// Opens the camera. Throws [CameraUnavailableException] if there is no
   /// camera or the user denied permission.
@@ -32,6 +37,18 @@ abstract class FrameSource {
   /// The live preview, filling its parent like `BoxFit.cover`. The overlay's
   /// coordinate mapper assumes exactly this fit.
   Widget buildPreview(BuildContext context);
+}
+
+/// A frame source that knows where the camera is in 3D (ARKit) and can find
+/// real surfaces in the picture.
+abstract interface class SurfaceFinder {
+  /// False until [FrameSource.start] completes, and on devices without
+  /// ARKit world tracking.
+  bool get canFindSurfaces;
+
+  /// The surface seen at [framePixel] (frame pixels), or null if ARKit has
+  /// not found one there yet.
+  Future<ArSurface?> findSurface(Vec2 framePixel);
 }
 
 class CameraUnavailableException implements Exception {

@@ -4,11 +4,14 @@ Protocol on ws://<host>:8000/ws/frames
   client -> server
     text   (optional) JSON metadata for the next image, e.g.
            {"frame_id": 12, "timestamp": 1728575000.123, "anchor": {...}}
+           iOS ARKit clients add the camera: "intrinsics": {fx, fy, cx, cy} and
+           "camera_to_world": [16 numbers, row-major] (see cv_engine/ar_plane.py)
     binary JPEG (or PNG) bytes of one downsampled camera frame
     text   (on connect, and whenever settings change) the app's session settings,
            plus optional tracking settings, applied from the next frame:
            {"type": "config", "mode": "ramp", "mass_kg": 0.1, "px_per_m": 812.5,
             "target_px": {"x": 161, "y": 118}, "frame_size": {"w": 320, "h": 240},
+            "ar_plane": {"point": [x, y, z], "normal": [x, y, z]} | null,
             "detector": "motion", ...}  (or "color" with "colors": ["red", "blue"])
            No reply on success (the app treats unknown message types as errors);
            an invalid config gets {"type": "error"} and changes nothing.
@@ -26,7 +29,9 @@ Protocol on ws://<host>:8000/ws/frames
             "objects": [{"id", "label", "source", "score", "target",
                          "pixel": {x, y}, "bbox": {x, y, w, h},  (client frame pixels)
                          "pixel_norm", "bbox_norm", "area", "hits",
-                         "position": {x, y} | null, "width_m"}],  (meters, y up)
+                         "position": {x, y} | null, "width_m",  (meters, y up)
+                         "screen_axes": {"x": {x, y}, "y": {x, y}} | null,
+                         "position_3d": {x, y, z} | null}],  (ARKit world, meters)
             "calibration": {"method", "status", "world_to_image", ...}}
            or {"type": "error", "message": ...} for a bad message.
 

@@ -101,7 +101,11 @@ class PhysicsSocket {
     _inFlight[frameId] = _clock();
     final sink = _channel!.sink;
     sink.add(
-      FrameMetadata(frameId: frameId, timestamp: frame.captureTime).encode(),
+      FrameMetadata(
+        frameId: frameId,
+        timestamp: frame.captureTime,
+        pose: frame.pose,
+      ).encode(),
     );
     sink.add(frame.jpeg);
     return true;

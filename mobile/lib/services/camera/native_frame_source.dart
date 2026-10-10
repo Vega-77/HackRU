@@ -7,9 +7,11 @@ import 'package:image/image.dart' as img;
 
 import '../../core/config/app_config.dart';
 import '../../models/session_config.dart';
+import 'arkit_frame_source.dart';
 import 'frame_source.dart';
 
-/// iOS camera through the `camera` plugin.
+/// iOS camera through the `camera` plugin, for devices without ARKit
+/// world tracking (see `ArKitFrameSource`).
 ///
 /// The plugin streams raw BGRA frames. We keep only the newest one and,
 /// when [capture] is called, downsample and JPEG-encode it in a background
@@ -181,4 +183,5 @@ Uint8List _encode(_EncodeJob job) {
   return img.encodeJpg(small, quality: job.quality);
 }
 
-FrameSource createPlatformFrameSource() => NativeFrameSource();
+FrameSource createPlatformFrameSource() =>
+    ArKitFrameSource(fallback: NativeFrameSource());

@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:typed_data';
 
+import 'camera_pose.dart';
 import 'experiment_mode.dart';
 import 'vec2.dart';
 
@@ -34,6 +35,7 @@ class SessionConfig {
     required this.frameSize,
     this.pxPerM,
     this.targetPx,
+    this.surface,
   });
 
   final ExperimentMode mode;
@@ -46,6 +48,10 @@ class SessionConfig {
   /// Where the user tapped the object, in frame pixels. Null means auto-detect.
   final Vec2? targetPx;
 
+  /// The AR surface the object moves on, iOS only. When set, the backend
+  /// maps positions with the camera pose instead of [pxPerM].
+  final ArSurface? surface;
+
   Map<String, dynamic> toJson() => {
     'type': 'config',
     'mode': mode.wireName,
@@ -53,6 +59,7 @@ class SessionConfig {
     'px_per_m': pxPerM,
     'target_px': targetPx?.toJson(),
     'frame_size': frameSize.toJson(),
+    'ar_plane': surface?.toJson(),
   };
 
   String encode() => jsonEncode(toJson());
@@ -64,6 +71,7 @@ class EncodedFrame {
     required this.jpeg,
     required this.size,
     required this.captureTime,
+    this.pose,
   });
 
   final Uint8List jpeg;
@@ -71,21 +79,31 @@ class EncodedFrame {
 
   /// Seconds on the phone's monotonic clock.
   final double captureTime;
+
+  /// The camera that took this frame, when ARKit is running.
+  final CameraPose? pose;
 }
 
 /// The text message sent just before each JPEG, so the backend knows which
 /// frame it is and when it was captured.
 class FrameMetadata {
-  const FrameMetadata({required this.frameId, required this.timestamp});
+  const FrameMetadata({
+    required this.frameId,
+    required this.timestamp,
+    this.pose,
+  });
 
   final int frameId;
 
   /// Capture time in seconds on the phone's monotonic clock.
   final double timestamp;
 
+  final CameraPose? pose;
+
   Map<String, dynamic> toJson() => {
     'frame_id': frameId,
     'timestamp': timestamp,
+    ...?pose?.toJson(),
   };
 
   String encode() => jsonEncode(toJson());

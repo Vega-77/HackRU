@@ -3,9 +3,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hands_on_physics/app.dart';
 import 'package:hands_on_physics/core/routing/router.dart';
+import 'package:hands_on_physics/models/camera_pose.dart';
 import 'package:hands_on_physics/models/experiment_mode.dart';
 import 'package:hands_on_physics/models/session_config.dart';
 import 'package:hands_on_physics/services/camera/frame_source.dart';
+import 'package:hands_on_physics/models/vec2.dart';
+import 'package:hands_on_physics/state/calibration_controller.dart';
 import 'package:hands_on_physics/state/experiment_settings.dart';
 import 'package:hands_on_physics/state/session_controller.dart';
 
@@ -40,6 +43,24 @@ class _FakeCamera implements FrameSource {
 
   @override
   Widget buildPreview(BuildContext context) => const SizedBox.expand();
+}
+
+/// An ARKit camera: knows its pose and finds a board wherever it looks.
+class _FakeArCamera extends _FakeCamera implements SurfaceFinder {
+  final List<Vec2> searches = [];
+
+  @override
+  bool get canFindSurfaces => running;
+
+  @override
+  Future<ArSurface?> findSurface(Vec2 framePixel) async {
+    searches.add(framePixel);
+    return const ArSurface(
+      point: [0, 0, -1],
+      normal: [0, 0, 1],
+      vertical: true,
+    );
+  }
 }
 
 /// Smoke tests for the whole demo flow, at iPhone size. They catch layout
@@ -182,6 +203,31 @@ void main() {
     expect(camera.isRunning, isTrue);
     expect(camera.starts, 2);
     expect(camera.stops, 1);
+
+    await unmount(tester);
+  });
+
+  testWidgets('with ARKit, setup finds the surface instead of a ruler', (
+    tester,
+  ) async {
+    final ar = _FakeArCamera();
+    camera = ar;
+    final container = await pumpApp(tester);
+    container.read(experimentSettingsProvider.notifier).setDemoMode(false);
+    await tester.pump(const Duration(milliseconds: 100));
+
+    await tester.tap(find.textContaining('Set up'));
+    await tester.pump(const Duration(milliseconds: 600));
+    await tester.pump(); // the camera's frame size arrives after start()
+    expect(find.text('Find the surface'), findsOneWidget);
+    expect(find.text('No surface yet'), findsOneWidget);
+
+    await tester.tap(find.text('Find'));
+    await tester.pump(const Duration(milliseconds: 100));
+    expect(ar.searches, [const Vec2(160, 120)], reason: 'middle of frame');
+    expect(container.read(calibrationProvider).surface, isNotNull);
+    expect(find.text('Using a vertical board'), findsOneWidget);
+    expect(find.textContaining('Not needed while a surface'), findsOneWidget);
 
     await unmount(tester);
   });

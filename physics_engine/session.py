@@ -73,6 +73,8 @@ class PhysicsSession:
         state["pixel"] = target.get("pixel")
         state["bbox"] = target.get("bbox")
         state["position"] = target.get("position")
+        state["position_3d"] = target.get("position_3d")
+        state["screen_axes"] = target.get("screen_axes")
 
         results: dict[int, KinematicsResult] = {}
         for obj in frame.get("objects", []):
@@ -134,6 +136,8 @@ class PhysicsSession:
                     + model["energy"].get("potential", 0.0)
                 )
 
+        _add_world_vectors(state, calibration.get("plane"))
+
         if mode == "collision":
             state["collision_objects"] = [
                 {
@@ -193,3 +197,21 @@ class PhysicsSession:
 
 def _vec(vector: Vector2D) -> dict:
     return {"x": vector.x, "y": vector.y}
+
+
+def _add_world_vectors(state: dict, plane: dict | None) -> None:
+    """For ARKit clients, also give every vector in ARKit world space (metres, +y up), so
+    a 3D renderer can anchor arrows in the scene. Physics itself runs in the plane's 2D
+    coordinates; a vector (x, y) there is x * x_axis + y * y_axis in the world."""
+
+    if not plane or "x_axis" not in plane or "y_axis" not in plane:
+        return
+    ex, ey = plane["x_axis"], plane["y_axis"]
+
+    def lift(v: dict) -> dict:
+        return {axis: round(v["x"] * ex[i] + v["y"] * ey[i], 6) for i, axis in enumerate("xyz")}
+
+    for key in ("velocity", "acceleration"):
+        if state.get(key) is not None:
+            state[f"{key}_3d"] = lift(state[key])
+    state["forces_3d"] = [{"name": f["name"], **lift(f)} for f in state.get("forces", [])]

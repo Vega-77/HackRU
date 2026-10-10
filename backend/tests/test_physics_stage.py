@@ -92,3 +92,38 @@ def test_two_clients_keep_separate_physics_history() -> None:
                 assert "velocity" not in fresh
             assert client.get("/health").json()["active_sessions"] == 1
         assert client.get("/health").json()["active_sessions"] == 0
+
+
+def test_arkit_pose_gives_world_space_vectors() -> None:
+    """An iOS client sends its ARKit pose with each frame and a plane once: positions are
+    metres on that plane, and every vector also comes back in ARKit world space."""
+    camera_to_world = np.eye(4)
+    camera_to_world[:3, 3] = [0.0, 0.0, 1.0]  # 1 m in front of the board, looking at it
+    pose = {"intrinsics": {"fx": 250.0, "fy": 250.0, "cx": 160.0, "cy": 120.0},
+            "camera_to_world": camera_to_world.reshape(-1).tolist()}
+    config = {
+        "type": "config", "mode": "ramp", "mass_kg": 0.2, "frame_size": {"w": 320, "h": 240},
+        "ramp_angle_deg": 0.0, "ar_plane": {"point": [0, 0, 0], "normal": [0, 0, 1]},
+    }
+    replies = []
+    with TestClient(app).websocket_connect("/ws/frames") as ws:
+        ws.send_text(json.dumps(config))
+        for index in range(6):
+            image = np.full((240, 320, 3), 90, np.uint8)
+            cv2.circle(image, (80 + 10 * index, 120), 12, (0, 0, 255), -1)
+            ok, encoded = cv2.imencode(".jpg", image)
+            assert ok
+            ws.send_text(json.dumps({"frame_id": index, "timestamp": index / 10, **pose}))
+            ws.send_bytes(encoded.tobytes())
+            replies.append(ws.receive_json())
+
+    state = replies[-1]
+    assert state["calibration"]["method"] == "arkit"
+    # 10 px per 0.1 s at 1 m with f = 250 px is 0.4 m/s to the right.
+    assert state["position_3d"] == pytest.approx({"x": (130 - 160) / 250, "y": 0.0, "z": 0.0}, abs=0.005)
+    assert state["velocity"]["x"] == pytest.approx(0.4, abs=0.05)
+    assert state["velocity_3d"]["x"] == pytest.approx(0.4, abs=0.05)
+    assert state["velocity_3d"]["z"] == pytest.approx(0.0, abs=1e-6)
+    gravity = next(f for f in state["forces_3d"] if f["name"] == "gravity")
+    assert gravity == pytest.approx({"name": "gravity", "x": 0.0, "y": -0.2 * 9.81, "z": 0.0}, abs=0.01)
+    assert state["screen_axes"]["x"]["x"] == pytest.approx(250, abs=1)

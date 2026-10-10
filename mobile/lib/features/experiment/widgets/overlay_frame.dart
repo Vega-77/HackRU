@@ -18,6 +18,7 @@ class OverlayFrame {
     this.acceleration = Vec2.zero,
     this.forces = const {},
     this.visibility = 0,
+    this.axes,
   });
 
   /// Object centre in frame pixels, or null before anything was tracked.
@@ -36,6 +37,9 @@ class OverlayFrame {
   /// 1 while tracked, fading to 0 when the object is lost.
   final double visibility;
 
+  /// Screen directions of world +x and +y, when the backend knows them.
+  final ScreenAxes? axes;
+
   static const OverlayFrame empty = OverlayFrame();
 
   factory OverlayFrame.fromState(PhysicsState? state) {
@@ -50,6 +54,7 @@ class OverlayFrame {
       acceleration: state.acceleration ?? Vec2.zero,
       forces: {for (final f in state.forces) f.name: f.vector},
       visibility: 1,
+      axes: state.screenAxes,
     );
   }
 
@@ -99,6 +104,8 @@ class OverlayFrame {
       acceleration: Vec2.lerp(acceleration, target.acceleration, vectorT),
       forces: nextForces,
       visibility: _lerp(visibility, target.visibility, vectorT),
+      // Axes change with the camera, not the object, so they snap.
+      axes: target.axes ?? axes,
     );
   }
 
