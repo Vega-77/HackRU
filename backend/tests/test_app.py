@@ -82,6 +82,7 @@ def test_bad_image_reports_error_and_keeps_connection():
 
 def test_tracked_object_reported_after_two_frames():
     with TestClient(app).websocket_connect("/ws/frames") as ws:
+        ws.send_text(json.dumps({"type": "config", "detector": "color"}))
         ws.send_bytes(frame_bytes(200))
         assert ws.receive_json()["objects"] == []
         ws.send_bytes(frame_bytes(220))
@@ -92,7 +93,7 @@ def test_tracked_object_reported_after_two_frames():
 
 def test_config_message_changes_colors():
     with TestClient(app).websocket_connect("/ws/frames") as ws:
-        ws.send_text(json.dumps({"type": "config", "colors": ["blue"]}))
+        ws.send_text(json.dumps({"type": "config", "detector": "color", "colors": ["blue"]}))
         ws.send_bytes(frame_bytes(200))
         ws.receive_json()
         ws.send_bytes(frame_bytes(220))
@@ -109,6 +110,7 @@ def test_calibrate_message_adds_world_coordinates():
 
     view, _ = camera_view(board_image(ball_world=(0.2, 0.1))[0])
     with TestClient(app).websocket_connect("/ws/frames") as ws:
+        ws.send_text(json.dumps({"type": "config", "detector": "color"}))
         ws.send_text(json.dumps({"type": "calibrate", "method": "aruco", "width_m": BOARD_W, "height_m": BOARD_H}))
         assert ws.receive_json()["calibration"]["status"] == "searching"
         for _ in range(2):

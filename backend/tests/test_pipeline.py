@@ -13,7 +13,7 @@ def frame(x, frame_id):
 
 
 def test_reports_tracks_in_source_pixels_and_normalized():
-    pipe = TrackingPipeline()
+    pipe = TrackingPipeline(PipelineConfig(detector="color"))
     assert pipe(frame(300, 0))["objects"] == []  # not confirmed yet (min_hits=2)
     objs = pipe(frame(320, 1))["objects"]
     assert len(objs) == 1
@@ -44,7 +44,7 @@ def test_failed_reconfigure_keeps_old_setup():
 def test_mediapipe_mode_switch():
     pipe = TrackingPipeline(PipelineConfig(detector="both"))
     assert pipe._mediapipe is not None
-    pipe.configure(pipe.config.updated({"detector": "color"}))
+    pipe.configure(pipe.config.updated({"detector": "motion"}))
     assert pipe._mediapipe is None
 
 
@@ -59,7 +59,7 @@ def scene(frame_id, ball_x=None, ball_bgr=(255, 0, 0), static=()):
 
 
 def test_auto_target_follows_the_moving_ball_not_a_still_red_object():
-    pipe = TrackingPipeline()
+    pipe = TrackingPipeline(PipelineConfig(detector="color"))
     for i in range(20):
         out = pipe(scene(i, ball_x=200 + 30 * i, static=[((1100, 150), (0, 0, 255))]))
     (target,) = [o for o in out["objects"] if o["target"]]
@@ -67,7 +67,7 @@ def test_auto_target_follows_the_moving_ball_not_a_still_red_object():
 
 
 def test_auto_target_switches_when_another_object_starts_moving():
-    pipe = TrackingPipeline()
+    pipe = TrackingPipeline(PipelineConfig(detector="color"))
     still = [((1100, 150), (0, 200, 0))]
     for i in range(5):  # nothing moves yet: some object is picked
         pipe(scene(i, ball_x=200, static=still))

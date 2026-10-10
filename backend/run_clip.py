@@ -89,8 +89,7 @@ def run(args: argparse.Namespace) -> list[dict]:
 
 
 def score(rows: list[dict], truth_path: Path) -> None:
-    """Match each true object to the tracked object of the same color nearest to it
-    (any nearby object for the motion detector, whose labels carry no color)."""
+    """Match each true object to a nearby detection, including manual selections."""
     tracked = defaultdict(list)
     for r in rows:
         if r["position"]:
@@ -101,10 +100,10 @@ def score(rows: list[dict], truth_path: Path) -> None:
             s = by_object[t["object"]]
             s["frames"] += 1
             tx, ty = float(t["x_m"]), float(t["y_m"])
-            same = [r for r in tracked[int(t["frame"])] if r["label"] in (t["color"], "object")]
-            if not same:
+            candidates = [r for r in tracked[int(t["frame"])] if r["label"] in (t["color"], "object", "selected")]
+            if not candidates:
                 continue
-            best = min(same, key=lambda r: math.hypot(r["position"]["x"] - tx, r["position"]["y"] - ty))
+            best = min(candidates, key=lambda r: math.hypot(r["position"]["x"] - tx, r["position"]["y"] - ty))
             err = math.hypot(best["position"]["x"] - tx, best["position"]["y"] - ty)
             if err < 0.05:
                 s["found"] += 1
@@ -130,7 +129,7 @@ def main() -> None:
     p.add_argument("clip")
     p.add_argument("--aruco", type=float, nargs=2, metavar=("WIDTH_M", "HEIGHT_M"),
                    help="calibrate with ArUco markers 0-3 on a rectangle of this size (center to center)")
-    p.add_argument("--detector", default="color", choices=["color", "motion", "mediapipe", "both"])
+    p.add_argument("--detector", default="motion", choices=["color", "motion", "mediapipe", "both"])
     p.add_argument("--colors", nargs="+", help="colors to track (default: red green blue yellow)")
     p.add_argument("--out", help="annotated video path")
     p.add_argument("--show", action="store_true", help="also show a live window")

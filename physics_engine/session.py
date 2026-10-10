@@ -65,6 +65,10 @@ class PhysicsSession:
         state["mode"] = mode
         state["forces"] = []
         state["extras"] = {}
+        visible_ids = {int(obj["id"]) for obj in frame.get("objects", [])}
+        for missing_id in set(self.engines) - visible_ids:
+            self.engines[missing_id].reset()
+            self.initial_energy.pop(missing_id, None)
         target = next((o for o in frame.get("objects", []) if o.get("target")), None)
         if target is None:
             state["tracked"] = False
@@ -87,7 +91,7 @@ class PhysicsSession:
                 continue
             object_id = int(obj["id"])
             engine = self.engines.setdefault(
-                object_id, KinematicsEngine(window_size=self.window_size, confidence_threshold=0.3)
+                object_id, KinematicsEngine(window_size=self.window_size, confidence_threshold=0.6)
             )
             result = engine.add_world_sample(
                 timestamp, float(position["x"]), float(position["y"]),

@@ -59,6 +59,7 @@ changes a setting.
 | `mass_kg` | number | user input, default `0.1` |
 | `px_per_m` | number or null | from the ruler calibration, in **frame** pixels; null until calibrated |
 | `target_px` | `{x,y}` or null | where the user tapped the object, frame pixels; null means "auto-detect" |
+| `target_bbox` | `{x,y,w,h}` or null | optional box around the tapped object in frame pixels; helps track objects outside detector categories |
 | `frame_size` | `{w,h}` | size of the JPEGs that follow |
 | `ar_plane` | object or null | iOS only: the surface the object moves on, from an ARKit raycast. `{"point": [x,y,z], "normal": [x,y,z], "offset_m": 0.0}` in ARKit world metres. `offset_m` moves it towards the camera, such as by a ball's radius. Takes priority over `px_per_m`; null removes it |
 
@@ -134,6 +135,9 @@ the marker and the x(t) chart from the object marked `"target": true`:
   at the object, in frame pixels per metre (y down). The app draws a vector
   `(vx, vy)` along `vx * x + vy * y`, so arrows lie on a tilted surface.
 - `position_3d` (with an `ar_plane`): the same point in ARKit world space.
+- `source` identifies `motion`, `manual`, `color`, or `mediapipe` observations.
+  `tracking_status` distinguishes `detected`, `low_confidence`, `searching`, and `lost`;
+  `confidence` equals the object's existing `score`. No predicted or demo objects are sent.
 
 ### `state` (text, JSON): physics result, one per processed frame
 
