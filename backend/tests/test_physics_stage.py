@@ -10,6 +10,13 @@ from fastapi.testclient import TestClient
 from app import app
 
 
+@pytest.fixture(autouse=True)
+def color_detector(monkeypatch):
+    # The ball is on screen from the first frame, which the color detector sees at once; the
+    # app default (motion) only finds it once it moves off a learned background.
+    monkeypatch.setenv("CV_DETECTOR", "color")
+
+
 def send_ball(ws, frame_id: int, x_px: int) -> dict:
     image = np.full((240, 320, 3), 90, np.uint8)
     cv2.circle(image, (x_px, 120), 12, (0, 0, 255), -1)

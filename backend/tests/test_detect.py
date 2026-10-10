@@ -104,3 +104,13 @@ def test_motion_detector_ignores_handheld_wobble():
             assert dets == [], f"frame {i}: wobble reported as motion"
     (d,) = dets
     assert d.centroid == pytest.approx((320, 180), abs=2)
+
+
+def test_motion_detector_keeps_a_released_ball_apart_from_where_it_sat():
+    det = MotionDetector()
+    for i in range(10):  # the ball rests at x=300 while the background is learned
+        det.detect(table([((300, 400), 40, (0, 0, 255))], frame_id=i))
+    for step in range(1, 5):
+        x = 300 + 30 * step  # rolls off, still overlapping the spot it left at first
+        (d,) = det.detect(table([((x, 400), 40, (0, 0, 255))], frame_id=10 + step))
+        assert d.centroid == pytest.approx((x / 2, 200), abs=1.5)

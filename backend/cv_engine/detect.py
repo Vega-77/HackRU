@@ -170,6 +170,31 @@ class MotionDetector:
             return None
         return H
 
+    def _trim_to_objects(self, fg: np.ndarray, contours: list, view: np.ndarray) -> np.ndarray:
+        """Drop foreground pixels that look like the surface right around their blob. When a
+        ball rolls off the spot where it sat while the background was learned, the bare
+        table it uncovers differs from the model too, and that "ghost" would otherwise
+        merge with the ball and drag its centroid back toward where it started."""
+        out = np.zeros_like(fg)
+        h, w = fg.shape
+        for c in contours:
+            x, y, bw, bh = cv2.boundingRect(c)
+            pad = 8
+            x0, y0, x1, y1 = max(0, x - pad), max(0, y - pad), min(w, x + bw + pad), min(h, y + bh + pad)
+            blob = np.zeros((y1 - y0, x1 - x0), np.uint8)
+            cv2.drawContours(blob, [c - (x0, y0)], -1, 255, -1)
+            ring = cv2.dilate(blob, self._kernel, iterations=2) & ~fg[y0:y1, x0:x1]
+            patch = view[y0:y1, x0:x1].astype(np.float32)
+            if np.count_nonzero(ring) < 10:
+                out[y0:y1, x0:x1] |= blob
+                continue
+            surface = np.median(patch[ring > 0], axis=0)
+            spread = np.median(np.linalg.norm(patch[ring > 0] - surface, axis=1))
+            looks_like_surface = np.linalg.norm(patch - surface, axis=2) < max(30.0, 3 * spread)
+            blob[looks_like_surface] = 0
+            out[y0:y1, x0:x1] |= cv2.morphologyEx(blob, cv2.MORPH_OPEN, self._kernel)
+        return out
+
     def detect(self, frame: PreprocessedFrame) -> list[Detection]:
         w, h = frame.size
         H = self._align(frame) if self.stabilize else np.eye(3)
@@ -205,6 +230,10 @@ class MotionDetector:
 
         contours, _ = cv2.findContours(fg, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
         contours = [c for c in contours if cv2.contourArea(c) >= self.min_area]
+        if contours:
+            fg = self._trim_to_objects(fg, contours, view)
+            contours, _ = cv2.findContours(fg, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
+            contours = [c for c in contours if cv2.contourArea(c) >= self.min_area]
         if not contours:
             return []
         view_gray = cv2.cvtColor(view, cv2.COLOR_BGR2GRAY)
