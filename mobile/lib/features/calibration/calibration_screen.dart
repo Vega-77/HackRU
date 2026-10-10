@@ -116,8 +116,11 @@ class _CalibrationScreenState extends ConsumerState<CalibrationScreen> {
 
   Future<void> _startExperiment() async {
     await context.push(Routes.experiment);
-    // The experiment releases the camera when it closes; take it back.
-    if (mounted && !_demo) _startCamera();
+    if (!mounted) return;
+    // A popped route can finish disposing after this Future completes. Stop
+    // its session before setup takes the shared camera back.
+    await ref.read(sessionProvider.notifier).stop();
+    if (mounted && !_demo) await _startCamera();
   }
 
   @override

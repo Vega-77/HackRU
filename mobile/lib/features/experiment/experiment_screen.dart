@@ -34,13 +34,18 @@ class _ExperimentScreenState extends ConsumerState<ExperimentScreen> {
   static const _sheetMax = 0.88;
 
   late final SessionController _session;
+  int? _sessionEpoch;
   final _sheetExtent = ValueNotifier<double>(_sheetInitial);
 
   @override
   void initState() {
     super.initState();
     _session = ref.read(sessionProvider.notifier);
-    WidgetsBinding.instance.addPostFrameCallback((_) => _session.start());
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _session.start();
+      _sessionEpoch = _session.sessionEpoch;
+    });
   }
 
   @override
@@ -48,7 +53,10 @@ class _ExperimentScreenState extends ConsumerState<ExperimentScreen> {
     _sheetExtent.dispose();
     // Not during the tree teardown: providers can't change mid-frame.
     final session = _session;
-    Future.microtask(session.stop);
+    final epoch = _sessionEpoch;
+    if (epoch != null) {
+      Future.microtask(() => session.stop(onlyIfEpoch: epoch));
+    }
     super.dispose();
   }
 
@@ -480,7 +488,6 @@ class _StageMessage extends ConsumerWidget {
           child: message == null
               ? const SizedBox.shrink()
               : Semantics(
-                  key: ValueKey(message.$2),
                   liveRegion: true,
                   child: _GlassPill(
                     child: Row(
