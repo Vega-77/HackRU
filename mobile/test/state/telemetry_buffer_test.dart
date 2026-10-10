@@ -4,11 +4,11 @@ import 'package:hands_on_physics/models/vec2.dart';
 import 'package:hands_on_physics/state/telemetry_buffer.dart';
 
 PhysicsState _at(double t, {bool tracked = true}) => PhysicsState(
-      frameId: 0,
-      t: t,
-      tracked: tracked,
-      position: tracked ? Vec2(t, 0) : null,
-    );
+  frameId: 0,
+  t: t,
+  tracked: tracked,
+  position: tracked ? Vec2(t, 0) : null,
+);
 
 void main() {
   test('keeps only the last window of samples', () {

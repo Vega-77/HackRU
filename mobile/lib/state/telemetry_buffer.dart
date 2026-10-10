@@ -48,13 +48,15 @@ class TelemetryBuffer {
     // Time went backwards: the backend restarted. Start a fresh history.
     if (_samples.isNotEmpty && state.t < _samples.last.t) _samples.clear();
 
-    _samples.add(TelemetrySample(
-      t: state.t,
-      position: position,
-      velocity: state.velocity,
-      acceleration: state.acceleration,
-      energy: state.energy,
-    ));
+    _samples.add(
+      TelemetrySample(
+        t: state.t,
+        position: position,
+        velocity: state.velocity,
+        acceleration: state.acceleration,
+        energy: state.energy,
+      ),
+    );
 
     final cutoff = state.t - window.inMicroseconds / 1e6;
     while (_samples.isNotEmpty && _samples.first.t < cutoff) {

@@ -12,6 +12,9 @@ enum ExperimentMode {
   final String wireName;
   final String label;
 
-  static ExperimentMode fromWire(String value) => ExperimentMode.values
-      .firstWhere((m) => m.wireName == value, orElse: () => ExperimentMode.ramp);
+  static ExperimentMode fromWire(String value) =>
+      ExperimentMode.values.firstWhere(
+        (m) => m.wireName == value,
+        orElse: () => ExperimentMode.ramp,
+      );
 }

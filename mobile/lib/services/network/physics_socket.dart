@@ -31,8 +31,8 @@ class PhysicsSocket {
     this.url, {
     WebSocketChannel Function(Uri uri)? connector,
     Duration Function()? clock,
-  })  : _connector = connector ?? WebSocketChannel.connect,
-        _clock = clock ?? _stopwatchClock();
+  }) : _connector = connector ?? WebSocketChannel.connect,
+       _clock = clock ?? _stopwatchClock();
 
   final String url;
   final WebSocketChannel Function(Uri uri) _connector;
@@ -105,6 +105,25 @@ class PhysicsSocket {
     );
     sink.add(frame.jpeg);
     return true;
+  }
+
+  /// Opens and closes one connection to [url], for "Test connection" in
+  /// Settings. Returns how long the handshake took, or throws if it failed
+  /// or took longer than [timeout].
+  static Future<Duration> probe(
+    String url, {
+    Duration timeout = const Duration(seconds: 3),
+    WebSocketChannel Function(Uri uri) connector = WebSocketChannel.connect,
+  }) async {
+    final stopwatch = Stopwatch()..start();
+    final channel = connector(Uri.parse(url));
+    try {
+      await channel.ready.timeout(timeout);
+      return stopwatch.elapsed;
+    } finally {
+      // Ignore close errors: a refused socket has nothing to close.
+      unawaited(channel.sink.close().catchError((_) {}));
+    }
   }
 
   Future<void> dispose() async {

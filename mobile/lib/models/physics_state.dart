@@ -55,7 +55,10 @@ class PhysicsState {
       velocity: Vec2.tryParse(json['velocity']),
       acceleration: Vec2.tryParse(json['acceleration']),
       forces: rawForces is List
-          ? rawForces.map(ForceVector.tryParse).whereType<ForceVector>().toList()
+          ? rawForces
+                .map(ForceVector.tryParse)
+                .whereType<ForceVector>()
+                .toList()
           : const [],
       energy: EnergyState.tryParse(json['energy']),
       extras: rawExtras is Map
@@ -68,19 +71,19 @@ class PhysicsState {
   }
 
   Map<String, dynamic> toJson() => {
-        'type': 'state',
-        'frame_id': frameId,
-        'timestamp': t,
-        'tracked': tracked,
-        if (pixel != null) 'pixel': pixel!.toJson(),
-        if (bbox != null) 'bbox': bbox!.toJson(),
-        if (position != null) 'position': position!.toJson(),
-        if (velocity != null) 'velocity': velocity!.toJson(),
-        if (acceleration != null) 'acceleration': acceleration!.toJson(),
-        'forces': [for (final f in forces) f.toJson()],
-        if (energy != null) 'energy': energy!.toJson(),
-        'extras': extras,
-      };
+    'type': 'state',
+    'frame_id': frameId,
+    'timestamp': t,
+    'tracked': tracked,
+    if (pixel != null) 'pixel': pixel!.toJson(),
+    if (bbox != null) 'bbox': bbox!.toJson(),
+    if (position != null) 'position': position!.toJson(),
+    if (velocity != null) 'velocity': velocity!.toJson(),
+    if (acceleration != null) 'acceleration': acceleration!.toJson(),
+    'forces': [for (final f in forces) f.toJson()],
+    if (energy != null) 'energy': energy!.toJson(),
+    'extras': extras,
+  };
 }
 
 /// How a force is drawn: the net force in blue, its components in yellow.
@@ -128,10 +131,10 @@ class EnergyState {
   }
 
   Map<String, double> toJson() => {
-        'kinetic': ?kinetic,
-        'potential': ?potential,
-        'thermal': ?thermal,
-      };
+    'kinetic': ?kinetic,
+    'potential': ?potential,
+    'thermal': ?thermal,
+  };
 }
 
 /// An axis-aligned rectangle in frame pixels.
@@ -171,9 +174,9 @@ sealed class ServerMessage {
         'state' => StateMessage(PhysicsState.fromJson(json)),
         'frame' => FrameAckMessage.fromJson(json),
         'error' => ErrorMessage(
-            '${json['message'] ?? 'Unknown server error'}',
-            frameId: (json['frame_id'] as num?)?.toInt(),
-          ),
+          '${json['message'] ?? 'Unknown server error'}',
+          frameId: (json['frame_id'] as num?)?.toInt(),
+        ),
         _ => UnknownMessage(raw),
       };
     } on FormatException {

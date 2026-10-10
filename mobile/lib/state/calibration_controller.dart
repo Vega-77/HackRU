@@ -26,5 +26,5 @@ class CalibrationController extends Notifier<Calibration> {
 
 final calibrationProvider =
     NotifierProvider<CalibrationController, Calibration>(
-  CalibrationController.new,
-);
+      CalibrationController.new,
+    );

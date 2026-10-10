@@ -34,16 +34,15 @@ class ExperimentSettings {
     bool? showForces,
     bool? demoMode,
     String? backendUrl,
-  }) =>
-      ExperimentSettings(
-        mode: mode ?? this.mode,
-        massKg: massKg ?? this.massKg,
-        showVelocity: showVelocity ?? this.showVelocity,
-        showAcceleration: showAcceleration ?? this.showAcceleration,
-        showForces: showForces ?? this.showForces,
-        demoMode: demoMode ?? this.demoMode,
-        backendUrl: backendUrl ?? this.backendUrl,
-      );
+  }) => ExperimentSettings(
+    mode: mode ?? this.mode,
+    massKg: massKg ?? this.massKg,
+    showVelocity: showVelocity ?? this.showVelocity,
+    showAcceleration: showAcceleration ?? this.showAcceleration,
+    showForces: showForces ?? this.showForces,
+    demoMode: demoMode ?? this.demoMode,
+    backendUrl: backendUrl ?? this.backendUrl,
+  );
 }
 
 class ExperimentSettingsController extends Notifier<ExperimentSettings> {
@@ -72,5 +71,5 @@ class ExperimentSettingsController extends Notifier<ExperimentSettings> {
 
 final experimentSettingsProvider =
     NotifierProvider<ExperimentSettingsController, ExperimentSettings>(
-  ExperimentSettingsController.new,
-);
+      ExperimentSettingsController.new,
+    );

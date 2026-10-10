@@ -126,8 +126,7 @@ class NativeFrameSource implements FrameSource {
     // CameraPreview sizes itself by aspect ratio; FittedBox makes it cover
     // the parent the same way the web <video> does with object-fit: cover.
     final preview = controller.value.previewSize!;
-    final portrait =
-        MediaQuery.orientationOf(context) == Orientation.portrait;
+    final portrait = MediaQuery.orientationOf(context) == Orientation.portrait;
     final longSide = preview.longestSide;
     final shortSide = preview.shortestSide;
     return ClipRect(

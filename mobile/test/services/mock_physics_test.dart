@@ -32,7 +32,12 @@ void main() {
     });
 
     test('${mode.label}: net force equals m·a', () {
-      final state = MockPhysics.sample(mode, 0.3, frameSize: frame, massKg: 0.2);
+      final state = MockPhysics.sample(
+        mode,
+        0.3,
+        frameSize: frame,
+        massKg: 0.2,
+      );
       final net = state.forces.firstWhere((f) => f.name == 'net').vector;
       expect(net.x, closeTo(state.acceleration!.x * 0.2, 1e-9));
       expect(net.y, closeTo(state.acceleration!.y * 0.2, 1e-9));

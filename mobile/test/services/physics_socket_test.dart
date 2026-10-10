@@ -28,11 +28,17 @@ class _FakeChannel extends Fake implements WebSocketChannel {
 
   void open() => _ready.complete();
 
+  void refuse() => _ready.completeError(const SocketRefused());
+
   @override
   Future<void> get ready => _ready.future;
 
   @override
   Stream<dynamic> get stream => server.stream;
+}
+
+class SocketRefused implements Exception {
+  const SocketRefused();
 }
 
 void main() {
@@ -51,9 +57,12 @@ void main() {
     captureTime: 1.0,
   );
 
-  String reply(int frameId) => jsonEncode(
-        {'type': 'state', 'frame_id': frameId, 'timestamp': 1.0, 'tracked': true},
-      );
+  String reply(int frameId) => jsonEncode({
+    'type': 'state',
+    'frame_id': frameId,
+    'timestamp': 1.0,
+    'tracked': true,
+  });
 
   setUp(() async {
     now = Duration.zero;
@@ -149,5 +158,40 @@ void main() {
     await pumpEventQueue();
     expect(socket.status, ConnectionStatus.offline);
     expect(socket.canSendFrame, isFalse);
+  });
+
+  group('probe', () {
+    test('returns how long the connection took', () async {
+      final probed = _FakeChannel()..open();
+      Uri? asked;
+      final time = await PhysicsSocket.probe(
+        'ws://10.0.0.5:8000/ws/frames',
+        connector: (uri) {
+          asked = uri;
+          return probed;
+        },
+      );
+      expect(asked.toString(), 'ws://10.0.0.5:8000/ws/frames');
+      expect(time, greaterThanOrEqualTo(Duration.zero));
+    });
+
+    test('fails when the backend refuses', () {
+      final probed = _FakeChannel()..refuse();
+      expect(
+        PhysicsSocket.probe('ws://10.0.0.5:8000', connector: (_) => probed),
+        throwsA(isA<SocketRefused>()),
+      );
+    });
+
+    test('gives up after the timeout', () {
+      expect(
+        PhysicsSocket.probe(
+          'ws://10.0.0.5:8000',
+          timeout: const Duration(milliseconds: 20),
+          connector: (_) => _FakeChannel(),
+        ),
+        throwsA(isA<TimeoutException>()),
+      );
+    });
   });
 }

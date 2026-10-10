@@ -33,17 +33,16 @@ class Calibration {
     Vec2? rulerEnd,
     double? rulerLengthM,
     Vec2? target,
-  }) =>
-      Calibration(
-        rulerStart: rulerStart ?? this.rulerStart,
-        rulerEnd: rulerEnd ?? this.rulerEnd,
-        rulerLengthM: rulerLengthM ?? this.rulerLengthM,
-        target: target ?? this.target,
-      );
+  }) => Calibration(
+    rulerStart: rulerStart ?? this.rulerStart,
+    rulerEnd: rulerEnd ?? this.rulerEnd,
+    rulerLengthM: rulerLengthM ?? this.rulerLengthM,
+    target: target ?? this.target,
+  );
 
   Calibration clearTarget() => Calibration(
-        rulerStart: rulerStart,
-        rulerEnd: rulerEnd,
-        rulerLengthM: rulerLengthM,
-      );
+    rulerStart: rulerStart,
+    rulerEnd: rulerEnd,
+    rulerLengthM: rulerLengthM,
+  );
 }

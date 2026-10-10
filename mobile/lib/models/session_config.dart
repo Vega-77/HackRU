@@ -47,13 +47,13 @@ class SessionConfig {
   final Vec2? targetPx;
 
   Map<String, dynamic> toJson() => {
-        'type': 'config',
-        'mode': mode.wireName,
-        'mass_kg': massKg,
-        'px_per_m': pxPerM,
-        'target_px': targetPx?.toJson(),
-        'frame_size': frameSize.toJson(),
-      };
+    'type': 'config',
+    'mode': mode.wireName,
+    'mass_kg': massKg,
+    'px_per_m': pxPerM,
+    'target_px': targetPx?.toJson(),
+    'frame_size': frameSize.toJson(),
+  };
 
   String encode() => jsonEncode(toJson());
 }
@@ -83,7 +83,10 @@ class FrameMetadata {
   /// Capture time in seconds on the phone's monotonic clock.
   final double timestamp;
 
-  Map<String, dynamic> toJson() => {'frame_id': frameId, 'timestamp': timestamp};
+  Map<String, dynamic> toJson() => {
+    'frame_id': frameId,
+    'timestamp': timestamp,
+  };
 
   String encode() => jsonEncode(toJson());
 }
