@@ -20,7 +20,8 @@ import 'mass_steps.dart';
 import 'widgets/calibration_stage.dart';
 
 /// Three steps before an experiment: set the scale with a ruler, mark the
-/// object, enter its mass.
+/// object, enter its mass. On iOS with ARKit there is a step before them:
+/// pick the real surface the object moves on, which replaces the ruler.
 ///
 /// The scale matters most. The backend measures motion in pixels and
 /// divides by pixels per metre to get metres, so a ruler line that is 10 %
@@ -135,7 +136,17 @@ class _CalibrationScreenState extends ConsumerState<CalibrationScreen> {
       camera: _camera,
       mode: mode,
     );
-    final steps = _Steps(demo: _demo);
+    final surfaces = switch (_camera) {
+      final SurfaceFinder f
+          when !_demo && _cameraFrame != null && f.canFindSurfaces =>
+        f,
+      _ => null,
+    };
+    final steps = _Steps(
+      demo: _demo,
+      surfaces: surfaces,
+      frameSize: _cameraFrame,
+    );
     final start = FilledButton(
       onPressed: _startExperiment,
       child: const Text('Start experiment'),
@@ -312,9 +323,13 @@ class _CameraMessage extends StatelessWidget {
 
 /// The numbered steps. Numbered because they are a real sequence.
 class _Steps extends ConsumerWidget {
-  const _Steps({required this.demo});
+  const _Steps({required this.demo, this.surfaces, this.frameSize});
 
   final bool demo;
+
+  /// Set when the camera can find AR surfaces.
+  final SurfaceFinder? surfaces;
+  final FrameSize? frameSize;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -322,6 +337,9 @@ class _Steps extends ConsumerWidget {
     final mass = ref.watch(experimentSettingsProvider.select((s) => s.massKg));
     final scheme = Theme.of(context).colorScheme;
     final scale = calibration.pxPerM;
+    final surfaces = this.surfaces;
+    final hasSurface = surfaces != null && calibration.surface != null;
+    var number = 0;
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(
@@ -363,7 +381,7 @@ class _Steps extends ConsumerWidget {
                   ),
                 ),
                 Text(
-                  '3 steps',
+                  '${surfaces == null ? 3 : 4} steps',
                   style: AppType.readoutSmall.copyWith(
                     color: scheme.onSurfaceVariant,
                   ),
@@ -371,14 +389,23 @@ class _Steps extends ConsumerWidget {
               ],
             ),
           ),
+          if (surfaces != null)
+            _SurfaceStep(
+              number: ++number,
+              finder: surfaces,
+              frameSize: frameSize!,
+            ),
           _Step(
-            number: 1,
+            number: ++number,
             title: 'Set the scale',
             body: demo
                 ? 'The line is on a 30 cm mark. Drag its ends to try it.'
+                : hasSurface
+                ? 'Not needed while a surface is set. The surface measures '
+                      'depth and tilt, so it is more accurate.'
                 : 'Put a ruler in the picture, level with the experiment. '
                       'Drag both ends of the line onto it.',
-            done: scale != null,
+            done: scale != null || hasSurface,
             trailing: _RulerLengthField(lengthM: calibration.rulerLengthM),
             footer: Text(
               scale == null
@@ -390,7 +417,7 @@ class _Steps extends ConsumerWidget {
             ),
           ),
           _Step(
-            number: 2,
+            number: ++number,
             title: 'Mark the object',
             body: calibration.target == null
                 ? 'Tap the object in the picture so the tracker knows which '
@@ -407,7 +434,7 @@ class _Steps extends ConsumerWidget {
                   ),
           ),
           _Step(
-            number: 3,
+            number: ++number,
             title: 'Enter its mass',
             body: 'Forces and energy scale with mass. Weigh it if you can.',
             done: true,
@@ -418,6 +445,95 @@ class _Steps extends ConsumerWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// Finds the board or table the object moves on with an ARKit raycast
+/// through the middle of the picture. Positions are then measured on that
+/// surface in 3D, so the phone may move during the experiment.
+class _SurfaceStep extends ConsumerStatefulWidget {
+  const _SurfaceStep({
+    required this.number,
+    required this.finder,
+    required this.frameSize,
+  });
+
+  final int number;
+  final SurfaceFinder finder;
+  final FrameSize frameSize;
+
+  @override
+  ConsumerState<_SurfaceStep> createState() => _SurfaceStepState();
+}
+
+class _SurfaceStepState extends ConsumerState<_SurfaceStep> {
+  bool _searching = false;
+  bool _missed = false;
+
+  Future<void> _find() async {
+    setState(() {
+      _searching = true;
+      _missed = false;
+    });
+    final centre = Vec2(
+      widget.frameSize.width / 2,
+      widget.frameSize.height / 2,
+    );
+    final surface = await widget.finder.findSurface(centre);
+    if (!mounted) return;
+    if (surface != null) {
+      HapticFeedback.selectionClick();
+      ref.read(calibrationProvider.notifier).setSurface(surface);
+    }
+    setState(() {
+      _searching = false;
+      _missed = surface == null;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final surface = ref.watch(calibrationProvider.select((c) => c.surface));
+    final mode = ref.watch(experimentSettingsProvider.select((s) => s.mode));
+    final scheme = Theme.of(context).colorScheme;
+    // Gravity lies in a vertical board, so its 2D physics is exact there.
+    final wantsBoard = mode != ExperimentMode.collision;
+
+    final String status;
+    if (_missed) {
+      status =
+          'No surface found there. Move the phone slowly so it can map the '
+          'scene, then try again.';
+    } else if (surface == null) {
+      status = 'No surface yet';
+    } else if (surface.vertical) {
+      status = 'Using a vertical board';
+    } else if (wantsBoard) {
+      status =
+          'Using a table top. For this experiment, the board behind it '
+          'gives better forces.';
+    } else {
+      status = 'Using a table top';
+    }
+
+    return _Step(
+      number: widget.number,
+      title: 'Find the surface',
+      body: wantsBoard
+          ? 'Aim the middle of the picture at a board behind the experiment, '
+                'parallel to the motion, then tap Find.'
+          : 'Aim the middle of the picture at the table the carts roll on, '
+                'then tap Find.',
+      done: surface != null,
+      trailing: TextButton(
+        onPressed: _searching ? null : _find,
+        child: Text(surface == null ? 'Find' : 'Find again'),
+      ),
+      footer: Text(
+        status,
+        style: AppType.readoutSmall.copyWith(color: scheme.onSurfaceVariant),
       ),
     );
   }

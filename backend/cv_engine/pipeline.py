@@ -12,6 +12,7 @@ from dataclasses import dataclass, field
 
 import numpy as np
 
+from cv_engine.ar_plane import ArPlane, image_axes
 from cv_engine.detect import DEFAULT_COLORS, ColorDetector, Detection, MediaPipeDetector, MotionDetector
 from cv_engine.preprocess import PreprocessedFrame
 from cv_engine.spatial import SpatialMapper
@@ -27,7 +28,8 @@ AUTO_TARGET_MIN_MOTION = 10.0
 EXPERIMENT_MODES = ("free_fall", "ramp", "pendulum", "collision")
 # Settings the app sends in its config message (docs/protocol.md). The CV engine uses
 # px_per_m (calibration fallback) and target_px (which object to follow); the rest is
-# kept for the physics stage.
+# kept for the physics stage. iOS ARKit clients may also send ar_plane, the surface the
+# object moves on: {"point": [x, y, z], "normal": [x, y, z], "offset_m": 0.0} in world metres.
 SESSION_DEFAULTS = {"mode": None, "mass_kg": 0.1, "px_per_m": None, "target_px": None, "frame_size": None}
 
 
@@ -80,6 +82,8 @@ def validated_session(current: dict, changes: dict) -> dict:
         or any(not isinstance(value, (int, float)) or not math.isfinite(value) or value <= 0 for value in masses)
     ):
         raise ValueError("collision_masses_kg must contain two positive masses")
+    if s.get("ar_plane") is not None:
+        ArPlane.from_request(s["ar_plane"])  # raises ValueError if malformed
     for key, fields in (("target_px", ("x", "y")), ("frame_size", ("w", "h"))):
         v = s[key]
         if v is not None and not (isinstance(v, dict) and all(isinstance(v.get(f), (int, float)) for f in fields)):
@@ -137,6 +141,7 @@ class TrackingPipeline:
             t = session["target_px"]
             self._target_last = (t["x"], t["y"]) if t else None
         self.session = session
+        self.spatial.set_ar_plane(session.get("ar_plane"))
         self.spatial.set_scale(session["px_per_m"], session["frame_size"])
         return self.settings()
 
@@ -221,15 +226,20 @@ class TrackingPipeline:
 
 def track_to_json(t: Track, frame: PreprocessedFrame, spatial: SpatialMapper | None = None) -> dict:
     """Report positions in the client's own frame pixels (pixel, bbox), normalized 0-1
-    coords and, when the plane is calibrated, meters on that plane (position, y up)."""
+    coords and, when the plane is calibrated, meters on that plane (position, y up), how
+    the plane's axes look on screen there (screen_axes) and, for ARKit clients, the 3D
+    point in ARKit world space (position_3d)."""
     s = frame.scale
     w, h = frame.size
     x, y, bw, bh = t.bbox
     cx, cy = t.centroid
-    position = width_m = None
+    position = width_m = position_3d = axes = None
     if spatial is not None and spatial.mapping is not None:
         wx, wy = spatial.to_world((cx / s, cy / s), (cx / w, cy / h))
         position = {"x": wx, "y": wy}
+        position_3d = spatial.to_world_3d((wx, wy))
+        if spatial.space == "px":
+            axes = image_axes(spatial.mapping, (wx, wy))
         # Object width on the plane, from the left and right edges at centroid height.
         left = spatial.to_world((x / s, cy / s), (x / w, cy / h))
         right = spatial.to_world(((x + bw) / s, cy / s), ((x + bw) / w, cy / h))
@@ -246,5 +256,7 @@ def track_to_json(t: Track, frame: PreprocessedFrame, spatial: SpatialMapper | N
         "area": round(t.area / (s * s), 1),
         "hits": t.hits,
         "position": position,
+        "position_3d": position_3d,
+        "screen_axes": axes,
         "width_m": width_m,
     }

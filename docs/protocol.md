@@ -1,4 +1,4 @@
-# HandsOn Physics WebSocket protocol (draft v0.2)
+# HandsOn Physics WebSocket protocol (draft v0.3)
 
 This is the contract between the Flutter app (Dev 1) and the FastAPI backend
 (Devs 2-4). If either side needs a change, edit this file in the same commit
@@ -21,6 +21,11 @@ backend against it. Open questions are listed at the end.
 |---|---|---|---|---|
 | Frame pixels | top-left of the JPEG the client sent | x right, y **down** | px | `pixel`, `bbox`, `target_px` |
 | World | wherever the backend puts it (first tracked point is fine) | x right, y **up** | SI (m, m/s, m/s², N, J) | everything physical |
+| ARKit world (iOS) | where the AR session started | ARKit's: y **up** against gravity, x and z level | m | `camera_to_world`, `ar_plane`, every `*_3d` field |
+
+With an AR surface, "world" is 2D coordinates on that surface: on a vertical
+board x is right and y is straight up; on a table x is right and y points away
+from the camera. The `*_3d` fields give the same values in ARKit world space.
 
 The app maps frame pixels to screen pixels itself (it knows how the preview is
 scaled), so the backend never needs to know the phone's screen size.
@@ -55,6 +60,7 @@ changes a setting.
 | `px_per_m` | number or null | from the ruler calibration, in **frame** pixels; null until calibrated |
 | `target_px` | `{x,y}` or null | where the user tapped the object, frame pixels; null means "auto-detect" |
 | `frame_size` | `{w,h}` | size of the JPEGs that follow |
+| `ar_plane` | object or null | iOS only: the surface the object moves on, from an ARKit raycast. `{"point": [x,y,z], "normal": [x,y,z], "offset_m": 0.0}` in ARKit world metres. `offset_m` moves it towards the camera, such as by a ball's radius. Takes priority over `px_per_m`; null removes it |
 
 The backend applies `config` separately from frame metadata. Valid settings
 apply from the next frame without an acknowledgement; invalid settings get an
@@ -72,6 +78,12 @@ apply from the next frame without an acknowledgement; invalid settings get an
    |---|---|
    | `frame_id` | counter starting at 0 for each connection, +1 per frame |
    | `timestamp` | capture time in seconds on the phone's **monotonic** clock. Only differences are meaningful (use it for dt); it is not Unix time |
+   | `intrinsics` | iOS with ARKit: `{fx, fy, cx, cy}` of the camera, in the pixels of the JPEG that follows |
+   | `camera_to_world` | iOS with ARKit: 16 numbers, a row-major 4x4 transform from camera axes (x right, y up, z towards the viewer, for the image as sent) to ARKit world |
+
+   With both pose fields and an `ar_plane`, the backend casts a ray through
+   the object's centroid and intersects it with the surface, so positions are
+   true 3D and the phone may move during the experiment.
 
 2. Binary: the JPEG bytes, `frame_size.w` x `frame_size.h`, quality 0.7.
 
@@ -118,6 +130,10 @@ the marker and the x(t) chart from the object marked `"target": true`:
 - `pixel` and `bbox` are in the pixels of the frame the app sent (x right,
   y down), the same space as `target_px`.
 - `position` is in metres (y up), or `null` without a calibration.
+- `screen_axes` (when calibrated): where world +x and +y point in the frame
+  at the object, in frame pixels per metre (y down). The app draws a vector
+  `(vx, vy)` along `vx * x + vy * y`, so arrows lie on a tilted surface.
+- `position_3d` (with an `ar_plane`): the same point in ARKit world space.
 
 ### `state` (text, JSON): physics result, one per processed frame
 
@@ -153,6 +169,8 @@ Replaces `frame` once the kinematics stage is in. This is what the app draws.
 | `pixel`, `bbox` | client frame pixels |
 | `position`, `velocity`, `acceleration` | world space, SI, already smoothed |
 | `forces` | list; known names: `gravity`, `normal`, `friction`, `tension`, `gravity_parallel`, `gravity_perpendicular`, `net`. Unknown names are drawn in a neutral colour |
+| `screen_axes` | as in `frame` objects; the app draws vectors along them when present |
+| `position_3d`, `velocity_3d`, `acceleration_3d`, `forces_3d` | with an `ar_plane` only: the same vectors in ARKit world space, for a renderer that anchors arrows in 3D |
 | `energy` | joules; any key may be omitted |
 | `extras` | mode-specific values the app shows as readouts (`angle_deg`, `mu`, `theta_deg`, `momentum`, `restitution`, ...) |
 
@@ -177,6 +195,11 @@ that frame as answered.
    a later version.
 
 ## Changelog
+
+- **v0.3**: iOS ARKit support. Frame metadata may carry `intrinsics` and
+  `camera_to_world`; `config` may carry `ar_plane`; replies add
+  `screen_axes`, `position_3d` and the other `*_3d` vectors. Clients that send
+  none of these see v0.2 behaviour plus `screen_axes`.
 
 - **v0.2, later**: documented the `objects` entries in `frame` reports; the
   app now shows the tracked target from them. No wire changes.

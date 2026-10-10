@@ -1,6 +1,7 @@
 import 'package:flutter/painting.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hands_on_physics/features/experiment/widgets/coordinate_mapper.dart';
+import 'package:hands_on_physics/models/physics_state.dart';
 import 'package:hands_on_physics/models/session_config.dart';
 import 'package:hands_on_physics/models/vec2.dart';
 
@@ -60,6 +61,31 @@ void main() {
         CoordinateMapper.worldToScreenDirection(const Vec2(1, 2)),
         const Offset(1, -2),
       );
+    });
+  });
+
+  group('screenDirection', () {
+    test('without axes, world y up is screen y down', () {
+      final d = CoordinateMapper.screenDirection(const Vec2(0, 2), null);
+      expect(d.dx, closeTo(0, 1e-9));
+      expect(d.dy, closeTo(-1, 1e-9));
+    });
+
+    test('follows the axes of a tilted surface', () {
+      // A board turned away from the camera: world +x runs right and a
+      // little up on screen, world +y straight up.
+      const axes = ScreenAxes(Vec2(400, -100), Vec2(0, -300));
+      final d = CoordinateMapper.screenDirection(const Vec2(1, 0), axes);
+      expect(d.dx, closeTo(400 / 412.31, 1e-4));
+      expect(d.dy, closeTo(-100 / 412.31, 1e-4));
+      final up = CoordinateMapper.screenDirection(const Vec2(0, 1), axes);
+      expect(up, const Offset(0, -1));
+    });
+
+    test('falls back when the axes squash the vector to nothing', () {
+      const axes = ScreenAxes(Vec2.zero, Vec2.zero);
+      final d = CoordinateMapper.screenDirection(const Vec2(1, 0), axes);
+      expect(d, const Offset(1, 0));
     });
   });
 }
