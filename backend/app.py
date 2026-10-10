@@ -46,6 +46,7 @@ import itertools
 import json
 import math
 import os
+import threading
 import time
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -84,6 +85,8 @@ class IncomingFrame:
 
 app = FastAPI(title="HandsOn Physics CV engine")
 app.state.pipeline_factory = lambda: TrackingPipeline(default_config())
+app.state.active_sessions = 0
+app.state.session_lock = threading.Lock()
 
 
 @dataclass
@@ -100,12 +103,16 @@ _connection_ids = itertools.count(1)
 
 @app.get("/health")
 def health() -> dict:
-    return {"status": "ok", "working_width": WORKING_WIDTH}
+    with app.state.session_lock:
+        active_sessions = app.state.active_sessions
+    return {"status": "ok", "working_width": WORKING_WIDTH, "active_sessions": active_sessions}
 
 
 @app.websocket("/ws/frames")
 async def frames_ws(ws: WebSocket) -> None:
     await ws.accept()
+    with app.state.session_lock:
+        app.state.active_sessions += 1
     slot: LatestFrameSlot[IncomingFrame] = LatestFrameSlot()
     stats = {"processed": 0, "decode_errors": 0}
     pipeline = ws.app.state.pipeline_factory()
@@ -150,7 +157,7 @@ async def frames_ws(ws: WebSocket) -> None:
                         pending_meta = {}
                         continue
                     if frame_id < next_id or len(msg["bytes"]) > MAX_FRAME_BYTES:
-                        message = "frame_id must increase" if frame_id < next_id else "frame exceeds 512 KiB"
+                        message = "frame_id must be increasing" if frame_id < next_id else "frame exceeds 512 KiB"
                         await ws.send_json({"type": "error", "message": message, "frame_id": frame_id})
                         pending_meta = {}
                         continue
@@ -211,6 +218,8 @@ async def frames_ws(ws: WebSocket) -> None:
         receiver.cancel()
         processor.cancel()
         pipeline.close()
+        with ws.app.state.session_lock:
+            ws.app.state.active_sessions = max(0, ws.app.state.active_sessions - 1)
         ws.app.state.debug.pop(conn_id, None)
 
 
