@@ -84,3 +84,7 @@ def test_calibrate_message_adds_world_coordinates():
         assert abs(obj["world"][0] - 0.2) < 0.006 and abs(obj["world"][1] - 0.1) < 0.006
         ws.send_text(json.dumps({"type": "calibrate", "method": "aruco"}))
         assert ws.receive_json()["type"] == "error"
+
+
+def test_debug_page():
+    assert "/debug/stream" in TestClient(app).get("/debug").text

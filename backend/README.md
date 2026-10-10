@@ -29,6 +29,39 @@ The client prints send rate, bandwidth, frames dropped by the server, and latenc
 Use `--send-width` and `--quality` to tune how much the phone downsamples and compresses.
 `CV_WORKING_WIDTH` (default 640) sets the resolution the server processes at.
 
+## Debug view and sample clips
+
+**Live, from the phone or the test client:** while frames are streaming, open
+`http://<server>:8000/debug` in any browser. It shows the newest connection's frames with
+boxes, IDs, motion trails, metric positions, the calibrated plane grid and +X/+Y axes,
+plus processing time, latency and dropped frames. Everything drawn comes from the same JSON
+the app receives, so if it looks right here, the app is getting the right data.
+
+**Offline, on a video file:**
+
+```bash
+python run_clip.py samples/pendulum.mp4 --aruco 0.60 0.40           # writes samples/pendulum_debug.mp4
+python run_clip.py my_clip.mp4 --aruco 0.30 0.20 --show              # also a live window (desktop only)
+```
+
+It writes an annotated video and a `<clip>_tracks.csv` with every tracked position (pixels
+and meters), which is handy test input for the kinematics stage.
+
+**Sample clips** in `samples/` simulate the three experiments filmed by a tilted, slightly
+shaky phone, on a 0.60 x 0.40 m board with ArUco markers. Each has a `_truth.csv` with the
+true positions from the physics simulation, and `run_clip.py` scores against it:
+
+| clip | motion | found | ID switches | position error (rms) |
+|---|---|---|---|---|
+| `ramp.mp4` | red ball rolling down a 25 degree incline | 44/45 frames | 0 | 0.4 mm |
+| `pendulum.mp4` | blue bob, L = 0.28 m, from 30 degrees | 119/120 | 0 | 0.3 mm |
+| `carts.mp4` | red cart hits resting green cart (elastic) | 89/90 each | 0 | 0.5 / 0.3 mm |
+
+The one missed frame per object is the first one, since new tracks are confirmed on their
+second frame. These are clean synthetic videos, so expect larger errors on real footage
+(lighting, motion blur, the ball sitting slightly in front of the board).
+Regenerate them with `python samples/generate_samples.py`.
+
 ## Detection and tracking
 
 Two detectors, picked with `CV_MODE` (or a config message, see below):
