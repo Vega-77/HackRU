@@ -21,6 +21,7 @@ class PhysicsState {
     this.energy,
     this.extras = const {},
     this.screenAxes,
+    this.trackingDebug = const {},
   });
 
   /// Echo of the `frame_id` the client sent with the frame.
@@ -46,6 +47,7 @@ class PhysicsState {
   /// How world +x and +y look on screen at the object. Null without a
   /// metric calibration.
   final ScreenAxes? screenAxes;
+  final Map<String, dynamic> trackingDebug;
 
   factory PhysicsState.fromJson(Map<String, dynamic> json) {
     final rawForces = json['forces'];
@@ -73,6 +75,9 @@ class PhysicsState {
             }
           : const {},
       screenAxes: ScreenAxes.tryParse(json['screen_axes']),
+      trackingDebug: json['tracking_debug'] is Map<String, dynamic>
+          ? json['tracking_debug'] as Map<String, dynamic>
+          : const {},
     );
   }
 

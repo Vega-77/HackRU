@@ -3,6 +3,7 @@ import 'dart:typed_data';
 
 import 'camera_pose.dart';
 import 'experiment_mode.dart';
+import 'physics_state.dart';
 import 'vec2.dart';
 
 /// Pixel dimensions of the JPEG frames we stream.
@@ -35,6 +36,8 @@ class SessionConfig {
     required this.frameSize,
     this.pxPerM,
     this.targetPx,
+    this.targetBbox,
+    this.debugTracking = false,
     this.surface,
   });
 
@@ -47,6 +50,8 @@ class SessionConfig {
 
   /// Where the user tapped the object, in frame pixels. Null means auto-detect.
   final Vec2? targetPx;
+  final PixelRect? targetBbox;
+  final bool debugTracking;
 
   /// The AR surface the object moves on, iOS only. When set, the backend
   /// maps positions with the camera pose instead of [pxPerM].
@@ -58,8 +63,17 @@ class SessionConfig {
     'mass_kg': massKg,
     'px_per_m': pxPerM,
     'target_px': targetPx?.toJson(),
+    'target_bbox': targetBbox == null
+        ? null
+        : {
+            'x': targetBbox!.x,
+            'y': targetBbox!.y,
+            'w': targetBbox!.w,
+            'h': targetBbox!.h,
+          },
     'frame_size': frameSize.toJson(),
     'ar_plane': surface?.toJson(),
+    if (debugTracking) 'debug_tracking': true,
   };
 
   String encode() => jsonEncode(toJson());

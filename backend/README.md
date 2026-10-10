@@ -1,5 +1,36 @@
 # HandsOn Physics CV and physics backend
 
+For gray balls, draw a tight box in calibration. The app holds that image and
+sends it first, followed by live frames. A tap can initialize from one colored
+contour containing the point; a background/ambiguous tap requests a box.
+Selection reports `initialized` without claiming tracking. A subsequent image
+must verify the appearance. Loss triggers a full-frame search against the
+original patch; duplicate matches stay lost instead of switching objects.
+
+Build Flutter with `--dart-define=TRACKING_DIAGNOSTICS=true` to include search
+bounds, scores and rejection reasons in copied logs. This option stores no
+camera images. For replay, explicitly save transmitted JPEGs locally and use
+`python replay_tracking.py recording.json --out report.json`. The JSON manifest
+contains a `config` object and `frames` array, in processing order:
+
+```json
+{
+  "config": {"target_px": {"x": 80, "y": 90}, "target_bbox": {"x": 64, "y": 74, "w": 32, "h": 32}},
+  "frames": [
+    {"file": "selected.jpg", "frame_id": 0, "timestamp": 0.2},
+    {"file": "live.jpg", "frame_id": 3, "timestamp": 0.7,
+     "truth": {"visible": true, "x": 90, "y": 90, "diameter": 24}}
+  ]
+}
+```
+
+File paths are relative to the manifest. Use the actual transmitted images,
+frame IDs and capture timestamps. Optional manual labels score only the selected
+target; a correct center must be within one quarter of its labeled diameter.
+Reports contain observations and processing throughput, not network/overlay
+latency. Real bottle and ball clips still need validation; synthetic tests do
+not establish recall in an arbitrary room or under large rotations.
+
 Python backend that receives camera frames from the mobile app over a WebSocket,
 downsamples and color-converts them, detects and tracks objects with stable IDs,
 and maps them to metric coordinates on the plane of motion for the kinematics stage.

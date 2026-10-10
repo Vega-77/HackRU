@@ -115,6 +115,7 @@ class SessionController extends Notifier<SessionState> {
   Timer? _frameTimer;
   Timer? _statsTimer;
   bool _capturing = false;
+  EncodedFrame? _selectionFrame;
   Future<void>? _stopInProgress;
   int _sessionEpoch = 0;
 
@@ -228,6 +229,9 @@ class SessionController extends Notifier<SessionState> {
     }
 
     final frameSize = _camera.frameSize;
+    _selectionFrame = calibration.selectionFrame?.size == frameSize
+        ? calibration.selectionFrame
+        : null;
     log.i(
       'Camera ready in ${opening.elapsedMilliseconds} ms, frames '
       '${frameSize ?? '$fallbackFrameSize (assumed, none reported yet)'}',
@@ -377,13 +381,14 @@ class SessionController extends Notifier<SessionState> {
     _capturing = true;
     final capturing = Stopwatch()..start();
     try {
-      final frame = await _camera.capture();
+      final frame = _selectionFrame ?? await _camera.capture();
       if (frame == null) {
         _missingFrames++;
         if (_missingFrames % _repeatLogEvery == 1) {
           log.w('The camera had no frame to send ($_missingFrames so far)');
         }
       } else if (socket.sendFrame(frame)) {
+        _selectionFrame = null;
         _framesSentThisSecond++;
         _framesSent++;
         log.d(
@@ -464,12 +469,17 @@ class SessionController extends Notifier<SessionState> {
       frameSize: state.frameSize ?? fallbackFrameSize,
       pxPerM: calibration.pxPerM,
       targetPx: calibration.target,
+      targetBbox: calibration.targetBbox,
+      debugTracking: const bool.fromEnvironment('TRACKING_DIAGNOSTICS'),
       surface: calibration.surface,
     );
   }
 
   void _logState(PhysicsState s, double? rttMs) {
     _replies++;
+    if (s.trackingDebug.isNotEmpty) {
+      log.d('Tracking decision: ${jsonEncode(s.trackingDebug)}');
+    }
     log.d(
       'Frame ${s.frameId} state${_rtt(rttMs)}: '
       '${s.tracked ? 'tracked' : 'not tracked'}, '

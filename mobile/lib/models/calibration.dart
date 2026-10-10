@@ -1,4 +1,6 @@
 import 'camera_pose.dart';
+import 'physics_state.dart';
+import 'session_config.dart';
 import 'vec2.dart';
 
 /// The result of the calibration screen, all in frame pixels.
@@ -13,6 +15,8 @@ class Calibration {
     this.rulerEnd,
     this.rulerLengthM = 0.30,
     this.target,
+    this.targetBbox,
+    this.selectionFrame,
     this.surface,
   });
 
@@ -20,6 +24,8 @@ class Calibration {
   final Vec2? rulerEnd;
   final double rulerLengthM;
   final Vec2? target;
+  final PixelRect? targetBbox;
+  final EncodedFrame? selectionFrame;
   final ArSurface? surface;
 
   /// Frame pixels per metre, or null until both ruler ends are placed.
@@ -41,12 +47,16 @@ class Calibration {
     Vec2? rulerEnd,
     double? rulerLengthM,
     Vec2? target,
+    PixelRect? targetBbox,
+    EncodedFrame? selectionFrame,
     ArSurface? surface,
   }) => Calibration(
     rulerStart: rulerStart ?? this.rulerStart,
     rulerEnd: rulerEnd ?? this.rulerEnd,
     rulerLengthM: rulerLengthM ?? this.rulerLengthM,
     target: target ?? this.target,
+    targetBbox: targetBbox ?? this.targetBbox,
+    selectionFrame: selectionFrame ?? this.selectionFrame,
     surface: surface ?? this.surface,
   );
 
@@ -62,5 +72,7 @@ class Calibration {
     rulerEnd: rulerEnd,
     rulerLengthM: rulerLengthM,
     target: target,
+    targetBbox: targetBbox,
+    selectionFrame: selectionFrame,
   );
 }

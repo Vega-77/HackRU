@@ -5,10 +5,13 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/theme/tokens.dart';
+import '../../../core/logging/debug_log.dart';
 import '../../../models/calibration.dart';
+import '../../../models/physics_state.dart';
 import '../../../models/session_config.dart';
 import '../../../models/vec2.dart';
 import '../../../state/calibration_controller.dart';
+import '../../../state/session_controller.dart';
 import '../../experiment/widgets/coordinate_mapper.dart';
 
 /// The picture with the calibration marks on it:
@@ -53,10 +56,91 @@ class _CalibrationStageState extends ConsumerState<CalibrationStage> {
   _End? _dragging;
   Offset _grabOffset = Offset.zero;
   bool _snapped = false;
+  Vec2? _boxStart;
+  Vec2? _boxEnd;
+  Future<EncodedFrame?>? _selectionCapture;
+  EncodedFrame? _previewFrame;
+  int _selectionEpoch = 0;
+  bool _focused = false;
+
+  KeyEventResult _onKey(
+    KeyEvent event,
+    CoordinateMapper mapper,
+    Calibration c,
+  ) {
+    if (event is! KeyDownEvent && event is! KeyRepeatEvent) {
+      return KeyEventResult.ignored;
+    }
+    final key = event.logicalKey;
+    if (key == LogicalKeyboardKey.enter || key == LogicalKeyboardKey.space) {
+      final point = mapper.clampToVisible(
+        mapper.toFrame(
+          Offset(mapper.viewSize.width / 2, mapper.viewSize.height / 2),
+        ),
+      );
+      final epoch = ++_selectionEpoch;
+      _freezeSelection(epoch).then((frame) {
+        if (!mounted || frame == null || epoch != _selectionEpoch) return;
+        final x = (point.x - 16).clamp(0.0, widget.frameSize.width - 32.0);
+        final y = (point.y - 16).clamp(0.0, widget.frameSize.height - 32.0);
+        ref
+            .read(calibrationProvider.notifier)
+            .selectObject(Vec2(x + 16, y + 16), PixelRect(x, y, 32, 32), frame);
+      });
+      return KeyEventResult.handled;
+    }
+    final box = c.targetBbox, frame = c.selectionFrame;
+    if (box == null || frame == null) return KeyEventResult.ignored;
+    var x = box.x, y = box.y, w = box.w, h = box.h;
+    if (key == LogicalKeyboardKey.arrowLeft) {
+      x -= 1;
+    } else if (key == LogicalKeyboardKey.arrowRight) {
+      x += 1;
+    } else if (key == LogicalKeyboardKey.arrowUp) {
+      y -= 1;
+    } else if (key == LogicalKeyboardKey.arrowDown) {
+      y += 1;
+    } else if (key == LogicalKeyboardKey.equal) {
+      w += 2;
+      h += 2;
+    } else if (key == LogicalKeyboardKey.minus) {
+      w -= 2;
+      h -= 2;
+    } else {
+      return KeyEventResult.ignored;
+    }
+    w = w.clamp(8.0, widget.frameSize.width.toDouble());
+    h = h.clamp(8.0, widget.frameSize.height.toDouble());
+    x = x.clamp(0.0, widget.frameSize.width - w);
+    y = y.clamp(0.0, widget.frameSize.height - h);
+    ref
+        .read(calibrationProvider.notifier)
+        .selectObject(Vec2(x + w / 2, y + h / 2), PixelRect(x, y, w, h), frame);
+    return KeyEventResult.handled;
+  }
+
+  Future<EncodedFrame?> _freezeSelection(int epoch) async {
+    EncodedFrame? frame;
+    try {
+      frame = await ref.read(frameSourceProvider).capture();
+    } catch (error, stack) {
+      log.w('Could not capture the selection picture', error, stack);
+      return null;
+    }
+    if (!mounted || epoch != _selectionEpoch) return null;
+    setState(() => _previewFrame = frame);
+    return frame;
+  }
 
   @override
   Widget build(BuildContext context) {
     final calibration = ref.watch(calibrationProvider);
+    ref.listen(calibrationProvider, (previous, next) {
+      if (next.target == null) {
+        _selectionEpoch++;
+        setState(() => _previewFrame = null);
+      }
+    });
 
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -73,33 +157,82 @@ class _CalibrationStageState extends ConsumerState<CalibrationStage> {
           null => null,
         };
 
-        return Semantics(
-          label: _describe(calibration),
-          child: GestureDetector(
-            behavior: HitTestBehavior.opaque,
-            onTapUp: (d) => _onTap(d.localPosition, mapper, calibration),
-            onPanStart: (d) =>
-                _onPanStart(d.localPosition, mapper, calibration),
-            onPanUpdate: (d) =>
-                _onPanUpdate(d.localPosition, mapper, calibration),
-            onPanEnd: (_) => _onPanEnd(),
-            onPanCancel: _onPanEnd,
-            child: Stack(
-              fit: StackFit.expand,
-              children: [
-                widget.background,
-                CustomPaint(
-                  painter: _MarksPainter(
-                    start: screen(calibration.rulerStart),
-                    end: screen(calibration.rulerEnd),
-                    target: screen(calibration.target),
-                    label: _lengthLabel(calibration.rulerLengthM),
-                    active: _dragging,
-                    snapped: _snapped,
+        return Focus(
+          onFocusChange: (value) => setState(() => _focused = value),
+          onKeyEvent: (_, event) => _onKey(event, mapper, calibration),
+          child: Semantics(
+            label: _describe(calibration),
+            child: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTapUp: (d) => _onTap(d.localPosition, mapper, calibration),
+              onPanStart: (d) =>
+                  _onPanStart(d.localPosition, mapper, calibration),
+              onPanUpdate: (d) =>
+                  _onPanUpdate(d.localPosition, mapper, calibration),
+              onPanEnd: (_) => _onPanEnd(),
+              onPanCancel: () {
+                _selectionEpoch++;
+                setState(() {
+                  _dragging = null;
+                  _boxStart = null;
+                  _boxEnd = null;
+                  _previewFrame = calibration.selectionFrame;
+                });
+              },
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  if (_previewFrame != null)
+                    Image.memory(_previewFrame!.jpeg, fit: widget.fit)
+                  else
+                    widget.background,
+                  if (_boxStart != null && _boxEnd != null)
+                    Positioned.fromRect(
+                      rect: Rect.fromPoints(
+                        screen(_boxStart)!,
+                        screen(_boxEnd)!,
+                      ),
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          border: Border.all(color: AppColors.vellum),
+                        ),
+                      ),
+                    ),
+                  CustomPaint(
+                    painter: _MarksPainter(
+                      start: screen(calibration.rulerStart),
+                      end: screen(calibration.rulerEnd),
+                      target: screen(calibration.target),
+                      targetBox: calibration.targetBbox == null
+                          ? null
+                          : mapper.rectToScreen(calibration.targetBbox!),
+                      label: _lengthLabel(calibration.rulerLengthM),
+                      active: _dragging,
+                      snapped: _snapped,
+                    ),
                   ),
-                ),
-                if (active != null) _loupe(active, view),
-              ],
+                  if (active != null) _loupe(active, view),
+                  if (_focused)
+                    IgnorePointer(
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          border: Border.all(
+                            color: AppColors.graphiteDeep,
+                            width: 4,
+                          ),
+                        ),
+                        child: DecoratedBox(
+                          decoration: BoxDecoration(
+                            border: Border.all(
+                              color: AppColors.vellum,
+                              width: 2,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
             ),
           ),
         );
@@ -148,18 +281,37 @@ class _CalibrationStageState extends ConsumerState<CalibrationStage> {
     return toStart <= toEnd ? _End.start : _End.end;
   }
 
-  void _onTap(Offset touch, CoordinateMapper mapper, Calibration c) {
+  Future<void> _onTap(
+    Offset touch,
+    CoordinateMapper mapper,
+    Calibration c,
+  ) async {
     // A tap on a ruler end is a missed drag, not a new target.
     if (_endNear(touch, mapper, c) != null) return;
     HapticFeedback.selectionClick();
+    final epoch = ++_selectionEpoch;
+    final frame = await _freezeSelection(epoch);
+    if (!mounted || frame == null || epoch != _selectionEpoch) return;
     ref
         .read(calibrationProvider.notifier)
-        .setTarget(mapper.clampToVisible(mapper.toFrame(touch)));
+        .selectObject(
+          mapper.clampToVisible(mapper.toFrame(touch)),
+          null,
+          frame,
+        );
   }
 
   void _onPanStart(Offset touch, CoordinateMapper mapper, Calibration c) {
     final end = _endNear(touch, mapper, c);
-    if (end == null) return;
+    if (end == null) {
+      final epoch = ++_selectionEpoch;
+      _selectionCapture = _freezeSelection(epoch);
+      setState(() {
+        _boxStart = mapper.clampToVisible(mapper.toFrame(touch));
+        _boxEnd = _boxStart;
+      });
+      return;
+    }
     final p = end == _End.start ? c.rulerStart! : c.rulerEnd!;
     HapticFeedback.lightImpact();
     setState(() {
@@ -171,7 +323,12 @@ class _CalibrationStageState extends ConsumerState<CalibrationStage> {
 
   void _onPanUpdate(Offset touch, CoordinateMapper mapper, Calibration c) {
     final end = _dragging;
-    if (end == null) return;
+    if (end == null) {
+      if (_boxStart != null) {
+        setState(() => _boxEnd = mapper.clampToVisible(mapper.toFrame(touch)));
+      }
+      return;
+    }
     var p = mapper.clampToVisible(mapper.toFrame(touch + _grabOffset));
     final other = end == _End.start ? c.rulerEnd : c.rulerStart;
 
@@ -190,8 +347,29 @@ class _CalibrationStageState extends ConsumerState<CalibrationStage> {
     end == _End.start ? controller.setRulerStart(p) : controller.setRulerEnd(p);
   }
 
-  void _onPanEnd() {
-    if (_dragging == null) return;
+  Future<void> _onPanEnd() async {
+    if (_dragging == null) {
+      final start = _boxStart, end = _boxEnd;
+      final epoch = _selectionEpoch;
+      final frame = await _selectionCapture;
+      if (!mounted || epoch != _selectionEpoch) return;
+      setState(() {
+        _boxStart = null;
+        _boxEnd = null;
+      });
+      if (start == null || end == null || frame == null) return;
+      final x = math.min(start.x, end.x), y = math.min(start.y, end.y);
+      final w = (start.x - end.x).abs(), h = (start.y - end.y).abs();
+      if (w < 8 || h < 8) return;
+      ref
+          .read(calibrationProvider.notifier)
+          .selectObject(
+            Vec2(x + w / 2, y + h / 2),
+            PixelRect(x, y, w, h),
+            frame,
+          );
+      return;
+    }
     setState(() {
       _dragging = null;
       _snapped = false;
@@ -225,6 +403,7 @@ class _CalibrationStageState extends ConsumerState<CalibrationStage> {
         'Ruler line set to ${_lengthLabel(c.rulerLengthM)}, '
             '${scale.round()} pixels per metre.',
       c.target == null ? 'No object marked.' : 'Object marked.',
+      'Enter selects a box. Arrow keys move it. Plus and minus resize it.',
     ].join(' ');
   }
 }
@@ -236,6 +415,7 @@ class _MarksPainter extends CustomPainter {
     required this.start,
     required this.end,
     required this.target,
+    this.targetBox,
     required this.label,
     required this.active,
     required this.snapped,
@@ -244,6 +424,7 @@ class _MarksPainter extends CustomPainter {
   final Offset? start;
   final Offset? end;
   final Offset? target;
+  final Rect? targetBox;
   final String label;
   final _End? active;
   final bool snapped;
@@ -254,6 +435,22 @@ class _MarksPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     if (target != null) _paintTarget(canvas, target!);
+    if (targetBox != null) {
+      canvas.drawRect(
+        targetBox!,
+        Paint()
+          ..color = _halo
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 4,
+      );
+      canvas.drawRect(
+        targetBox!,
+        Paint()
+          ..color = _ink
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 1.5,
+      );
+    }
     if (start != null && end != null) _paintRuler(canvas, size, start!, end!);
   }
 
@@ -362,6 +559,7 @@ class _MarksPainter extends CustomPainter {
       old.start != start ||
       old.end != end ||
       old.target != target ||
+      old.targetBox != targetBox ||
       old.label != label ||
       old.active != active ||
       old.snapped != snapped;
