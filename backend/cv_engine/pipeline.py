@@ -152,19 +152,29 @@ class TrackingPipeline:
             self._manual.reset()
             self._pending_selection = t is not None
         self.session = session
+        plane_before = self.spatial.ar_plane
         self.spatial.set_ar_plane(session.get("ar_plane"))
+        if self.motion and self.spatial.ar_plane is not plane_before:
+            self.motion.reset()  # its reference view was aligned to the old surface
         self.spatial.set_scale(session["px_per_m"], session["frame_size"])
         return self.settings()
 
     def settings(self) -> dict:
         return {"detector": dict(self.config.__dict__), "session": dict(self.session)}
 
+    def _plane_to_working(self, frame: PreprocessedFrame) -> np.ndarray | None:
+        """The AR surface's plane -> working-pixel homography for this frame, so the motion
+        detector can align views with the camera pose instead of image features."""
+        if self.spatial.method != "arkit" or self.spatial.mapping is None:
+            return None
+        return np.diag([frame.scale, frame.scale, 1.0]) @ self.spatial.mapping.H_inv
+
     def detect(self, frame: PreprocessedFrame) -> list[Detection]:
         dets: list[Detection] = []
         if self.config.detector in ("color", "both"):
             dets += self.color.detect(frame)
         if self.config.detector == "motion" and self.motion:
-            dets += self.motion.detect(frame)
+            dets += self.motion.detect(frame, self._plane_to_working(frame))
         if self.config.detector in ("mediapipe", "both") and self._mediapipe:
             dets += self._mediapipe.detect(frame)
         return dets

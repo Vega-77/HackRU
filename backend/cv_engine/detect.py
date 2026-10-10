@@ -108,6 +108,11 @@ class MotionDetector:
     view; detections are mapped back to the current frame. If the view moves too far to
     align, the background is relearned from scratch.
 
+    On iOS the ARKit camera pose gives that alignment directly: detect() can take the
+    calibrated surface's plane-to-image homography for the frame, and the surface seen from
+    the reference pose and from the current pose lines up exactly, with no features needed
+    (a blank board or table aligns as well as a textured one). ORB is the fallback.
+
     An object that stops moving fades into the background over roughly `history` frames.
     A ball that sat still while the background was learned leaves a "ghost" when it moves
     off; ghosts are dropped because their outline is an edge in the background model but
@@ -146,11 +151,23 @@ class MotionDetector:
         self._subtractor.setBackgroundRatio(0.5)
         self._frames = 0
         self._ref: tuple | None = None  # ORB keypoints + descriptors of the reference view
+        self._ref_plane: np.ndarray | None = None  # plane -> reference view, from the AR pose
 
-    def _align(self, frame: PreprocessedFrame) -> np.ndarray | None:
+    def _align(self, frame: PreprocessedFrame, plane_to_image: np.ndarray | None = None) -> np.ndarray | None:
         """Homography mapping the current frame onto the reference view, or None if the
         two views don't share enough features. A reference view with too little texture to
-        align against (a blank table) is assumed to be filmed from a steady camera."""
+        align against (a blank table) is assumed to be filmed from a steady camera.
+
+        plane_to_image (working pixels) comes from the ARKit pose. When the reference view
+        has one too, the views are aligned through the plane and ORB is skipped."""
+        if plane_to_image is not None:
+            if self._frames == 0:
+                self._ref_plane = plane_to_image
+            if self._ref_plane is not None:
+                H = self._ref_plane @ np.linalg.inv(plane_to_image)
+                return H / H[2, 2]
+        elif self._ref_plane is not None:
+            return None  # the pose dropped out: no ORB reference to fall back on, so relearn
         kp, des = self._orb.detectAndCompute(frame.gray_sharp(), None)
         if self._ref is None:
             self._ref = (kp, des)
@@ -195,13 +212,13 @@ class MotionDetector:
             out[y0:y1, x0:x1] |= cv2.morphologyEx(blob, cv2.MORPH_OPEN, self._kernel)
         return out
 
-    def detect(self, frame: PreprocessedFrame) -> list[Detection]:
+    def detect(self, frame: PreprocessedFrame, plane_to_image: np.ndarray | None = None) -> list[Detection]:
         w, h = frame.size
-        H = self._align(frame) if self.stabilize else np.eye(3)
+        H = self._align(frame, plane_to_image) if self.stabilize else np.eye(3)
         if H is None:
             log.debug("camera moved too far to align; relearning the background")
             self.reset()
-            H = self._align(frame)
+            H = self._align(frame, plane_to_image)
         first = self._frames == 0
         if first or not self.stabilize:
             view, valid = frame.bgr, None
