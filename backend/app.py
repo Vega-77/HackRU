@@ -58,6 +58,7 @@ from cv_engine.frame_slot import LatestFrameSlot
 from cv_engine.overlay import TrailHistory, draw_overlay
 from cv_engine.pipeline import PipelineConfig, TrackingPipeline
 from cv_engine.preprocess import PreprocessedFrame, decode_jpeg, preprocess_frame
+from physics_stage import PhysicsSession
 
 WORKING_WIDTH = int(os.environ.get("CV_WORKING_WIDTH", "640"))
 
@@ -106,6 +107,7 @@ async def frames_ws(ws: WebSocket) -> None:
     slot: LatestFrameSlot[IncomingFrame] = LatestFrameSlot()
     stats = {"processed": 0, "decode_errors": 0}
     pipeline = ws.app.state.pipeline_factory()
+    physics = PhysicsSession()
     next_id = 0
     conn_id = next(_connection_ids)
     trails = TrailHistory()
@@ -167,6 +169,9 @@ async def frames_ws(ws: WebSocket) -> None:
             try:
                 async with pipeline_lock:
                     result, image = await asyncio.to_thread(_process, frame, pipeline)
+                    session_settings = getattr(pipeline, "session", {})
+                    if session_settings.get("mode") is not None:
+                        result = physics.process_frame(result, session_settings)
             except ValueError as e:
                 stats["decode_errors"] += 1
                 await ws.send_json({"type": "error", "message": str(e), "frame_id": frame.meta["frame_id"]})

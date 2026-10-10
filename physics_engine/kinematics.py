@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from collections import deque
 from dataclasses import asdict, dataclass
-from math import hypot, isfinite
+from math import atan, degrees, hypot, isfinite
 from typing import Deque, Optional
 
 
@@ -92,6 +92,50 @@ class KinematicsEngine:
 
         self._samples.clear()
 
+    def trajectory_angle_deg(self, min_horizontal_m: float = 0.03) -> Optional[float]:
+        """Estimate the slope of a straight track, independent of travel direction."""
+
+        if len(self._samples) < 3:
+            return None
+        first, last = self._samples[0], self._samples[-1]
+        dx = last.x - first.x
+        if abs(dx) < min_horizontal_m:
+            return None
+        return degrees(atan((last.y - first.y) / dx))
+
+    def estimate_circle_center(self) -> Optional[Vector2D]:
+        """Estimate a pendulum pivot from a curved trajectory segment.
+
+        A circle fit is underdetermined on a nearly straight or stationary
+        segment, so callers should wait for enough arc motion.
+        """
+
+        if len(self._samples) < 5:
+            return None
+        xs = [sample.x for sample in self._samples]
+        ys = [sample.y for sample in self._samples]
+        if max(xs) - min(xs) < 0.025:
+            return None
+        matrix = [
+            [sum(x * x for x in xs), sum(x * y for x, y in zip(xs, ys)), sum(xs),
+             sum(x * (x * x + y * y) for x, y in zip(xs, ys))],
+            [sum(x * y for x, y in zip(xs, ys)), sum(y * y for y in ys), sum(ys),
+             sum(y * (x * x + y * y) for x, y in zip(xs, ys))],
+            [sum(xs), sum(ys), float(len(xs)), sum(x * x + y * y for x, y in zip(xs, ys))],
+        ]
+        try:
+            twice_cx, twice_cy, _ = _solve_3x3(matrix)
+        except ValueError:
+            return None
+        pivot = Vector2D(twice_cx / 2.0, twice_cy / 2.0)
+        radii = [hypot(x - pivot.x, y - pivot.y) for x, y in zip(xs, ys)]
+        mean_radius = sum(radii) / len(radii)
+        if mean_radius <= 0 or max(abs(radius - mean_radius) for radius in radii) > 0.02 * mean_radius:
+            return None
+        if pivot.y <= self._samples[-1].y:
+            return None
+        return pivot
+
     def add_sample(
         self,
         timestamp: float,
@@ -121,6 +165,24 @@ class KinematicsEngine:
             x=x_px * meters_per_pixel,
             y=y_direction * y_px * meters_per_pixel,
         )
+
+        return self._add_position(timestamp, position, confidence)
+
+    def add_world_sample(
+        self, timestamp: float, x_m: float, y_m: float, confidence: float = 1.0
+    ) -> KinematicsResult:
+        """Accept Dev 2's calibrated coordinates (metres, positive Y up)."""
+
+        return self._add_position(timestamp, Vector2D(x_m, y_m), confidence)
+
+    def _add_position(
+        self, timestamp: float, position: Vector2D, confidence: float
+    ) -> KinematicsResult:
+        values = (timestamp, position.x, position.y, confidence)
+        if not all(isfinite(value) for value in values):
+            raise ValueError("sample values must be finite numbers")
+        if not 0.0 <= confidence <= 1.0:
+            raise ValueError("confidence must be between 0 and 1")
 
         if confidence < self.confidence_threshold:
             self.reset()
