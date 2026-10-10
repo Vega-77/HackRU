@@ -36,10 +36,10 @@ void main() {
       overrides: [frameSourceProvider.overrideWithValue(camera)],
     );
     addTearDown(container.dispose);
-    container.read(experimentSettingsProvider.notifier)
-      ..setDemoMode(false)
-      // Nothing listens here, so the socket just fails to connect.
-      ..setBackendUrl('ws://127.0.0.1:9/ws/frames');
+    // Nothing listens here, so the socket just fails to connect.
+    container
+        .read(experimentSettingsProvider.notifier)
+        .setBackendUrl('ws://127.0.0.1:9/ws/frames');
   });
 
   SessionController session() => container.read(sessionProvider.notifier);

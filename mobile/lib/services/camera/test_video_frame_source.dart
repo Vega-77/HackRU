@@ -14,7 +14,7 @@ import 'frame_source.dart';
 /// A drawn video of a red ball on a string, for devices with no camera
 /// (the iOS Simulator, a laptop without a webcam).
 ///
-/// The frames go to the backend like camera frames, so live mode works end
+/// The frames go to the backend like camera frames, so the app works end
 /// to end: the backend's colour tracker finds the ball and measures a real
 /// pendulum swing. The preview draws the same scene at the same moment, so
 /// the overlay lines up with it.

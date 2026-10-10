@@ -1,23 +1,26 @@
-import 'dart:async';
 import 'dart:math' as math;
 
-import '../../models/experiment_mode.dart';
-import '../../models/physics_state.dart';
-import '../../models/session_config.dart';
-import '../../models/vec2.dart';
+import '../../../models/experiment_mode.dart';
+import '../../../models/physics_state.dart';
+import '../../../models/session_config.dart';
+import '../../../models/vec2.dart';
 
-/// Synthetic, physically consistent states for every experiment mode.
+/// Simulated, physically consistent states for every experiment mode, for
+/// the home screen's previews. The experiment itself always measures with
+/// the backend.
 ///
-/// Used for demo mode (no backend), for the home screen's mini diagrams,
-/// and in tests. [sample] is a pure function of time, so the same `t`
-/// always gives the same state. Each experiment loops forever.
+/// [sample] is a pure function of time, so the same `t` always gives the
+/// same state. Each experiment loops forever.
 ///
 /// World coordinates are SI with y up and the origin at the bottom-left of
 /// the frame. The world is 0.65 m tall regardless of frame size, so the
 /// motion always fits on screen.
-abstract final class MockPhysics {
+abstract final class PreviewPhysics {
   static const double g = 9.81;
   static const double worldHeightM = 0.65;
+
+  /// The frame the previews are drawn in.
+  static const FrameSize frameSize = FrameSize(320, 240);
 
   /// Radius of the tracked object (block, ball, bob or cart), in metres.
   static const double objectRadiusM = 0.025;
@@ -31,9 +34,9 @@ abstract final class MockPhysics {
     return Vec2(world.x * scale, frameSize.height - world.y * scale);
   }
 
-  /// The apparatus for [mode] at time [t], so demo mode can draw the ramp,
+  /// The apparatus for [mode] at time [t], so a preview can draw the ramp,
   /// floor, pendulum mount or second cart behind the overlay.
-  static MockScenery scenery(ExperimentMode mode, double t) {
+  static PreviewScenery scenery(ExperimentMode mode, double t) {
     const r = objectRadiusM;
     switch (mode) {
       case ExperimentMode.ramp:
@@ -43,7 +46,7 @@ abstract final class MockPhysics {
         final top = surface - down * 0.04;
         final bottom = surface + down * (_rampLength + 0.04);
         final corner = Vec2(top.x, bottom.y);
-        return MockScenery(
+        return PreviewScenery(
           solids: [
             [top, bottom, corner],
           ],
@@ -51,16 +54,18 @@ abstract final class MockPhysics {
         );
       case ExperimentMode.freeFall:
         const floor = _fallFloor - r;
-        return const MockScenery(ground: [(Vec2(0, floor), Vec2(0.86, floor))]);
+        return const PreviewScenery(
+          ground: [(Vec2(0, floor), Vec2(0.86, floor))],
+        );
       case ExperimentMode.pendulum:
         const pivot = _PendulumTable.pivot;
-        return MockScenery(
+        return PreviewScenery(
           ceiling: [(pivot - const Vec2(0.12, 0), pivot + const Vec2(0.12, 0))],
           pivot: pivot,
         );
       case ExperimentMode.collision:
         const track = _cartY - r;
-        return MockScenery(
+        return PreviewScenery(
           ground: const [(Vec2(0, track), Vec2(0.86, track))],
           boxes: [
             (
@@ -75,7 +80,7 @@ abstract final class MockPhysics {
   static PhysicsState sample(
     ExperimentMode mode,
     double t, {
-    FrameSize frameSize = const FrameSize(320, 240),
+    FrameSize frameSize = PreviewPhysics.frameSize,
     double massKg = 0.1,
     int frameId = 0,
   }) {
@@ -341,7 +346,7 @@ abstract final class MockPhysics {
 class _PendulumTable {
   _PendulumTable._() {
     const dt = _dt;
-    const k = MockPhysics.g / length;
+    const k = PreviewPhysics.g / length;
     double f(double th) => -k * math.sin(th); // angular acceleration
 
     var th = amplitude;
@@ -386,9 +391,9 @@ class _PendulumTable {
   }
 }
 
-/// Static apparatus for demo mode, in world metres (y up).
-class MockScenery {
-  const MockScenery({
+/// Static apparatus for a preview, in world metres (y up).
+class PreviewScenery {
+  const PreviewScenery({
     this.ground = const [],
     this.ceiling = const [],
     this.solids = const [],
@@ -428,25 +433,4 @@ class _World {
   final List<ForceVector> forces;
   final EnergyState energy;
   final Map<String, double> extras;
-}
-
-/// Emits [MockPhysics.sample] at [hz], timed from when you subscribe.
-Stream<PhysicsState> mockPhysicsStream({
-  required ExperimentMode mode,
-  required FrameSize frameSize,
-  required double massKg,
-  int hz = 30,
-}) {
-  final clock = Stopwatch()..start();
-  var frameId = 0;
-  return Stream<PhysicsState>.periodic(
-    Duration(microseconds: 1000000 ~/ hz),
-    (_) => MockPhysics.sample(
-      mode,
-      clock.elapsedMicroseconds / 1e6,
-      frameSize: frameSize,
-      massKg: massKg,
-      frameId: frameId++,
-    ),
-  );
 }

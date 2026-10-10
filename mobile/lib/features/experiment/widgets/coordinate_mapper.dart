@@ -10,8 +10,8 @@ import '../../../models/vec2.dart';
 /// screen pixels (the widget the frame is shown in).
 ///
 /// The camera preview fills its widget like [BoxFit.cover]: scaled up until
-/// both sides are covered, centred, and the overflow cropped. Demo mode has
-/// no camera and uses [BoxFit.contain] so the whole simulated scene shows.
+/// both sides are covered, centred, and the overflow cropped. The home
+/// screen previews use [BoxFit.contain] so the whole drawn scene shows.
 /// Whichever fit the background uses, the overlay must use the same one,
 /// or arrows drift away from the object.
 class CoordinateMapper {

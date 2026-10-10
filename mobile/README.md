@@ -12,10 +12,9 @@ The message format between app and backend is in
 ## Open it
 
 **[vega-77.github.io/HackRU](https://vega-77.github.io/HackRU/)** runs the
-latest `main` in any browser, nothing to install. On a phone it can use the
-real camera: open the link, choose **Live backend** in Settings, and allow
-camera access. It is rebuilt each time `main` changes
-(`../.github/workflows/deploy-web.yml`).
+latest `main` in any browser, nothing to install. It streams the camera to
+the hosted backend: open the link and allow camera access. It is rebuilt
+each time `main` changes (`../.github/workflows/deploy-web.yml`).
 
 ## Run it
 
@@ -32,8 +31,8 @@ flutter pub get
 flutter run -d chrome
 ```
 
-The app starts in **demo mode**: simulated experiments, no camera or backend.
-To see a phone-sized window, open Chrome DevTools and turn on the device
+It streams the laptop's webcam to the hosted backend (see
+[Against the backend](#against-the-backend)). To see a phone-sized window, open Chrome DevTools and turn on the device
 toolbar (iPhone 12/13/14 is 390 x 844).
 
 ### On an iPhone (needs a Mac)
@@ -55,13 +54,13 @@ toolbar (iPhone 12/13/14 is 390 x 844).
 
 ### Against the backend
 
-The backend is hosted on Render (`../render.yaml`), and the app points at it
-by default. In the app, open Settings and choose **Live backend**. It tests
-the connection straight away. Nothing to run on a laptop.
+The backend is hosted on Render (`../render.yaml`), and the app streams to
+it by default. Opening Settings tests the connection straight away. Nothing
+to run on a laptop.
 
 - If nobody has used it for 15 minutes the server is asleep, and the first
   connection takes up to a minute. The app waits and says so.
-- The iOS Simulator and laptops without a webcam have no camera. Live mode
+- The iOS Simulator and laptops without a webcam have no camera. The app
   then streams a test video instead: a red ball swinging on a string, which
   the backend tracks like a real one.
 
@@ -76,19 +75,19 @@ To use a backend on a laptop instead:
 1. Put the laptop running the backend and the phone on the **same Wi-Fi**.
 2. Find the laptop's IP (`ipconfig` on Windows, `ipconfig getifaddr en0` on
    a Mac).
-3. In Settings, choose **Live backend**, and enter
-   `ws://<that IP>:8000/ws/frames`. Press **Test connection**. **Use the
+3. In Settings, enter `ws://<that IP>:8000/ws/frames`. Press **Test connection**. **Use the
    hosted backend** switches back.
 
 To set the address at build time instead:
 
 ```bash
-flutter run --dart-define=BACKEND_URL=ws://192.168.1.20:8000/ws/frames --dart-define=DEMO_MODE=false
+flutter run --dart-define=BACKEND_URL=ws://192.168.1.20:8000/ws/frames
 ```
 
 The backend's own README (`../backend/README.md`) says how to start it. To
-try the app without it, `tool/mock_server.py` speaks the same protocol on the
-same port and path and sends back a made-up trajectory:
+work on the app without it, `tool/mock_server.py` speaks the same protocol on
+the same port and path and sends back a made-up trajectory. Point Settings at
+`ws://localhost:8000/ws/frames`:
 
 ```bash
 pip install websockets
@@ -129,17 +128,17 @@ app from the bottom up.
 |---|---|
 | `lib/models/` | Plain Dart types that mirror `docs/protocol.md`: `PhysicsState`, `SessionConfig`, `Calibration`, `Vec2`. No Flutter. |
 | `lib/services/camera/` | `FrameSource`: start the camera, grab a JPEG frame, show a preview. One version for iOS (`native_`), one for Chrome (`web_`), and a drawn test video (`test_video_`) for devices with no camera. |
-| `lib/services/network/` | `PhysicsSocket` (the WebSocket client, with reconnect and flow control) and `MockPhysics` (the demo data). |
+| `lib/services/network/` | `PhysicsSocket`: the WebSocket client, with reconnect and flow control. |
 | `lib/state/` | Riverpod controllers: experiment settings, calibration, the running session, and the rolling telemetry buffer for charts. |
-| `lib/features/` | One folder per screen: `home`, `calibration`, `experiment`, `settings`. Screen-only widgets sit in each `widgets/`. |
+| `lib/features/` | One folder per screen: `home`, `calibration`, `experiment`, `settings`. Screen-only widgets sit in each `widgets/`. The moving diagrams on the home screen (`PreviewPhysics`) only illustrate each experiment; every measurement comes from the backend. |
 | `lib/core/` | App-wide pieces: config constants, routes, theme tokens, icons. |
-| `test/` | Mirrors `lib/`. `test/widgets/app_flow_test.dart` clicks through the whole demo flow at iPhone size. |
+| `test/` | Mirrors `lib/`. `test/widgets/app_flow_test.dart` clicks through the whole flow at iPhone size, with a fake camera. |
 
 ### What happens when you press Start
 
-1. `SessionController.start()` builds a `SessionConfig` from the settings and
-   calibration, and opens a `PhysicsSocket` (or `MockPhysics` in demo mode).
-2. In live mode, it grabs a camera frame about 15 times a second, keeping at
+1. `SessionController.start()` opens the camera, builds a `SessionConfig`
+   from the settings and calibration, and opens a `PhysicsSocket`.
+2. It grabs a camera frame about 15 times a second, keeping at
    most 2 frames waiting for an answer, so the picture never lags behind.
 3. Each `state` message from the backend lands in `SessionState.latest` and
    in the `TelemetryBuffer`.
