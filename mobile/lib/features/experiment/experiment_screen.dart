@@ -488,7 +488,6 @@ class _StageMessage extends ConsumerWidget {
           child: message == null
               ? const SizedBox.shrink()
               : Semantics(
-                  key: ValueKey(message.$2),
                   liveRegion: true,
                   child: _GlassPill(
                     child: Row(
