@@ -16,20 +16,21 @@ from cv_engine.detect import DEFAULT_COLORS, ColorDetector, Detection, MediaPipe
 from cv_engine.preprocess import PreprocessedFrame
 from cv_engine.spatial import SpatialMapper
 from cv_engine.tracker import CentroidTracker, Track
+from cv_engine.universal import ManualTracker, MotionDetector
 
 log = logging.getLogger(__name__)
 
-DETECTORS = ("color", "mediapipe", "both")
+DETECTORS = ("motion", "color", "mediapipe", "both")
 EXPERIMENT_MODES = ("free_fall", "ramp", "pendulum", "collision")
 # Settings the app sends in its config message (docs/protocol.md). The CV engine uses
 # px_per_m (calibration fallback) and target_px (which object to follow); the rest is
 # kept for the physics stage.
-SESSION_DEFAULTS = {"mode": None, "mass_kg": 0.1, "px_per_m": None, "target_px": None, "frame_size": None}
+SESSION_DEFAULTS = {"mode": None, "mass_kg": 0.1, "px_per_m": None, "target_px": None, "target_bbox": None, "frame_size": None}
 
 
 @dataclass
 class PipelineConfig:
-    detector: str = "color"  # which detectors to run: color, mediapipe or both
+    detector: str = "motion"  # color-free default; legacy color and model modes remain available
     colors: list[str] = field(default_factory=lambda: list(DEFAULT_COLORS))
     min_area: float = 80.0
     mediapipe_labels: list[str] | None = None  # e.g. ["sports ball"]; None = all COCO classes
@@ -76,10 +77,14 @@ def validated_session(current: dict, changes: dict) -> dict:
         or any(not isinstance(value, (int, float)) or not math.isfinite(value) or value <= 0 for value in masses)
     ):
         raise ValueError("collision_masses_kg must contain two positive masses")
-    for key, fields in (("target_px", ("x", "y")), ("frame_size", ("w", "h"))):
+    for key, fields in (("target_px", ("x", "y")), ("target_bbox", ("x", "y", "w", "h")), ("frame_size", ("w", "h"))):
         v = s[key]
-        if v is not None and not (isinstance(v, dict) and all(isinstance(v.get(f), (int, float)) for f in fields)):
+        if v is not None and not (isinstance(v, dict) and all(isinstance(v.get(f), (int, float)) and math.isfinite(v[f]) for f in fields)):
             raise ValueError(f"{key} must be null or an object with numeric {', '.join(fields)}")
+    if s["target_bbox"] is not None and (s["target_bbox"]["w"] <= 0 or s["target_bbox"]["h"] <= 0):
+        raise ValueError("target_bbox must have positive width and height")
+    if s["frame_size"] is not None and (s["frame_size"]["w"] <= 0 or s["frame_size"]["h"] <= 0):
+        raise ValueError("frame_size must have positive width and height")
     return s
 
 
@@ -90,6 +95,8 @@ class TrackingPipeline:
         self.session = dict(SESSION_DEFAULTS)
         self._target_id: int | None = None
         self._target_last: tuple[float, float] | None = None  # client px
+        self._manual = ManualTracker()
+        self._pending_selection = False
         self.configure(config or PipelineConfig())
 
     def configure(self, config: PipelineConfig) -> None:
@@ -101,18 +108,21 @@ class TrackingPipeline:
             config.mediapipe_score,
         )
         mediapipe = self._mediapipe
-        if config.detector != "color" and (mediapipe is None or mp_settings_changed):
+        if config.detector in ("mediapipe", "both") and (mediapipe is None or mp_settings_changed):
             mediapipe = MediaPipeDetector(score_threshold=config.mediapipe_score, allow_labels=config.mediapipe_labels)
-        elif config.detector == "color":
+        elif config.detector not in ("mediapipe", "both"):
             mediapipe = None
         if self._mediapipe is not None and self._mediapipe is not mediapipe:
             self._mediapipe.close()
 
         self.config = config
         self.color = color
+        self.motion = MotionDetector(min_area=config.min_area)
         self._mediapipe = mediapipe
         self.tracker = CentroidTracker(config.max_distance, config.max_missed, config.min_hits)
         self._target_id = None
+        self._manual.reset()
+        self._pending_selection = self.session["target_px"] is not None
 
     def apply_config(self, message: dict) -> dict:
         """Handle a {"type": "config"} message. Detector keys (see PipelineConfig) retune
@@ -126,10 +136,12 @@ class TrackingPipeline:
 
         if new_config is not None:
             self.configure(new_config)
-        if session["target_px"] != self.session["target_px"]:
+        if session["target_px"] != self.session["target_px"] or session["target_bbox"] != self.session["target_bbox"]:
             self._target_id = None
             t = session["target_px"]
             self._target_last = (t["x"], t["y"]) if t else None
+            self._manual.reset()
+            self._pending_selection = t is not None
         self.session = session
         self.spatial.set_scale(session["px_per_m"], session["frame_size"])
         return self.settings()
@@ -139,6 +151,8 @@ class TrackingPipeline:
 
     def detect(self, frame: PreprocessedFrame) -> list[Detection]:
         dets: list[Detection] = []
+        if self.config.detector == "motion":
+            dets += self.motion.detect(frame)
         if self.config.detector in ("color", "both"):
             dets += self.color.detect(frame)
         if self.config.detector in ("mediapipe", "both") and self._mediapipe:
@@ -148,13 +162,31 @@ class TrackingPipeline:
     def __call__(self, frame: PreprocessedFrame) -> dict:
         """Process one frame; returns the "objects" and "calibration" parts of the result."""
         self.spatial.update(frame)
-        tracks = self.tracker.update(self.detect(frame))
+        detections = self.detect(frame)
+        tap = self.session["target_px"]
+        manual = None
+        if tap is not None:
+            if self._pending_selection:
+                manual = self._manual.select(frame, (tap["x"] * frame.scale, tap["y"] * frame.scale), self.session["target_bbox"])
+                self._pending_selection = False
+            else:
+                manual = self._manual.detect(frame)
+        if manual is not None:
+            mx, my, mw, mh = manual.bbox
+            detections = [d for d in detections if not (mx < d.bbox[0] + d.bbox[2] and d.bbox[0] < mx + mw
+                          and my < d.bbox[1] + d.bbox[3] and d.bbox[1] < my + mh)]
+            detections.append(manual)
+        tracks = self.tracker.update(detections)
         target = self._pick_target(tracks, frame)
         objects = [track_to_json(t, frame, self.spatial) for t in tracks]
         for o in objects:
             o["target"] = o["id"] == self._target_id
+            o["timestamp"] = frame.timestamp
+            o["tracking_status"] = "low_confidence" if o["score"] < 0.6 else "detected"
         return {
             "tracked": target is not None,
+            "tracking_status": ("low_confidence" if target.score < 0.6 else "detected") if target is not None
+                               else ("lost" if self._target_id is not None else "searching"),
             "target_id": self._target_id,
             "objects": objects,
             "calibration": self.spatial.status(),
@@ -168,7 +200,12 @@ class TrackingPipeline:
             return None
         scale = frame.scale
         by_id = {t.id: t for t in tracks}
-        if self._target_id in by_id:
+        manual_tracks = [t for t in tracks if t.source == "manual"] if self.session["target_px"] is not None else []
+        if manual_tracks:
+            chosen = max(manual_tracks, key=lambda t: t.score)
+        elif self.session["target_px"] is not None and self._manual.template is not None:
+            return None
+        elif self._target_id in by_id:
             chosen = by_id[self._target_id]
         elif self._target_last is not None:
             lx, ly = self._target_last
@@ -212,6 +249,8 @@ def track_to_json(t: Track, frame: PreprocessedFrame, spatial: SpatialMapper | N
         "label": t.label,
         "source": t.source,
         "score": round(t.score, 3),
+        "confidence": round(t.score, 3),
+        "tracking_status": "detected",
         "pixel": {"x": round(cx / s, 2), "y": round(cy / s, 2)},
         "bbox": {"x": round(x / s, 1), "y": round(y / s, 1), "w": round(bw / s, 1), "h": round(bh / s, 1)},
         "pixel_norm": {"x": round(cx / w, 5), "y": round(cy / h, 5)},

@@ -1,7 +1,7 @@
 # HandsOn Physics CV and physics backend
 
 Python backend that receives camera frames from the mobile app over a WebSocket,
-downsamples and color-converts them, detects and tracks objects with stable IDs,
+downsamples them, detects and tracks objects with stable IDs,
 and maps them to metric coordinates on the plane of motion for the kinematics stage.
 When an experiment mode is configured, the physics stage estimates motion,
 forces, and energy and replies with the app's `state` message.
@@ -22,7 +22,7 @@ uvicorn app:app --host 0.0.0.0 --port 8000
 Then, in another terminal, stream frames to it the way the app will:
 
 ```bash
-python stream_client.py --source synthetic      # moving red ball, no camera needed
+python stream_client.py --source synthetic      # moving ball, no camera needed
 python stream_client.py --source 0              # laptop webcam
 python stream_client.py --source clip.mp4 --fps 30
 ```
@@ -59,23 +59,33 @@ true positions from the physics simulation, and `run_clip.py` scores against it:
 | `pendulum.mp4` | blue bob, L = 0.28 m, from 30 degrees | 119/120 | 0 | 0.3 mm |
 | `carts.mp4` | red cart hits resting green cart (elastic) | 89/90 each | 0 | 0.5 / 0.3 mm |
 
-The one missed frame per object is the first one, since new tracks are confirmed on their
-second frame. These are clean synthetic videos, so expect larger errors on real footage
+These historical numbers used `--detector color`. The default is now `motion`, so they are
+not benchmarks for the new detector. The one missed frame per object is the first one, since
+new automatic tracks are confirmed on their second frame. These are clean synthetic videos, so expect larger errors on real footage
 (lighting, motion blur, the ball sitting slightly in front of the board).
 Regenerate them with `python samples/generate_samples.py`.
 
 ## Detection and tracking
 
-Two detectors, picked with `CV_DETECTOR` (or `"detector"` in a config message, see below):
+Detection is picked with `CV_DETECTOR` (or `"detector"` in a config message):
 
 | detector | what it runs | cost on a laptop CPU |
 |---|---|---|
-| `color` (default) | HSV thresholding + contours for colored objects (`red`, `orange`, `yellow`, `green`, `blue`, `purple`) | ~2-3 ms/frame |
+| `motion` (default) | Inter-frame RGB change and object edges; accepts any color but needs visible movement and a mostly steady camera | ~3 ms/frame on the synthetic ramp clip |
+| `color` (legacy opt-in) | HSV thresholding + contours for colored objects (`red`, `orange`, `yellow`, `green`, `blue`, `purple`) | ~2-3 ms/frame |
 | `mediapipe` | MediaPipe EfficientDet-Lite0, 80 COCO classes (`sports ball`, `bottle`, `cup`, ...) | ~25-30 ms/frame |
 | `both` | both of the above | ~30 ms/frame |
 
-The color detector is the reliable choice for lab setups: use a brightly colored ball, or stick
-colored tape on carts and pendulum bobs. `CV_COLORS=red,blue` limits which colors are tracked.
+For an arbitrary object, the app can send `target_px` to start a grayscale template tracker.
+For precise bounds, also send `target_bbox` (`x`, `y`, `w`, `h`) in the sent image's pixels.
+The box must include the tap and at least 8 pixels in each dimension. A tap without a box
+uses a 48 pixel square at working resolution. Selection works for stationary objects and
+objects outside model categories when the patch has visible texture or contrast. It reports
+`tracking_status: lost` and stops sending that target as an observed object when matching
+confidence drops. A reacquired object keeps its ID through up to `max_missed` processed
+frames. A selected object is reported immediately; automatic proposals still require two
+matches. The optional `color` mode remains for old clients and regression checks.
+`CV_COLORS=red,blue` limits only that legacy mode.
 The MediaPipe model (4.6 MB) downloads to `models/` on first use.
 On a headless Linux server MediaPipe also needs `libegl1` and `libgles2` from apt.
 
@@ -144,13 +154,23 @@ The app sends a `config` message on connect and whenever a setting changes
 - `px_per_m` turns on scale calibration (see Spatial mapping); `null` turns it off.
 - `target_px` is where the user tapped the object, in frame pixels. The nearest tracked object
   (within 20% of the frame width) becomes the target and is followed by ID from then on,
-  re-acquired near its last position if lost. `null` means auto: the longest-tracked object.
+  re-acquired near its last position if lost. In the default mode it also starts manual
+  tracking even if the object is not automatically detected. `null` means auto: the longest-tracked object.
+- `target_bbox` optionally gives the selected object's box in the same pixel space as `target_px`.
 - `mode` (`free_fall`, `ramp`, `pendulum`, `collision`) and `mass_kg` drive the physics stage.
 - Optional tracking keys can ride along: `detector`, `colors`, `min_area`, `mediapipe_labels`,
   `mediapipe_score`, `max_distance`, `max_missed`, `min_hits`.
 
 A valid config gets no reply (the app treats unknown message types as errors). An invalid one
 gets an `error` message and changes nothing.
+
+Each object adds `timestamp` (the frame capture timestamp) and `tracking_status` (`detected`
+or `low_confidence`). The top level adds `tracking_status` (`detected`, `low_confidence`,
+`searching`, or `lost`). `confidence` duplicates `score` for clients that want an explicit
+tracking confidence field. Existing `objects`,
+`score`, `pixel`, `bbox`, `position`, `tracked`, and physics fields retain their meaning.
+There are no predicted or simulated objects in `objects`; the physics stage resets motion
+history after a track disappears, so it will not draw a stale velocity arrow on return.
 
 Server to client, per processed frame without a configured experiment mode:
 
@@ -209,6 +229,25 @@ are `null` while there is no calibration. `target` marks the object the app shou
 named by `space`: `px` for the image you sent, `norm` for 0-1 fractions). The AR renderer can
 use it to draw a vector computed in meters: multiply `[X, Y, 1]` by the matrix and divide by
 the third component.
+
+## Current performance and limits
+
+On the bundled 45 frame `ramp.mp4`, 640 pixel working width, local CPU processing
+(decode and WebSocket transfer excluded), automatic motion mode took a median 3.0 ms/frame
+and p95 3.2 ms/frame. It returned at least one object in 39/45 frames, but a nearest-truth
+comparison had 18.8 mm median error and eight ID changes. These figures are synthetic
+fixture results, not real iPhone FPS or accuracy. A drag box initialized from the first
+frame returned the intended target on 45/45 frames, with one ID and 2.6 mm median calibrated
+error on the same clip. The selected path took a median 4.0 ms/frame and p95 4.2 ms/frame.
+It is the better choice for physics measurements.
+
+Automatic motion detection can miss stationary objects, low contrast outlines, slow motion,
+and objects merged with a busy background. Camera shake can create false proposals. Manual
+tracking can lose a featureless patch, major scale or rotation changes, or a long occlusion;
+choose a snug box around a textured object and retap after prolonged loss. MediaPipe can
+provide category detections when its model is installed, but cannot recognize every object.
+All coordinates refer to the JPEG pixels the client sends, after any client rotation; the
+client must use that same orientation for `target_px`, `target_bbox`, and overlays.
 
 ## Tests
 

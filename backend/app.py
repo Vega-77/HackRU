@@ -9,7 +9,7 @@ Protocol on ws://<host>:8000/ws/frames
            plus optional tracking settings, applied from the next frame:
            {"type": "config", "mode": "ramp", "mass_kg": 0.1, "px_per_m": 812.5,
             "target_px": {"x": 161, "y": 118}, "frame_size": {"w": 320, "h": 240},
-            "detector": "color", "colors": ["red", "blue"], ...}
+            "detector": "motion", ...}
            No reply on success (the app treats unknown message types as errors);
            an invalid config gets {"type": "error"} and changes nothing.
     text   (any time) plane calibration for metric coordinates:
@@ -44,6 +44,7 @@ from __future__ import annotations
 import asyncio
 import itertools
 import json
+import math
 import os
 import time
 from collections.abc import Callable
@@ -61,13 +62,14 @@ from cv_engine.preprocess import PreprocessedFrame, decode_jpeg, preprocess_fram
 from physics_stage import PhysicsSession
 
 WORKING_WIDTH = int(os.environ.get("CV_WORKING_WIDTH", "640"))
+MAX_FRAME_BYTES = 512 * 1024
 
 # Takes a preprocessed frame and returns result fields ("objects", "calibration").
 FrameAnalyzer = Callable[[PreprocessedFrame], dict]
 
 
 def default_config() -> PipelineConfig:
-    config = PipelineConfig(detector=os.environ.get("CV_DETECTOR", "color"))
+    config = PipelineConfig(detector=os.environ.get("CV_DETECTOR", "motion"))
     if colors := os.environ.get("CV_COLORS"):
         config.colors = [c.strip() for c in colors.split(",") if c.strip()]
     return config
@@ -136,9 +138,24 @@ async def frames_ws(ws: WebSocket) -> None:
                     else:
                         pending_meta = data
                 elif msg.get("bytes") is not None:
-                    if "frame_id" not in pending_meta:
-                        pending_meta["frame_id"] = next_id
-                    next_id = int(pending_meta["frame_id"]) + 1
+                    frame_id = pending_meta.get("frame_id", next_id)
+                    timestamp = pending_meta.get("timestamp", time.time())
+                    if (isinstance(frame_id, bool) or not isinstance(frame_id, int) or frame_id < 0
+                            or isinstance(timestamp, bool) or not isinstance(timestamp, (int, float))
+                            or not math.isfinite(timestamp)):
+                        error = {"type": "error", "message": "frame_id must be a nonnegative integer and timestamp finite"}
+                        if isinstance(frame_id, int) and not isinstance(frame_id, bool) and frame_id >= 0:
+                            error["frame_id"] = frame_id
+                        await ws.send_json(error)
+                        pending_meta = {}
+                        continue
+                    if frame_id < next_id or len(msg["bytes"]) > MAX_FRAME_BYTES:
+                        message = "frame_id must increase" if frame_id < next_id else "frame exceeds 512 KiB"
+                        await ws.send_json({"type": "error", "message": message, "frame_id": frame_id})
+                        pending_meta = {}
+                        continue
+                    pending_meta["frame_id"] = frame_id
+                    next_id = frame_id + 1
                     slot.put(IncomingFrame(msg["bytes"], pending_meta, time.time()))
                     pending_meta = {}
         finally:

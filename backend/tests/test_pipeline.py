@@ -13,7 +13,7 @@ def frame(x, frame_id):
 
 
 def test_reports_tracks_in_source_pixels_and_normalized():
-    pipe = TrackingPipeline()
+    pipe = TrackingPipeline(PipelineConfig(detector="color"))
     assert pipe(frame(300, 0))["objects"] == []  # not confirmed yet (min_hits=2)
     objs = pipe(frame(320, 1))["objects"]
     assert len(objs) == 1
@@ -44,5 +44,5 @@ def test_failed_reconfigure_keeps_old_setup():
 def test_mediapipe_mode_switch():
     pipe = TrackingPipeline(PipelineConfig(detector="both"))
     assert pipe._mediapipe is not None
-    pipe.configure(pipe.config.updated({"detector": "color"}))
+    pipe.configure(pipe.config.updated({"detector": "motion"}))
     assert pipe._mediapipe is None

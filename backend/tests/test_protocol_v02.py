@@ -17,7 +17,7 @@ APP_CONFIG = {
     "mass_kg": 0.1,
     "px_per_m": 812.5,
     "target_px": None,
-    "frame_size": {"w": 320, "h": 240},
+    "frame_size": {"w": 320, "h": 240}, "detector": "color",
 }
 
 
@@ -48,7 +48,7 @@ def test_app_config_is_accepted_silently():
 def test_pipeline_keeps_session_settings():
     pipe = TrackingPipeline()
     settings = pipe.apply_config(APP_CONFIG)
-    assert settings["session"] == {k: v for k, v in APP_CONFIG.items() if k != "type"}
+    assert settings["session"] == {**{k: v for k, v in APP_CONFIG.items() if k not in ("type", "detector")}, "target_bbox": None}
 
 
 def test_objects_in_phone_pixels_with_px_per_m_position():
@@ -78,6 +78,7 @@ def test_invalid_config_is_rejected_and_nothing_changes():
     with TestClient(app).websocket_connect("/ws/frames") as ws:
         ws.send_text(json.dumps({**APP_CONFIG, "mode": "teleport", "px_per_m": 1000}))
         assert ws.receive_json()["type"] == "error"
+        ws.send_text(json.dumps({"type": "config", "detector": "color"}))
         send_frame(ws, 0, phone_frame())
         out = send_frame(ws, 1, phone_frame())
     assert out["objects"][0]["position"] is None  # px_per_m was not applied
@@ -90,13 +91,13 @@ def test_target_px_picks_the_tapped_object():
     for i in range(2):
         out = pipe(preprocess_frame(phone_frame(balls), i, i / 15))
     (target,) = [o for o in out["objects"] if o["target"]]
-    assert target["label"] == "blue"
+    assert target["source"] == "manual"
 
     # Re-tapping the other object switches the target.
     pipe.apply_config({"type": "config", "target_px": {"x": 62, "y": 121}})
     out = pipe(preprocess_frame(phone_frame(balls), 2, 2 / 15))
     (target,) = [o for o in out["objects"] if o["target"]]
-    assert target["label"] == "red"
+    assert target["source"] == "manual" and target["pixel"]["x"] < 100
 
 
 def test_tap_far_from_any_object_tracks_nothing():

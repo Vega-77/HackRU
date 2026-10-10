@@ -86,7 +86,7 @@ class CentroidTracker:
                 self.tracks[t.id] = t
                 self._next_id += 1
 
-        return [t for t in self.tracks.values() if t.missed == 0 and t.hits >= self.min_hits]
+        return [t for t in self.tracks.values() if t.missed == 0 and (t.hits >= self.min_hits or t.source == "manual")]
 
     @staticmethod
     def _apply(t: Track, d: Detection) -> None:
