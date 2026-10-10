@@ -7,6 +7,7 @@ history) and calibration never leak between phones.
 from __future__ import annotations
 
 import logging
+import math
 from dataclasses import dataclass, field
 
 import numpy as np
@@ -54,8 +55,27 @@ def validated_session(current: dict, changes: dict) -> dict:
         raise ValueError(f"mode must be one of {EXPERIMENT_MODES}")
     if s["px_per_m"] is not None and not (isinstance(s["px_per_m"], (int, float)) and s["px_per_m"] > 0):
         raise ValueError("px_per_m must be a positive number or null")
-    if not isinstance(s["mass_kg"], (int, float)) or s["mass_kg"] <= 0:
+    if not isinstance(s["mass_kg"], (int, float)) or not math.isfinite(s["mass_kg"]) or s["mass_kg"] <= 0:
         raise ValueError("mass_kg must be a positive number")
+    angle = s.get("ramp_angle_deg")
+    if angle is not None and (
+        not isinstance(angle, (int, float)) or not math.isfinite(angle) or abs(angle) >= 90
+    ):
+        raise ValueError("ramp_angle_deg must be between -90 and 90 degrees")
+    if "sliding_body" in s and not isinstance(s["sliding_body"], bool):
+        raise ValueError("sliding_body must be a boolean")
+    pivot = s.get("pendulum_pivot_m")
+    if pivot is not None and (
+        not isinstance(pivot, dict)
+        or any(not isinstance(pivot.get(key), (int, float)) or not math.isfinite(pivot[key]) for key in ("x", "y"))
+    ):
+        raise ValueError("pendulum_pivot_m must have finite numeric x and y")
+    masses = s.get("collision_masses_kg")
+    if masses is not None and (
+        not isinstance(masses, list) or len(masses) != 2
+        or any(not isinstance(value, (int, float)) or not math.isfinite(value) or value <= 0 for value in masses)
+    ):
+        raise ValueError("collision_masses_kg must contain two positive masses")
     for key, fields in (("target_px", ("x", "y")), ("frame_size", ("w", "h"))):
         v = s[key]
         if v is not None and not (isinstance(v, dict) and all(isinstance(v.get(f), (int, float)) for f in fields)):
