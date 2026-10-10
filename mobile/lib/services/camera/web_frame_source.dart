@@ -13,17 +13,36 @@ import 'frame_source.dart';
 /// Browser camera for development in Chrome.
 ///
 /// The `camera` plugin cannot stream frames on web, so this talks to
-/// getUserMedia directly: the stream plays in a hidden-chrome `<video>`
-/// element (shown through [HtmlElementView]) and [capture] draws the current
-/// video frame onto a canvas and encodes it as JPEG.
+/// getUserMedia directly. [capture] draws from a private `<video>` that is
+/// never put on screen, and every [buildPreview] gets its own `<video>` on the
+/// same stream.
+///
+/// The previews must not share an element: calibration stays mounted under
+/// the experiment route, and handing one element to two platform views moves
+/// it in the DOM, which pauses it and freezes both the picture and the frames
+/// sent to the backend.
 class WebFrameSource implements FrameSource {
+  WebFrameSource() {
+    ui_web.platformViewRegistry.registerViewFactory(_viewType, (int _) {
+      final preview = _newVideo();
+      preview.style
+        ..width = '100%'
+        ..height = '100%'
+        ..objectFit = 'cover'
+        ..pointerEvents = 'none';
+      _previews.add(preview);
+      _attach(preview);
+      return preview;
+    });
+  }
+
   static int _nextViewId = 0;
 
   final String _viewType = 'hands-on-camera-${_nextViewId++}';
-  final web.HTMLVideoElement _video = web.HTMLVideoElement();
+  final web.HTMLVideoElement _video = _newVideo();
+  final Set<web.HTMLVideoElement> _previews = {};
   final web.HTMLCanvasElement _canvas = web.HTMLCanvasElement();
   web.MediaStream? _stream;
-  bool _registered = false;
 
   @override
   bool get isRunning => _stream != null;
@@ -58,26 +77,12 @@ class WebFrameSource implements FrameSource {
       );
     }
 
-    _video
-      ..autoplay = true
-      ..muted = true
-      ..setAttribute('playsinline', 'true')
-      ..srcObject = _stream;
-    _video.style
-      ..width = '100%'
-      ..height = '100%'
-      ..objectFit = 'cover'
-      ..pointerEvents = 'none';
-
-    if (!_registered) {
-      ui_web.platformViewRegistry.registerViewFactory(
-        _viewType,
-        (int _) => _video,
-      );
-      _registered = true;
-    }
-
-    await _video.play().toDart;
+    // Previews from closed screens have left the page; the ones still on
+    // screen (calibration, back from an experiment) need the new stream.
+    _previews
+      ..removeWhere((preview) => !preview.isConnected)
+      ..forEach(_attach);
+    _attach(_video);
     // videoWidth is 0 until the first frame's metadata arrives.
     while (_video.videoWidth == 0) {
       await Future<void>.delayed(const Duration(milliseconds: 30));
@@ -93,6 +98,9 @@ class WebFrameSource implements FrameSource {
       track.stop();
     }
     _video.srcObject = null;
+    for (final preview in _previews) {
+      preview.srcObject = null;
+    }
   }
 
   @override
@@ -121,9 +129,39 @@ class WebFrameSource implements FrameSource {
   Widget buildPreview(BuildContext context) =>
       HtmlElementView(viewType: _viewType);
 
+  /// Plays the camera stream in [video], if the camera is running.
+  void _attach(web.HTMLVideoElement video) {
+    final stream = _stream;
+    if (stream == null) return;
+    video.srcObject = stream;
+    _play(video);
+  }
+
   FrameSize _sizeForWidth(int width) {
     final height = (width * _video.videoHeight / _video.videoWidth).round();
     return FrameSize(width, height);
+  }
+
+  static web.HTMLVideoElement _newVideo() {
+    final video = web.HTMLVideoElement()
+      ..autoplay = true
+      ..muted = true
+      ..setAttribute('playsinline', 'true');
+    // Browsers pause a video when it leaves the document, and autoplay does
+    // not restart it, so a preview Flutter re-parents would stay frozen.
+    video.addEventListener(
+      'pause',
+      ((web.Event _) {
+        if (video.srcObject != null) _play(video);
+      }).toJS,
+    );
+    return video;
+  }
+
+  /// play() rejects if the element is removed again before it starts; the
+  /// pause listener retries, so the rejection is not an error.
+  static void _play(web.HTMLVideoElement video) {
+    unawaited(video.play().toDart.catchError((Object _) => null));
   }
 }
 

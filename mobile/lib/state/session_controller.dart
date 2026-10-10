@@ -109,6 +109,11 @@ class SessionController extends Notifier<SessionState> {
   bool _hasPhysics = false;
   int _framesSentThisSecond = 0;
 
+  /// Whether [start] opened the camera. Calibration usually has it open
+  /// already and is still on screen under the experiment, so [stop] must
+  /// leave it running then.
+  bool _ownsCamera = false;
+
   FrameSource get _camera => ref.read(frameSourceProvider);
 
   @override
@@ -140,6 +145,7 @@ class SessionController extends Notifier<SessionState> {
 
     final demo = ref.read(experimentSettingsProvider).demoMode;
     if (!demo) {
+      _ownsCamera = !_camera.isRunning;
       try {
         await _camera.start();
       } on CameraUnavailableException catch (e) {
@@ -198,7 +204,10 @@ class SessionController extends Notifier<SessionState> {
     // and the camera provider released the camera.
     if (!ref.mounted) return;
     _teardown();
-    await _camera.stop();
+    if (_ownsCamera) {
+      _ownsCamera = false;
+      await _camera.stop();
+    }
     if (ref.mounted) state = const SessionState();
   }
 
