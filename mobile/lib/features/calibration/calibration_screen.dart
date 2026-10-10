@@ -6,16 +6,12 @@ import 'package:go_router/go_router.dart';
 import '../../core/routing/router.dart';
 import '../../core/theme/app_icons.dart';
 import '../../core/theme/tokens.dart';
-import '../../models/experiment_mode.dart';
 import '../../models/session_config.dart';
 import '../../models/vec2.dart';
 import '../../services/camera/frame_source.dart';
-import '../../services/network/mock_physics_stream.dart';
 import '../../state/calibration_controller.dart';
 import '../../state/experiment_settings.dart';
 import '../../state/session_controller.dart';
-import '../experiment/widgets/demo_scene.dart';
-import '../home/widgets/experiment_preview.dart';
 import 'mass_steps.dart';
 import 'widgets/calibration_stage.dart';
 
@@ -25,9 +21,6 @@ import 'widgets/calibration_stage.dart';
 /// The scale matters most. The backend measures motion in pixels and
 /// divides by pixels per metre to get metres, so a ruler line that is 10 %
 /// short makes every velocity 10 % too fast.
-///
-/// In demo mode the ruler and object are already placed, so you can go
-/// straight on, or drag them to see how calibration works.
 class CalibrationScreen extends ConsumerStatefulWidget {
   const CalibrationScreen({super.key});
 
@@ -37,31 +30,21 @@ class CalibrationScreen extends ConsumerStatefulWidget {
 
 class _CalibrationScreenState extends ConsumerState<CalibrationScreen> {
   late final FrameSource _camera = ref.read(frameSourceProvider);
-  late final bool _demo = ref.read(experimentSettingsProvider).demoMode;
 
-  /// Live mode only: null while the camera starts.
+  /// Null while the camera starts.
   FrameSize? _cameraFrame;
   String? _cameraError;
-
-  FrameSize get _frameSize =>
-      _demo ? SessionController.demoFrameSize : _cameraFrame!;
 
   @override
   void initState() {
     super.initState();
-    if (_demo) {
-      WidgetsBinding.instance.addPostFrameCallback((_) => _placeDefaults());
-    } else {
-      _startCamera();
-    }
+    _startCamera();
   }
 
   @override
   void dispose() {
-    if (!_demo) {
-      final camera = _camera;
-      Future.microtask(camera.stop);
-    }
+    final camera = _camera;
+    Future.microtask(camera.stop);
     super.dispose();
   }
 
@@ -78,40 +61,15 @@ class _CalibrationScreenState extends ConsumerState<CalibrationScreen> {
     _placeDefaults();
   }
 
-  /// Puts the ruler and target somewhere sensible the first time, so there
-  /// is something to drag. In demo mode they land exactly on the scene's
-  /// 30 cm and on the object.
+  /// Puts the ruler across the middle the first time, so there is something
+  /// to drag onto a real ruler.
   void _placeDefaults() {
     final calibration = ref.read(calibrationProvider);
-    final controller = ref.read(calibrationProvider.notifier);
-    final frame = _frameSize;
-    final mode = ref.read(experimentSettingsProvider).mode;
-
-    if (calibration.rulerStart == null || calibration.rulerEnd == null) {
-      if (_demo) {
-        // The demo scene is drawn at MockPhysics.pxPerM, so the right answer
-        // is known: a 30 cm line along the top of the grid.
-        Vec2 at(double x, double y) =>
-            MockPhysics.worldToFrame(Vec2(x, y), frame);
-        controller
-          ..setRulerLength(0.30)
-          ..setRulerStart(at(0.5, 0.6))
-          ..setRulerEnd(at(0.8, 0.6));
-      } else {
-        // A starting guess across the middle; the user drags it onto a ruler.
-        controller
-          ..setRulerStart(Vec2(frame.width * 0.3, frame.height * 0.35))
-          ..setRulerEnd(Vec2(frame.width * 0.7, frame.height * 0.35));
-      }
-    }
-    if (_demo && calibration.target == null) {
-      final state = MockPhysics.sample(
-        mode,
-        ExperimentPreview.stillTime(mode),
-        frameSize: frame,
-      );
-      if (state.pixel != null) controller.setTarget(state.pixel!);
-    }
+    if (calibration.rulerStart != null && calibration.rulerEnd != null) return;
+    final frame = _cameraFrame!;
+    ref.read(calibrationProvider.notifier)
+      ..setRulerStart(Vec2(frame.width * 0.3, frame.height * 0.35))
+      ..setRulerEnd(Vec2(frame.width * 0.7, frame.height * 0.35));
   }
 
   Future<void> _startExperiment() async {
@@ -119,23 +77,21 @@ class _CalibrationScreenState extends ConsumerState<CalibrationScreen> {
     if (!mounted) return;
     // A popped route can finish disposing after this Future completes. Stop
     // its session before setup takes the shared camera back, and open the
-    // camera again if the experiment stopped it (a switch to demo data).
+    // camera again in case the experiment stopped it.
     await ref.read(sessionProvider.notifier).stop();
-    if (mounted && !_demo) await _startCamera();
+    if (mounted) await _startCamera();
   }
 
   @override
   Widget build(BuildContext context) {
     final mode = ref.watch(experimentSettingsProvider.select((s) => s.mode));
     final stage = _Stage(
-      demo: _demo,
-      frameSize: _demo ? SessionController.demoFrameSize : _cameraFrame,
+      frameSize: _cameraFrame,
       error: _cameraError,
       onRetry: _startCamera,
       camera: _camera,
-      mode: mode,
     );
-    final steps = _Steps(demo: _demo);
+    const steps = _Steps();
     final start = FilledButton(
       onPressed: _startExperiment,
       child: const Text('Start experiment'),
@@ -222,23 +178,19 @@ class _CalibrationScreenState extends ConsumerState<CalibrationScreen> {
   }
 }
 
-/// The dark picture panel: demo scene, live camera, or why there is none.
+/// The dark picture panel: the camera, or why there is none.
 class _Stage extends StatelessWidget {
   const _Stage({
-    required this.demo,
     required this.frameSize,
     required this.error,
     required this.onRetry,
     required this.camera,
-    required this.mode,
   });
 
-  final bool demo;
   final FrameSize? frameSize;
   final String? error;
   final VoidCallback onRetry;
   final FrameSource camera;
-  final ExperimentMode mode;
 
   @override
   Widget build(BuildContext context) {
@@ -255,10 +207,8 @@ class _Stage extends StatelessWidget {
     } else {
       content = CalibrationStage(
         frameSize: frame,
-        fit: demo ? DemoScene.fit : BoxFit.cover,
-        background: demo
-            ? DemoScene(mode: mode, frameSize: frame)
-            : camera.buildPreview(context),
+        fit: BoxFit.cover,
+        background: camera.buildPreview(context),
       );
     }
 
@@ -312,9 +262,7 @@ class _CameraMessage extends StatelessWidget {
 
 /// The numbered steps. Numbered because they are a real sequence.
 class _Steps extends ConsumerWidget {
-  const _Steps({required this.demo});
-
-  final bool demo;
+  const _Steps();
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -374,10 +322,9 @@ class _Steps extends ConsumerWidget {
           _Step(
             number: 1,
             title: 'Set the scale',
-            body: demo
-                ? 'The line is on a 30 cm mark. Drag its ends to try it.'
-                : 'Put a ruler in the picture, level with the experiment. '
-                      'Drag both ends of the line onto it.',
+            body:
+                'Put a ruler in the picture, level with the experiment. '
+                'Drag both ends of the line onto it.',
             done: scale != null,
             trailing: _RulerLengthField(lengthM: calibration.rulerLengthM),
             footer: Text(
@@ -561,7 +508,7 @@ class _RulerLengthFieldState extends ConsumerState<_RulerLengthField> {
   @override
   void didUpdateWidget(_RulerLengthField old) {
     super.didUpdateWidget(old);
-    // Changed elsewhere (demo defaults): show it, unless the user is typing.
+    // Changed elsewhere: show it, unless the user is typing.
     final typed = double.tryParse(_text.text.replaceAll(',', '.'));
     if (typed == null || (typed / 100 - widget.lengthM).abs() > 1e-6) {
       if (!_invalid) _text.text = _format(widget.lengthM);

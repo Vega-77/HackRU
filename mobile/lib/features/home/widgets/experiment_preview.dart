@@ -3,13 +3,12 @@ import 'package:flutter/widgets.dart';
 
 import '../../../models/experiment_mode.dart';
 import '../../../models/physics_state.dart';
-import '../../../services/network/mock_physics_stream.dart';
-import '../../../state/session_controller.dart';
-import '../../experiment/widgets/demo_scene.dart';
 import '../../experiment/widgets/vector_overlay.dart';
+import 'preview_physics.dart';
+import 'preview_scene.dart';
 
-/// A small, self-running version of the experiment screen: the demo scene
-/// with the real vector overlay on top, fed by the same mock physics.
+/// A small, self-running version of the experiment screen: a drawn scene
+/// with the real vector overlay on top, fed by [PreviewPhysics].
 ///
 /// It is the actual component, not an illustration of it, so what you see
 /// on the home screen is what the experiment screen will draw.
@@ -44,7 +43,7 @@ class ExperimentPreview extends StatefulWidget {
 
 class _ExperimentPreviewState extends State<ExperimentPreview>
     with SingleTickerProviderStateMixin {
-  static const _frameSize = SessionController.demoFrameSize;
+  static const _frameSize = PreviewPhysics.frameSize;
 
   /// Same rate as the real data, so the overlay's smoothing looks the same.
   static const _step = Duration(milliseconds: 66);
@@ -57,7 +56,7 @@ class _ExperimentPreviewState extends State<ExperimentPreview>
       widget.animate && !MediaQuery.disableAnimationsOf(context);
 
   PhysicsState _sample(double t) =>
-      MockPhysics.sample(widget.mode, t, frameSize: _frameSize);
+      PreviewPhysics.sample(widget.mode, t, frameSize: _frameSize);
 
   @override
   void didChangeDependencies() {
@@ -106,7 +105,7 @@ class _ExperimentPreviewState extends State<ExperimentPreview>
       child: Stack(
         fit: StackFit.expand,
         children: [
-          DemoScene(
+          PreviewScene(
             mode: widget.mode,
             frameSize: _frameSize,
             t: _state.t,
@@ -116,11 +115,11 @@ class _ExperimentPreviewState extends State<ExperimentPreview>
             state: _state,
             frameSize: _frameSize,
             massKg: 0.1,
-            fit: DemoScene.fit,
+            fit: PreviewScene.fit,
             showTrail: widget.animate,
             showLabels: widget.showLabels,
             tether: isPendulum
-                ? DemoScene.tetherFor(widget.mode, _frameSize)
+                ? PreviewScene.tetherFor(widget.mode, _frameSize)
                 : null,
           ),
         ],

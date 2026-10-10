@@ -86,7 +86,7 @@ class TrailDot {
 }
 
 /// Draws the object marker, its trail, and colour-coded arrows for
-/// velocity, acceleration and forces, on top of the camera or demo scene.
+/// velocity, acceleration and forces, on top of the camera or a preview.
 ///
 /// Inputs are already smoothed (see `OverlayFrame.approach`); this class
 /// only draws. It repaints whenever [frame] changes, without a widget

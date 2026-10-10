@@ -14,8 +14,8 @@ import 'vector_overlay_painter.dart';
 /// The live vector overlay: give it the newest [state] and it eases the
 /// drawn arrows towards it on every screen refresh.
 ///
-/// Sits on top of the camera preview (or demo scene) and must be given the
-/// same [fit], so frame pixels line up with what the user sees.
+/// Sits on top of the camera preview (or a home screen preview) and must be
+/// given the same [fit], so frame pixels line up with what the user sees.
 ///
 /// Animation stops by itself once the arrows have caught up, and is
 /// skipped entirely when the system asks for reduced motion.

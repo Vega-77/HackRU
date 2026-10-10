@@ -399,7 +399,7 @@ class _ModeRow extends StatelessWidget {
   }
 }
 
-/// The primary action, pinned to the bottom, plus where the data comes from.
+/// The primary action, pinned to the bottom, plus which backend measures it.
 class _StartBar extends ConsumerWidget {
   const _StartBar({required this.mode});
 
@@ -407,9 +407,6 @@ class _StartBar extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final demo = ref.watch(
-      experimentSettingsProvider.select((s) => s.demoMode),
-    );
     final url = ref.watch(
       experimentSettingsProvider.select((s) => s.backendUrl),
     );
@@ -448,14 +445,9 @@ class _StartBar extends ConsumerWidget {
                       foregroundColor: scheme.onSurfaceVariant,
                       textStyle: AppType.caption.copyWith(fontSize: 13),
                     ),
-                    icon: Icon(
-                      demo ? AppIcons.flask : AppIcons.broadcast,
-                      size: 16,
-                    ),
+                    icon: const Icon(AppIcons.broadcast, size: 16),
                     label: Text(
-                      demo
-                          ? 'Using demo data. Connect a backend in Settings.'
-                          : 'Live from ${Uri.tryParse(url)?.authority ?? url}',
+                      'Live from ${Uri.tryParse(url)?.authority ?? url}',
                       overflow: TextOverflow.ellipsis,
                     ),
                   ),

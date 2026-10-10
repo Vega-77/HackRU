@@ -1,14 +1,14 @@
 """Stand-in physics backend that speaks docs/protocol.md.
 
 It ignores the image content and replies to every frame with a synthetic
-trajectory, so the app's live mode (camera -> socket -> overlay) can be
+trajectory, so the app's pipeline (camera -> socket -> overlay) can be
 tested before the real backend exists.
 
     pip install websockets
     python mobile/tool/mock_server.py              # ws://0.0.0.0:8000/ws/frames
     python mobile/tool/mock_server.py --delay 0.08 # simulate 80 ms of CV work
 
-Then run the app with demo mode off and the backend URL set to
+Then set the app's backend address (Settings) to
 ws://<this machine's LAN IP>:8000/ws/frames (or ws://localhost:8000/ws/frames
 in Chrome). Same port and path as the real backend, so stop one before
 starting the other.
@@ -84,7 +84,7 @@ def state_for(config, frame_id, capture_t, sim_t):
     m = config.get("mass_kg", 0.1)
     fw, fh = config["frame_size"]["w"], config["frame_size"]["h"]
     pos, vel, acc, forces, energy, extras = MODES.get(config.get("mode"), ramp)(sim_t, m)
-    px_per_m = fh / 0.65  # same framing as the app's MockPhysics
+    px_per_m = fh / 0.65  # same framing as the app's PreviewPhysics
     px, py = pos[0] * px_per_m, fh - pos[1] * px_per_m
     return {
         "type": "state",

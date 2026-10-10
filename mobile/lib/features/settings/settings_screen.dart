@@ -11,17 +11,12 @@ import '../../core/theme/tokens.dart';
 import '../../state/experiment_settings.dart';
 import 'backend_url.dart';
 
-/// Where the data comes from: simulated, or the team's backend.
-class SettingsScreen extends ConsumerWidget {
+/// Which backend the camera streams to.
+class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final demo = ref.watch(
-      experimentSettingsProvider.select((s) => s.demoMode),
-    );
-    final settings = ref.read(experimentSettingsProvider.notifier);
-
+  Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Settings'),
@@ -46,7 +41,7 @@ class SettingsScreen extends ConsumerWidget {
                 AppSpace.xxl,
               ),
               children: [
-                const _SectionTitle('Data source'),
+                const _SectionTitle('Backend'),
                 Padding(
                   padding: const EdgeInsets.fromLTRB(
                     AppSpace.xs,
@@ -55,46 +50,15 @@ class SettingsScreen extends ConsumerWidget {
                     AppSpace.md,
                   ),
                   child: Text(
-                    'Choose a simulation for demos or connect a live camera stream.',
+                    'Your camera streams to the backend, which tracks the '
+                    'object and sends the physics back. With no camera, a '
+                    'test video stands in.',
                     style: AppType.body.copyWith(
                       color: Theme.of(context).colorScheme.onSurfaceVariant,
                     ),
                   ),
                 ),
-                RadioGroup<bool>(
-                  groupValue: demo,
-                  onChanged: (value) {
-                    if (value != null) settings.setDemoMode(value);
-                  },
-                  child: const Column(
-                    children: [
-                      _SourceOption(
-                        value: true,
-                        title: 'Demo data',
-                        body:
-                            'Simulated experiments. No camera or backend '
-                            'needed, so it works anywhere.',
-                      ),
-                      SizedBox(height: AppSpace.sm),
-                      _SourceOption(
-                        value: false,
-                        title: 'Live backend',
-                        body:
-                            'Your camera streams to the backend, which '
-                            'tracks the object and sends the physics back. '
-                            'With no camera, a test video stands in.',
-                      ),
-                    ],
-                  ),
-                ),
-                AnimatedSize(
-                  duration: AppMotion.standard,
-                  curve: AppMotion.ease,
-                  alignment: Alignment.topCenter,
-                  child: demo
-                      ? const SizedBox(width: double.infinity)
-                      : const _BackendForm(),
-                ),
+                const _BackendForm(),
                 const _About(),
               ],
             ),
@@ -122,53 +86,6 @@ class _SectionTitle extends StatelessWidget {
       child: Semantics(
         header: true,
         child: Text(text, style: Theme.of(context).textTheme.titleLarge),
-      ),
-    );
-  }
-}
-
-/// One choice of data source, as a whole tappable panel.
-class _SourceOption extends StatelessWidget {
-  const _SourceOption({
-    required this.value,
-    required this.title,
-    required this.body,
-  });
-
-  final bool value;
-  final String title;
-  final String body;
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    final selected = RadioGroup.maybeOf<bool>(context)?.groupValue == value;
-    return Material(
-      color: scheme.surfaceContainer,
-      shape: RoundedRectangleBorder(
-        borderRadius: AppRadii.panelAll,
-        side: BorderSide(
-          color: selected ? scheme.primary : scheme.outline,
-          width: selected ? 1.5 : 1,
-        ),
-      ),
-      clipBehavior: Clip.antiAlias,
-      child: RadioListTile<bool>(
-        value: value,
-        contentPadding: const EdgeInsets.fromLTRB(
-          AppSpace.sm,
-          AppSpace.xs,
-          AppSpace.lg,
-          AppSpace.xs,
-        ),
-        title: Text(title, style: AppType.bodyStrong.copyWith(fontSize: 16)),
-        subtitle: Text(
-          body,
-          style: AppType.caption.copyWith(
-            fontSize: 13,
-            color: scheme.onSurfaceVariant,
-          ),
-        ),
       ),
     );
   }
@@ -204,8 +121,8 @@ class _BackendFormState extends ConsumerState<_BackendForm> {
   void initState() {
     super.initState();
     _settings = ref.read(experimentSettingsProvider.notifier);
-    // Choosing Live backend checks it straight away. For the hosted server
-    // that also wakes it up while the user sets up the experiment.
+    // Opening Settings checks the backend straight away. For the hosted
+    // server that also wakes it up while the user sets up the experiment.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) _runTest();
     });
@@ -274,7 +191,7 @@ class _BackendFormState extends ConsumerState<_BackendForm> {
     final scheme = Theme.of(context).colorScheme;
 
     return Padding(
-      padding: const EdgeInsets.only(top: AppSpace.xl),
+      padding: const EdgeInsets.only(top: AppSpace.sm),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [

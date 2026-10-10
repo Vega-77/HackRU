@@ -1,5 +1,5 @@
 /// App-wide constants. Values the user can change at runtime (backend URL,
-/// demo mode) start from here and live in `state/experiment_settings.dart`.
+/// mass) start from here and live in `state/experiment_settings.dart`.
 abstract final class AppConfig {
   /// Default backend WebSocket URL: the team's backend on Render (see
   /// `render.yaml` at the repo root). Override at build time with
@@ -7,12 +7,6 @@ abstract final class AppConfig {
   static const String defaultBackendUrl = String.fromEnvironment(
     'BACKEND_URL',
     defaultValue: 'wss://handson-physics-backend.onrender.com/ws/frames',
-  );
-
-  /// Start in demo mode (synthetic data, no backend) unless told otherwise.
-  static const bool startInDemoMode = bool.fromEnvironment(
-    'DEMO_MODE',
-    defaultValue: true,
   );
 
   // Frame streaming, see docs/protocol.md.

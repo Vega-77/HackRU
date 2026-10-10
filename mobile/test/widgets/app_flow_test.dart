@@ -44,8 +44,8 @@ class _FakeCamera implements FrameSource {
   Widget buildPreview(BuildContext context) => const SizedBox.expand();
 }
 
-/// Smoke tests for the whole demo flow, at iPhone size. They catch layout
-/// overflows and crashes that unit tests can't see.
+/// Smoke tests for the whole flow, at iPhone size, with a fake camera. They
+/// catch layout overflows and crashes that unit tests can't see.
 void main() {
   late _FakeCamera camera;
 
@@ -98,47 +98,38 @@ void main() {
     await unmount(tester);
   });
 
-  testWidgets('demo flow runs from home to the experiment without a camera', (
+  testWidgets('flow runs from home to the experiment on the camera', (
     tester,
   ) async {
     final container = await pumpApp(tester);
+    expect(find.textContaining('Live from'), findsOneWidget);
 
     await tester.tap(find.textContaining('Set up'));
     await tester.pump(const Duration(milliseconds: 600));
     expect(find.text('Start experiment'), findsOneWidget);
     expect(find.text('Set the scale'), findsOneWidget);
+    expect(camera.isRunning, isTrue, reason: 'setup shows the camera');
 
     await tester.tap(find.text('Start experiment'));
     await tester.pump(const Duration(milliseconds: 600));
     await tester.pump(const Duration(seconds: 1));
 
-    final session = container.read(sessionProvider);
-    expect(session.phase, SessionPhase.running);
-    expect(session.latest, isNotNull, reason: 'the mock is streaming');
-    expect(camera.starts, 0, reason: 'demo mode never opens the camera');
-    expect(find.text('Demo'), findsOneWidget);
+    expect(container.read(sessionProvider).phase, SessionPhase.running);
+    expect(camera.starts, 1, reason: 'the experiment reuses the setup camera');
 
     await unmount(tester);
   });
 
-  testWidgets('settings switches to live and checks the address', (
-    tester,
-  ) async {
+  testWidgets('settings checks the backend address', (tester) async {
     final container = await pumpApp(tester, at: Routes.settings);
 
-    expect(find.text('Data source'), findsOneWidget);
-    expect(find.text('Backend address'), findsNothing);
-
-    await tester.tap(find.text('Live backend'));
-    await tester.pump(const Duration(milliseconds: 400));
-    expect(container.read(experimentSettingsProvider).demoMode, isFalse);
     expect(find.text('Backend address'), findsOneWidget);
     // The form tests the address after its first frame.
     await tester.pump(const Duration(milliseconds: 400));
     expect(
       find.text('Connected in 12 ms'),
       findsOneWidget,
-      reason: 'choosing live checks the hosted backend straight away',
+      reason: 'opening settings checks the hosted backend straight away',
     );
     expect(find.text('Use the hosted backend'), findsNothing);
 
@@ -168,19 +159,10 @@ void main() {
     await unmount(tester);
   });
 
-  testWidgets('live camera resumes on setup after an experiment', (
-    tester,
-  ) async {
+  testWidgets('camera stays on for setup after an experiment', (tester) async {
     final container = await pumpApp(tester);
     tester.view.physicalSize = const Size(600, 900) * 3;
     await tester.pump();
-
-    await tester.tap(find.byTooltip('Settings'));
-    await tester.pump(const Duration(milliseconds: 600));
-    await tester.tap(find.text('Live backend'));
-    await tester.pump(const Duration(milliseconds: 400));
-    await tester.tap(find.byTooltip('Back'));
-    await tester.pump(const Duration(milliseconds: 600));
 
     await tester.tap(find.textContaining('Set up'));
     await tester.pump(const Duration(milliseconds: 600));
