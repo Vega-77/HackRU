@@ -1,0 +1,5 @@
+# Keep LF in the repo and working copy so Windows and Mac teammates match.
+* text=auto eol=lf
+*.ttf binary
+*.png binary
+*.jpg binary
