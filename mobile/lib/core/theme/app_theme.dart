@@ -9,22 +9,22 @@ import 'tokens.dart';
 /// no Material widget can accidentally paint chrome green or red.
 abstract final class AppTheme {
   static ThemeData light() => _build(
-        brightness: Brightness.light,
-        background: AppColors.vellum,
-        surface: AppColors.vellumRaised,
-        ink: AppColors.graphite,
-        inkMuted: AppColors.inkMuted,
-        rule: AppColors.rule,
-      );
+    brightness: Brightness.light,
+    background: AppColors.vellum,
+    surface: AppColors.vellumRaised,
+    ink: AppColors.graphite,
+    inkMuted: AppColors.inkMuted,
+    rule: AppColors.rule,
+  );
 
   static ThemeData dark() => _build(
-        brightness: Brightness.dark,
-        background: AppColors.graphiteDeep,
-        surface: AppColors.graphiteRaised,
-        ink: AppColors.vellum,
-        inkMuted: AppColors.inkMutedDark,
-        rule: AppColors.ruleDark,
-      );
+    brightness: Brightness.dark,
+    background: AppColors.graphiteDeep,
+    surface: AppColors.graphiteRaised,
+    ink: AppColors.vellum,
+    inkMuted: AppColors.inkMutedDark,
+    rule: AppColors.ruleDark,
+  );
 
   static ThemeData _build({
     required Brightness brightness,
@@ -160,7 +160,8 @@ abstract final class AppTheme {
       ),
       switchTheme: SwitchThemeData(
         thumbColor: WidgetStateProperty.resolveWith(
-          (states) => states.contains(WidgetState.selected) ? background : inkMuted,
+          (states) =>
+              states.contains(WidgetState.selected) ? background : inkMuted,
         ),
         trackColor: WidgetStateProperty.resolveWith(
           (states) => states.contains(WidgetState.selected) ? ink : surface,

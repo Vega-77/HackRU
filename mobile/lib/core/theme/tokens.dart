@@ -50,21 +50,17 @@ abstract final class AppType {
     double letterSpacing = 0,
     bool tabular = false,
     bool italic = false,
-  }) =>
-      TextStyle(
-        fontFamily: family,
-        fontSize: size,
-        height: height,
-        letterSpacing: letterSpacing,
-        // fontWeight is the fallback when variations are unsupported.
-        fontWeight: FontWeight.values[((weight / 100).round() - 1).clamp(0, 8)],
-        fontStyle: italic ? FontStyle.italic : FontStyle.normal,
-        fontVariations: [
-          FontVariation.weight(weight),
-          FontVariation.width(width),
-        ],
-        fontFeatures: tabular ? const [FontFeature.tabularFigures()] : null,
-      );
+  }) => TextStyle(
+    fontFamily: family,
+    fontSize: size,
+    height: height,
+    letterSpacing: letterSpacing,
+    // fontWeight is the fallback when variations are unsupported.
+    fontWeight: FontWeight.values[((weight / 100).round() - 1).clamp(0, 8)],
+    fontStyle: italic ? FontStyle.italic : FontStyle.normal,
+    fontVariations: [FontVariation.weight(weight), FontVariation.width(width)],
+    fontFeatures: tabular ? const [FontFeature.tabularFigures()] : null,
+  );
 
   /// Screen titles. Wide and heavy, set tight.
   static final display = _archivo(
@@ -76,7 +72,12 @@ abstract final class AppType {
   );
 
   /// Section and sheet titles.
-  static final title = _archivo(size: 20, weight: 650, width: 115, height: 1.15);
+  static final title = _archivo(
+    size: 20,
+    weight: 650,
+    width: 115,
+    height: 1.15,
+  );
 
   static final body = _archivo(size: 15, weight: 400, height: 1.45);
 
@@ -145,4 +146,8 @@ abstract final class AppMotion {
   /// Fraction of the remaining distance an arrow closes per 60 Hz tick.
   /// About 0.25 settles in roughly 150 ms, which hides jitter without lag.
   static const double arrowSmoothing = 0.25;
+
+  /// The same for the object marker. Faster than the arrows, so the
+  /// marker stays on the object in the camera feed.
+  static const double markerSmoothing = 0.5;
 }
