@@ -8,9 +8,9 @@ from app import app
 from cv_engine.preprocess import encode_jpeg
 
 
-def frame_bytes():
+def frame_bytes(x=200):
     img = np.full((480, 1280, 3), 90, np.uint8)
-    cv2.circle(img, (200, 200), 40, (0, 0, 255), -1)
+    cv2.circle(img, (x, 200), 40, (0, 0, 255), -1)
     return encode_jpeg(img)
 
 
@@ -42,3 +42,25 @@ def test_bad_image_reports_error_and_keeps_connection():
         assert ws.receive_json()["type"] == "error"
         ws.send_bytes(frame_bytes())
         assert ws.receive_json()["type"] == "frame"
+
+
+def test_tracked_object_reported_after_two_frames():
+    with TestClient(app).websocket_connect("/ws/frames") as ws:
+        ws.send_bytes(frame_bytes(200))
+        assert ws.receive_json()["objects"] == []
+        ws.send_bytes(frame_bytes(220))
+        objs = ws.receive_json()["objects"]
+    assert len(objs) == 1 and objs[0]["label"] == "red"
+    assert abs(objs[0]["centroid"][0] - 220) < 3 and abs(objs[0]["centroid"][1] - 200) < 3
+
+
+def test_config_message_changes_colors():
+    with TestClient(app).websocket_connect("/ws/frames") as ws:
+        ws.send_text(json.dumps({"type": "config", "colors": ["blue"]}))
+        assert ws.receive_json()["config"]["colors"] == ["blue"]
+        ws.send_bytes(frame_bytes(200))
+        ws.receive_json()
+        ws.send_bytes(frame_bytes(220))
+        assert ws.receive_json()["objects"] == []  # red ball is no longer tracked
+        ws.send_text(json.dumps({"type": "config", "colors": ["chartreuse"]}))
+        assert ws.receive_json()["type"] == "error"

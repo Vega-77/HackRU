@@ -90,6 +90,8 @@ def _report(sent: int, bytes_sent: int, results: list[dict], elapsed: float) -> 
         f"{bytes_sent / sent / 1024:.1f} KB/frame) | processed {last['stats']['processed']} "
         f"dropped {last['stats']['dropped']} | latency {lat:.1f} ms, process {proc:.1f} ms"
     )
+    for o in last.get("objects", []):
+        print(f"    #{o['id']} {o['label']:<12} centroid {o['centroid']}  bbox {o['bbox']}")
 
 
 def main() -> None:

@@ -5,12 +5,16 @@ Protocol on ws://<host>:8000/ws/frames
     text   (optional) JSON metadata for the next image, e.g.
            {"frame_id": 12, "timestamp": 1728575000.123, "anchor": {...}}
     binary JPEG (or PNG) bytes of one downsampled camera frame
+    text   (any time) tracking settings, applied from the next frame:
+           {"type": "config", "mode": "color", "colors": ["red", "blue"], ...}
+           answered with {"type": "config", "config": {...}}
   server -> client
     text   JSON result for each frame that was processed:
            {"type": "frame", "frame_id", "timestamp", "size": [w, h],
             "source_size": [w, h], "scale", "latency_ms", "process_ms",
             "stats": {"received", "processed", "dropped", "decode_errors"},
-            "objects": []}
+            "objects": [{"id", "label", "source", "score", "centroid", "bbox",
+                         "centroid_norm", "bbox_norm", "area", "hits"}]}
            or {"type": "error", "message": ...} for a bad message.
 
 Frames that arrive while the engine is busy are dropped in favour of the newest
@@ -30,17 +34,20 @@ from dataclasses import dataclass
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 
 from cv_engine.frame_slot import LatestFrameSlot
+from cv_engine.pipeline import PipelineConfig, TrackingPipeline
 from cv_engine.preprocess import PreprocessedFrame, decode_jpeg, preprocess_frame
 
 WORKING_WIDTH = int(os.environ.get("CV_WORKING_WIDTH", "640"))
 
-# Hook for the tracking stage: takes a preprocessed frame, returns detected objects.
-# Step 1 has no tracker yet, so it reports nothing.
+# Takes a preprocessed frame and returns the tracked objects in it.
 FrameAnalyzer = Callable[[PreprocessedFrame], list[dict]]
 
 
-def no_objects(_: PreprocessedFrame) -> list[dict]:
-    return []
+def default_config() -> PipelineConfig:
+    config = PipelineConfig(mode=os.environ.get("CV_MODE", "color"))
+    if colors := os.environ.get("CV_COLORS"):
+        config.colors = [c.strip() for c in colors.split(",") if c.strip()]
+    return config
 
 
 @dataclass
@@ -51,7 +58,7 @@ class IncomingFrame:
 
 
 app = FastAPI(title="HandsOn Physics CV engine")
-app.state.analyzer = no_objects
+app.state.pipeline_factory = lambda: TrackingPipeline(default_config())
 
 
 @app.get("/health")
@@ -64,7 +71,7 @@ async def frames_ws(ws: WebSocket) -> None:
     await ws.accept()
     slot: LatestFrameSlot[IncomingFrame] = LatestFrameSlot()
     stats = {"processed": 0, "decode_errors": 0}
-    analyzer: FrameAnalyzer = ws.app.state.analyzer
+    pipeline = ws.app.state.pipeline_factory()
     next_id = 0
 
     async def receive_loop() -> None:
@@ -77,12 +84,17 @@ async def frames_ws(ws: WebSocket) -> None:
                     return
                 if msg.get("text") is not None:
                     try:
-                        pending_meta = json.loads(msg["text"])
-                        if not isinstance(pending_meta, dict):
+                        data = json.loads(msg["text"])
+                        if not isinstance(data, dict):
                             raise ValueError("metadata must be a JSON object")
                     except ValueError as e:
                         pending_meta = {}
                         await ws.send_json({"type": "error", "message": f"bad metadata: {e}"})
+                        continue
+                    if data.get("type") == "config":
+                        await apply_config({k: v for k, v in data.items() if k != "type"})
+                    else:
+                        pending_meta = data
                 elif msg.get("bytes") is not None:
                     if "frame_id" not in pending_meta:
                         pending_meta["frame_id"] = next_id
@@ -92,11 +104,25 @@ async def frames_ws(ws: WebSocket) -> None:
         finally:
             slot.close()
 
+    # Serializes reconfiguration with frame processing, which runs in a worker thread.
+    pipeline_lock = asyncio.Lock()
+
+    async def apply_config(changes: dict) -> None:
+        try:
+            async with pipeline_lock:
+                new = pipeline.config.updated(changes)
+                await asyncio.to_thread(pipeline.configure, new)
+        except (TypeError, ValueError, OSError, RuntimeError) as e:
+            await ws.send_json({"type": "error", "message": f"bad config: {e}"})
+            return
+        await ws.send_json({"type": "config", "config": pipeline.config.__dict__})
+
     async def process_loop() -> None:
         while (frame := await slot.get()) is not None:
             t0 = time.perf_counter()
             try:
-                result = await asyncio.to_thread(_process, frame, analyzer)
+                async with pipeline_lock:
+                    result = await asyncio.to_thread(_process, frame, pipeline)
             except ValueError as e:
                 stats["decode_errors"] += 1
                 await ws.send_json({"type": "error", "message": str(e), "frame_id": frame.meta["frame_id"]})
@@ -117,6 +143,7 @@ async def frames_ws(ws: WebSocket) -> None:
     finally:
         receiver.cancel()
         processor.cancel()
+        pipeline.close()
 
 
 def _process(frame: IncomingFrame, analyzer: FrameAnalyzer) -> dict:
