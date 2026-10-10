@@ -62,7 +62,7 @@ class ManualTracker:
             tw, th = max(8, round(w * scale)), max(8, round(h * scale))
             if search.shape[0] < th or search.shape[1] < tw:
                 continue
-            template = self.template if (tw, th) == (w, h) else cv2.resize(self.template, (tw, th))
+            template = self.template if self.template.shape[::-1] == (tw, th) else cv2.resize(self.template, (tw, th))
             scores = cv2.matchTemplate(search, template, cv2.TM_SQDIFF_NORMED)
             _, _, location, _ = cv2.minMaxLoc(scores)
             matched = search[location[1]:location[1] + th, location[0]:location[0] + tw]

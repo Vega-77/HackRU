@@ -75,6 +75,27 @@ void main() {
       expect(message.frameId, isNull);
     });
 
+    test('a crashed frame says where the backend failed', () {
+      final message = ServerMessage.parse(
+        '{"type":"error","message":"could not process frame: ValueError: x",'
+        '"frame_id":4,"error":{"kind":"ValueError","detail":"x",'
+        '"where":"backend/cv_engine/universal.py:69 in detect",'
+        '"server":"209bcec"}}',
+      );
+      final error = message as ErrorMessage;
+      expect(error.frameId, 4);
+      expect(error.where, 'backend/cv_engine/universal.py:69 in detect');
+      expect(error.serverVersion, '209bcec');
+    });
+
+    test('a malformed error object is ignored', () {
+      final message = ServerMessage.parse(
+        '{"type":"error","message":"oops","error":"not an object"}',
+      );
+      expect((message as ErrorMessage).where, isNull);
+      expect(message.serverVersion, isNull);
+    });
+
     test('a frame decode error names the frame', () {
       final message = ServerMessage.parse(
         '{"type":"error","message":"could not decode image bytes","frame_id":9}',

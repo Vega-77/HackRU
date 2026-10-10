@@ -178,7 +178,10 @@ straight up (gravity is exactly -Y); on a table +X is right and +Y points away f
 `offset_m` lifts the plane towards the camera, e.g. by a ball's radius, so positions are its
 centre. Objects then also report `position_3d` in ARKit world coordinates (metres, +Y up), and
 `state` replies add `position_3d`, `velocity_3d`, `acceleration_3d` and `forces_3d`. The
-status is `no_pose` while frames arrive without a pose. ArUco or manual calibration, when set,
+status is `no_pose` while frames arrive without a pose. The motion detector also uses the
+pose: it aligns each frame to its background view through the surface instead of ORB features,
+so a plain, textureless board or table still works while the phone moves (picking a new
+surface restarts its background). ArUco or manual calibration, when set,
 takes priority; `ar_plane` takes priority over `px_per_m`.
 
 **From the app's ruler (`px_per_m`).** If the app's config message has `px_per_m`, the server
