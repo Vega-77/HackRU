@@ -95,6 +95,36 @@ void main() {
       expect(message.objects, isEmpty);
     });
 
+    test('a frame report turns its target into a position-only state', () {
+      // Object shape from Dev 2's backend/README.md.
+      const raw = '''
+      {"type": "frame", "frame_id": 7, "timestamp": 2.5, "tracked": true,
+       "target_id": 1,
+       "objects": [
+         {"id": 2, "label": "blue", "target": false,
+          "pixel": {"x": 10, "y": 10}, "bbox": {"x": 0, "y": 0, "w": 20, "h": 20}},
+         {"id": 1, "label": "red", "target": true,
+          "pixel": {"x": 160.5, "y": 120}, "bbox": {"x": 150, "y": 110, "w": 21, "h": 20},
+          "position": {"x": 0.2, "y": 0.15}}
+       ]}''';
+      final message = ServerMessage.parse(raw) as FrameAckMessage;
+      final target = message.target!;
+      expect(target.frameId, 7);
+      expect(target.t, 2.5);
+      expect(target.tracked, isTrue);
+      expect(target.pixel!.x, 160.5);
+      expect(target.bbox!.w, 21);
+      expect(target.position!.y, 0.15);
+      expect(target.velocity, isNull, reason: 'CV knows place, not motion');
+    });
+
+    test('a frame report without a target has no state', () {
+      const raw = '''
+      {"type": "frame", "frame_id": 3, "tracked": false, "objects": [
+        {"id": 2, "target": false, "pixel": {"x": 1, "y": 2}}]}''';
+      expect((ServerMessage.parse(raw) as FrameAckMessage).target, isNull);
+    });
+
     test('garbage becomes UnknownMessage', () {
       expect(ServerMessage.parse('not json'), isA<UnknownMessage>());
       expect(ServerMessage.parse('[1,2]'), isA<UnknownMessage>());

@@ -193,13 +193,14 @@ class StateMessage extends ServerMessage {
   int get frameId => state.frameId;
 }
 
-/// The CV engine's per-frame report (`type: frame`). It arrives before the
-/// physics stage exists, and carries detected objects in frame pixels.
+/// The CV engine's per-frame report (`type: frame`). Until the physics
+/// stage sends `state`, it is the only sign of where the object is.
 class FrameAckMessage extends ServerMessage {
   const FrameAckMessage({
     required this.frameId,
     this.processMs,
     this.objects = const [],
+    this.target,
   });
 
   @override
@@ -208,17 +209,37 @@ class FrameAckMessage extends ServerMessage {
   /// Time the backend spent on this frame.
   final double? processMs;
 
-  /// Raw detections; their shape is still being designed by the backend.
+  /// Every detection, as sent. See docs/protocol.md for the fields.
   final List<Map<String, dynamic>> objects;
 
+  /// The object the backend is following (`"target": true`), as a state
+  /// with only its place filled in: no velocity, acceleration or forces.
+  /// Null when nothing is marked as the target.
+  final PhysicsState? target;
+
   factory FrameAckMessage.fromJson(Map<String, dynamic> json) {
+    final frameId = (json['frame_id'] as num?)?.toInt() ?? -1;
     final rawObjects = json['objects'];
+    final objects = rawObjects is List
+        ? rawObjects.whereType<Map<String, dynamic>>().toList()
+        : const <Map<String, dynamic>>[];
+    final followed = objects.where((o) => o['target'] == true).firstOrNull;
+    final pixel = followed == null ? null : Vec2.tryParse(followed['pixel']);
+
     return FrameAckMessage(
-      frameId: (json['frame_id'] as num?)?.toInt() ?? -1,
+      frameId: frameId,
       processMs: (json['process_ms'] as num?)?.toDouble(),
-      objects: rawObjects is List
-          ? rawObjects.whereType<Map<String, dynamic>>().toList()
-          : const [],
+      objects: objects,
+      target: pixel == null
+          ? null
+          : PhysicsState(
+              frameId: frameId,
+              t: (json['timestamp'] as num?)?.toDouble() ?? 0,
+              tracked: json['tracked'] != false,
+              pixel: pixel,
+              bbox: PixelRect.tryParse(followed!['bbox']),
+              position: Vec2.tryParse(followed['position']),
+            ),
     );
   }
 }

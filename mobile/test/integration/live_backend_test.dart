@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:hands_on_physics/models/experiment_mode.dart';
 import 'package:hands_on_physics/models/physics_state.dart';
 import 'package:hands_on_physics/models/session_config.dart';
+import 'package:hands_on_physics/models/vec2.dart';
 import 'package:hands_on_physics/services/network/physics_socket.dart';
 import 'package:image/image.dart' as img;
 
@@ -60,21 +61,39 @@ void main() {
       expect(reply.frameId, inInclusiveRange(0, sent - 1));
     }
     expect(socket.latencyMs, isNotNull);
+
+    // A CV report comes from looking at our pixels, so it should find the
+    // ball where it was drawn. (tool/mock_server.py ignores the image and
+    // sends `state` instead, so it skips this.)
+    final reports = replies.whereType<FrameAckMessage>().toList();
+    final located = [for (final report in reports) ?report.target];
+    if (reports.isNotEmpty) {
+      expect(located, isNotEmpty, reason: 'the red ball was never found');
+    }
+    for (final state in located) {
+      final drawnAt = _ballCentre(state.frameId);
+      expect(state.pixel!.x, closeTo(drawnAt.x, 12));
+      expect(state.pixel!.y, closeTo(drawnAt.y, 12));
+    }
     // ignore: avoid_print
     print(
-      '${replies.length} replies to $sent frames, '
-      'latency ${socket.latencyMs!.toStringAsFixed(1)} ms',
+      '${replies.length} replies to $sent frames, ${located.length} with '
+      'the ball, latency ${socket.latencyMs!.toStringAsFixed(1)} ms',
     );
   }, skip: url == null ? 'set LIVE_BACKEND_URL to run' : false);
 }
 
+/// Where frame [i]'s ball is drawn: moving right along the middle.
+Vec2 _ballCentre(int i) => Vec2(20.0 + i * 9, 120);
+
 Uint8List _ballFrame(FrameSize size, int i) {
   final image = img.Image(width: size.width, height: size.height)
     ..clear(img.ColorRgb8(90, 90, 90));
+  final centre = _ballCentre(i);
   img.fillCircle(
     image,
-    x: 20 + i * 9,
-    y: size.height ~/ 2,
+    x: centre.x.round(),
+    y: centre.y.round(),
     radius: 14,
     color: img.ColorRgb8(220, 30, 30),
   );

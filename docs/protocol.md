@@ -94,15 +94,25 @@ flow control and to measure round-trip latency.
 
 ### `frame` (text, JSON): CV engine report
 
-What `backend/app.py` sends today, before tracking and physics exist. The app
-uses it for flow control and latency, and ignores the rest for now.
+What `backend/app.py` sends today, before the physics stage exists. The full
+field list is in `backend/README.md` (Dev 2). The app uses every report for
+flow control and latency. Until it receives its first `state`, it also draws
+the marker and the x(t) chart from the object marked `"target": true`:
 
 ```json
-{"type": "frame", "frame_id": 12, "timestamp": 41.237,
- "size": [640, 360], "source_size": [320, 180], "scale": 1.0,
- "objects": [], "process_ms": 4.4, "latency_ms": 4.6,
- "stats": {"received": 13, "dropped": 0, "processed": 13, "decode_errors": 0}}
+{"type": "frame", "frame_id": 12, "timestamp": 41.237, "tracked": true,
+ "target_id": 1,
+ "objects": [
+   {"id": 1, "label": "red", "target": true,
+    "pixel": {"x": 164.8, "y": 146.5}, "bbox": {"x": 149.2, "y": 131.2, "w": 31.5, "h": 31.5},
+    "position": {"x": 0.3301, "y": 0.1622}}
+ ],
+ "process_ms": 4.4, "latency_ms": 4.6}
 ```
+
+- `pixel` and `bbox` are in the pixels of the frame the app sent (x right,
+  y down), the same space as `target_px`.
+- `position` is in metres (y up), or `null` without a calibration.
 
 ### `state` (text, JSON): physics result, one per processed frame
 
@@ -156,14 +166,15 @@ that frame as answered.
 
 1. Is a 320 px JPEG at quality 0.7 and about 15 fps enough for tracking a
    tennis ball? The app can send wider frames if needed (`AppConfig.frameWidth`).
-2. Shape of the entries in `objects` (Dev 2 to propose). The app would like
-   `{"pixel": {x,y}, "bbox": {x,y,w,h}}` in client frame pixels, so it can
-   show detections before the physics stage lands.
+2. ~~Shape of the entries in `objects`.~~ Settled by Dev 2: see `frame`
+   above.
 3. Collision mode needs two objects: proposal is `"objects": [state, state]` in
    a later version.
 
 ## Changelog
 
+- **v0.2, later**: documented the `objects` entries in `frame` reports; the
+  app now shows the tracked target from them. No wire changes.
 - **v0.2**: endpoint `/ws/frames`; per-frame metadata text + raw JPEG instead
   of a 12-byte binary header; `seq`/`t` renamed to `frame_id`/`timestamp`;
   added the `frame` report; replies settle all older frames; `error` may carry

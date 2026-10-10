@@ -103,6 +103,10 @@ class SessionController extends Notifier<SessionState> {
   Timer? _frameTimer;
   Timer? _statsTimer;
   bool _capturing = false;
+
+  /// Set once the backend sends a real `state`; from then on CV-only
+  /// reports are ignored so the two never fight over the overlay.
+  bool _hasPhysics = false;
   int _framesSentThisSecond = 0;
 
   FrameSource get _camera => ref.read(frameSourceProvider);
@@ -225,6 +229,7 @@ class SessionController extends Notifier<SessionState> {
   }
 
   void _startSocket(String url) {
+    _hasPhysics = false;
     final socket = PhysicsSocket(url);
     _socket = socket;
     _subscriptions
@@ -237,11 +242,14 @@ class SessionController extends Notifier<SessionState> {
         socket.messages.listen((message) {
           switch (message) {
             case StateMessage(state: final physics):
+              _hasPhysics = true;
               _onState(physics);
+            // Until the physics stage answers, the CV report still says
+            // where the object is, so the marker and x(t) chart work.
+            case FrameAckMessage(:final target?) when !_hasPhysics:
+              _onState(target);
             case ErrorMessage(:final message):
               state = state.copyWith(serverError: message);
-            // CV-only reports carry no physics yet; the socket already used
-            // them for flow control and latency.
             case FrameAckMessage() || UnknownMessage():
               break;
           }
