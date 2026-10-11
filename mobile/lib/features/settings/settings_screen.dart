@@ -217,11 +217,13 @@ class _BackendFormState extends ConsumerState<_BackendForm> {
             decoration: InputDecoration(
               labelText: 'Backend address',
               errorText: _error,
-              errorMaxLines: 2,
+              errorMaxLines: 3,
               // Break before the example so the address never wraps.
-              helperText:
-                  'Starts on the hosted backend. For a laptop on the\n'
-                  'same Wi-Fi, enter its address, like 192.168.1.20',
+              helperText: pageNeedsWss
+                  ? 'Starts on the hosted backend. For a laptop, enter\n'
+                        'its tunnel address, like name.trycloudflare.com'
+                  : 'Starts on the hosted backend. For a laptop on the\n'
+                        'same Wi-Fi, enter its address, like 192.168.1.20',
               helperMaxLines: 2,
             ),
           ),
@@ -273,7 +275,10 @@ class _BackendFormState extends ConsumerState<_BackendForm> {
   }
 
   Widget _result(ColorScheme scheme) {
-    final hosted = isHostedBackend(_text.text);
+    final url = _text.text.trim();
+    final online = isHostedBackend(url);
+    // Any other wss:// address is a laptop backend behind a tunnel.
+    final hosted = online && url == AppConfig.defaultBackendUrl;
     final (IconData? icon, String text) = switch (_test) {
       _Test.idle => (null, ''),
       _Test.running when hosted => (
@@ -281,12 +286,22 @@ class _BackendFormState extends ConsumerState<_BackendForm> {
         'Connecting. If nobody has used the hosted backend for a while, '
             'it takes up to a minute to wake up.',
       ),
+      _Test.running when online => (
+        AppIcons.arrowClockwise,
+        'Connecting. A new tunnel address can take up to a minute to '
+            'start working.',
+      ),
       _Test.running => (AppIcons.arrowClockwise, 'Connecting'),
       _Test.passed => (AppIcons.checkCircle, 'Connected in ${_took()}'),
       _Test.failed when hosted => (
         AppIcons.warning,
         "Couldn't reach the hosted backend. Check that this device is "
             'online, then test again.',
+      ),
+      _Test.failed when online => (
+        AppIcons.warning,
+        "Couldn't connect. Check the address, and that the laptop backend "
+            'and its tunnel are still running.',
       ),
       _Test.failed => (
         AppIcons.warning,

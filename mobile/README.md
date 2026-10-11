@@ -91,39 +91,50 @@ pick this repo. If the URL Render gives is not
 `handson-physics-backend.onrender.com`, update `defaultBackendUrl` in
 `lib/core/config/app_config.dart`.
 
-#### Faster: a laptop on the same Wi-Fi
+#### Faster: a laptop backend
 
 The hosted server is free, so it is slow: a frame takes 100 to 300 ms to
 come back and the app gets 4 to 9 frames a second, which loses a ball
-thrown at any real speed. A laptop on the same Wi-Fi answers in 20 to 40 ms
-at the full 30 frames a second.
+thrown at any real speed. A laptop answers in 20 to 40 ms at the full 30
+frames a second.
 
-1. Put the laptop and the phone on the **same Wi-Fi**.
-2. On the laptop, after the backend's setup (`../backend/README.md`), run
-   this from `backend/`:
+1. On the laptop, after the backend's setup (`../backend/README.md`),
+   install cloudflared once (`winget install Cloudflare.cloudflared`), then
+   run this from `backend/`:
 
    ```bash
-   python serve_lan.py
+   python serve_lan.py --tunnel
    ```
 
-   It prints the address to use, like `ws://192.168.1.20:8000/ws/frames`.
-3. In the app's Settings, enter that address (`192.168.1.20` on its own is
-   enough) and press **Test connection**. **Use the hosted backend**
-   switches back.
+   It prints two kinds of address:
+
+   - `wss://name.trycloudflare.com/ws/frames` goes through a free
+     Cloudflare tunnel. Use it in the web app, which as an https page can
+     only open `wss://` connections. It works from any network, adds about
+     15 ms, and changes every time the command starts.
+   - `ws://192.168.1.20:8000/ws/frames` goes straight over the Wi-Fi, for
+     the iPhone app ([no Mac needed](#on-an-iphone-from-windows-no-mac)) on
+     the same Wi-Fi as the laptop. Without `--tunnel`, this is the only
+     one.
+
+2. In the app's Settings, enter the address and press **Test connection**.
+   The name or IP on its own is enough: `name.trycloudflare.com` or
+   `192.168.1.20`. A new tunnel address can take a minute to start
+   working. **Use the hosted backend** switches back.
 
 If the test fails:
 
+- With the tunnel, check the laptop's terminal: the server and the tunnel
+  stop when it closes, and the next start prints a new address.
 - Open `http://192.168.1.20:8000/health` (with the laptop's address) in the
   phone's browser. If that fails too, the phone can't reach the laptop.
 - On Windows, allow Python through the firewall on private networks, and
   set the Wi-Fi to Private (Settings > Network & internet).
-- Venue Wi-Fi often keeps devices apart. Turn on Mobile Hotspot on the
-  Windows laptop, join it from the phone, and use `192.168.137.1`.
+- Venue Wi-Fi often keeps devices apart. Use the tunnel, or turn on Mobile
+  Hotspot on the Windows laptop, join it from the phone, and use
+  `192.168.137.1`.
 
-This needs the iPhone app. The web app on GitHub Pages is an https page,
-and browsers don't let one open an unencrypted `ws://` connection to
-another computer, so Settings says so. Chrome on the laptop itself can use
-`ws://localhost:8000/ws/frames`.
+Chrome on the laptop itself can use `ws://localhost:8000/ws/frames`.
 
 Wherever it can, the camera runs at 60 frames a second, and on iOS 16 or
 newer the iPhone keeps each exposure to 1/120 s or less, so a moving ball

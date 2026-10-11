@@ -33,7 +33,7 @@ void main() {
       final pages = Uri.parse('https://vega-77.github.io/HackRU/');
       expect(
         validateBackendUrl('ws://192.168.1.20:8000/ws/frames', page: pages),
-        contains('iPhone app'),
+        contains('--tunnel'),
       );
       expect(
         validateBackendUrl('wss://physics.onrender.com/ws/frames', page: pages),
@@ -83,6 +83,29 @@ void main() {
       );
     });
 
+    test('turns a bare tunnel address into a wss one', () {
+      expect(
+        normalizeBackendUrl('name-of-tunnel.trycloudflare.com'),
+        'wss://name-of-tunnel.trycloudflare.com/ws/frames',
+      );
+      expect(
+        normalizeBackendUrl('laptop.local'),
+        'ws://laptop.local:8000/ws/frames',
+        reason: 'a .local name is a laptop on the same Wi-Fi',
+      );
+    });
+
+    test('turns a web address into a WebSocket one', () {
+      expect(
+        normalizeBackendUrl('https://name-of-tunnel.trycloudflare.com'),
+        'wss://name-of-tunnel.trycloudflare.com/ws/frames',
+      );
+      expect(
+        normalizeBackendUrl('http://192.168.1.20:8000'),
+        'ws://192.168.1.20:8000/ws/frames',
+      );
+    });
+
     test('leaves a complete address alone', () {
       for (final url in [
         'ws://10.0.0.5:8000/ws',
@@ -96,8 +119,8 @@ void main() {
       expect(normalizeBackendUrl(''), '');
       expect(normalizeBackendUrl('  '), '');
       expect(
-        normalizeBackendUrl('http://192.168.1.20:8000'),
-        'http://192.168.1.20:8000',
+        normalizeBackendUrl('ftp://192.168.1.20:8000'),
+        'ftp://192.168.1.20:8000',
       );
       expect(normalizeBackendUrl('ws://'), 'ws://');
     });

@@ -6,24 +6,40 @@ import '../../services/network/physics_socket.dart';
 const _lanPort = 8000;
 const _framesPath = '/ws/frames';
 
-/// Fills in what a laptop address usually leaves out, so `192.168.1.20`
-/// becomes `ws://192.168.1.20:8000/ws/frames`, and adds the path to a full
-/// address that has none. Anything it can't read is returned trimmed, for
-/// [validateBackendUrl] to explain.
+/// Fills in what a typed address usually leaves out. A laptop's
+/// `192.168.1.20` becomes `ws://192.168.1.20:8000/ws/frames`, and a tunnel's
+/// `name.trycloudflare.com` becomes `wss://name.trycloudflare.com/ws/frames`.
+/// An http or https address, as a browser or cloudflared shows it, becomes
+/// ws or wss, and a full address with no path gets one. Anything it can't
+/// read is returned trimmed, for [validateBackendUrl] to explain.
 String normalizeBackendUrl(String text) {
   final value = text.trim();
   final bare = !value.contains('://');
   final uri = Uri.tryParse(bare ? 'ws://$value' : value);
   if (value.isEmpty || uri == null || uri.host.isEmpty) return value;
-  if (uri.scheme != 'ws' && uri.scheme != 'wss') return value;
+  final scheme = switch (uri.scheme) {
+    'ws' when bare && _isInternetName(uri.host) => 'wss',
+    'ws' || 'http' => 'ws',
+    'wss' || 'https' => 'wss',
+    _ => null,
+  };
+  if (scheme == null) return value;
   final noPath = uri.path.isEmpty || uri.path == '/';
   return uri
       .replace(
-        port: bare && !uri.hasPort ? _lanPort : null,
+        scheme: scheme,
+        port: bare && !uri.hasPort && scheme == 'ws' ? _lanPort : null,
         path: noPath ? _framesPath : null,
       )
       .toString();
 }
+
+/// A name on the internet, like a tunnel's, rather than a laptop on the
+/// Wi-Fi: it has a dot, and is neither an IPv4 address nor a `.local` name.
+bool _isInternetName(String host) =>
+    host.contains('.') &&
+    !host.endsWith('.local') &&
+    !RegExp(r'^[\d.]+$').hasMatch(host);
 
 /// Checks a backend address typed in Settings, after [normalizeBackendUrl].
 ///
@@ -42,8 +58,8 @@ String? validateBackendUrl(String text, {Uri? page}) {
   }
   if (uri.host.isEmpty) return 'Add the computer\'s address after ws://';
   if (_blockedAsMixedContent(uri, page ?? Uri.base)) {
-    return 'This https page can only reach wss:// addresses. For a laptop '
-        'backend, use the iPhone app.';
+    return 'This https page can only reach wss:// addresses. Start the '
+        'laptop backend with --tunnel and enter the address it prints.';
   }
   return null;
 }
@@ -54,6 +70,10 @@ bool _blockedAsMixedContent(Uri backend, Uri page) =>
     page.scheme == 'https' &&
     backend.scheme == 'ws' &&
     !const {'localhost', '127.0.0.1', '::1'}.contains(backend.host);
+
+/// True when the app itself is an https page, like the web app on GitHub
+/// Pages, so a laptop backend has to be reached through a tunnel.
+bool get pageNeedsWss => Uri.base.scheme == 'https';
 
 /// True for a backend on the internet (wss://), like the team's server on
 /// Render, as opposed to a laptop on the same Wi-Fi (ws://).
