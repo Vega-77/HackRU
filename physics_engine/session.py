@@ -8,6 +8,12 @@ from .kinematics import KinematicsEngine, KinematicsResult, Vector2D
 from .models import GRAVITY_MPS2, collision_metrics, motion_model
 
 
+# An object missing for longer than this starts a fresh history when it is seen again,
+# matching KinematicsEngine's own gap rule. Shorter gaps (a blurred frame, a hand
+# passing over) keep it, so velocity doesn't drop out for a single missed frame.
+FORGET_AFTER_S = 0.5
+
+
 class PhysicsSession:
     """One physics history per WebSocket connection and tracked object ID."""
 
@@ -15,6 +21,7 @@ class PhysicsSession:
         self.window_size = window_size
         self.engines: dict[int, KinematicsEngine] = {}
         self.initial_energy: dict[int, float] = {}
+        self._last_seen: dict[int, float] = {}
         self._configuration: tuple | None = None
         self._calibration: tuple | None = None
         self._pre_collision: tuple | None = None
@@ -23,6 +30,7 @@ class PhysicsSession:
     def reset(self) -> None:
         self.engines.clear()
         self.initial_energy.clear()
+        self._last_seen.clear()
         self._pre_collision = None
         self._last_collision = None
 
@@ -65,10 +73,12 @@ class PhysicsSession:
         state["mode"] = mode
         state["forces"] = []
         state["extras"] = {}
-        visible_ids = {int(obj["id"]) for obj in frame.get("objects", [])}
-        for missing_id in set(self.engines) - visible_ids:
-            self.engines[missing_id].reset()
-            self.initial_energy.pop(missing_id, None)
+        for obj in frame.get("objects", []):
+            self._last_seen[int(obj["id"])] = timestamp
+        for gone_id in [i for i, seen in self._last_seen.items() if timestamp - seen > FORGET_AFTER_S]:
+            self.engines.pop(gone_id, None)
+            self.initial_energy.pop(gone_id, None)
+            del self._last_seen[gone_id]
         target = next((o for o in frame.get("objects", []) if o.get("target")), None)
         if target is None:
             state["tracked"] = False

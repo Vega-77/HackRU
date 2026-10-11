@@ -139,10 +139,16 @@ the marker and the x(t) chart from the object marked `"target": true`:
 - `source` identifies `motion`, `manual`, `color`, or `mediapipe` observations.
   `tracking_status` distinguishes `detected`, `low_confidence`, `searching`, and `lost`;
   a selected patch first reports `initialized` with `tracked: false` until a later
-  image verifies it. An ambiguous/background tap reports `selection_required`:
-  draw an object box. Invalid or flat boxes report `invalid_selection` or
-  `insufficient_contrast`. After loss, recovery compares the retained original
-  appearance across the full frame and rejects ambiguous or different-color matches.
+  image verifies it. A tap without `target_bbox` is boxed by the backend when the
+  object under it stands out from its surroundings with a clear outline; a tap on
+  bare or evenly textured background, or on an object cut off by the frame edge,
+  reports `selection_required`: draw an object box. Invalid or flat boxes report
+  `invalid_selection` or `insufficient_contrast`. The selected object keeps one `id`
+  for as long as it is followed, and gets a new one when the selection changes. Its
+  `bbox` is the object the backend separated inside the user's box (not the fingers
+  or table the box also took in), so it can be smaller than `target_bbox`.
+  After loss, recovery compares the retained original appearance across the full
+  frame and rejects ambiguous or different-color matches.
   `confidence` equals the object's existing `score`. No predicted or demo objects are sent.
 
 ### Selection proposal and initialization handshake
@@ -261,6 +267,10 @@ gave the same error.
 
 ## Changelog
 
+- **v0.3, tracking fixes**: a tap without a box is boxed by the backend when the
+  object stands out; the selected object keeps its `id` through misses and
+  re-acquisition; `state` keeps velocity through gaps up to 0.5 s instead of
+  restarting after one missed frame. No wire changes.
 - **v0.3, later**: crash errors carry an `error` object (`kind`, `detail`,
   `where`, `server`) and `/health` reports `commit`. Both are additions.
 - **v0.3**: iOS ARKit support. Frame metadata may carry `intrinsics` and

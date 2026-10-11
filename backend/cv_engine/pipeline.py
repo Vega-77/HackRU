@@ -18,7 +18,7 @@ from cv_engine.detect import DEFAULT_COLORS, ColorDetector, Detection, MediaPipe
 from cv_engine.preprocess import PreprocessedFrame
 from cv_engine.spatial import SpatialMapper
 from cv_engine.tracker import CentroidTracker, Track
-from cv_engine.universal import ManualTracker
+from cv_engine.universal import ManualTracker, box_from_tap
 
 log = logging.getLogger(__name__)
 
@@ -154,6 +154,7 @@ class TrackingPipeline:
             t = session["target_px"]
             self._target_last = (t["x"], t["y"]) if t else None
             self._manual.reset()
+            self.tracker.forget_manual()
             self._pending_selection = t is not None
         self.session = session
         plane_before = self.spatial.ar_plane
@@ -194,9 +195,7 @@ class TrackingPipeline:
                 point = (tap["x"] * frame.scale, tap["y"] * frame.scale)
                 box = self.session["target_bbox"]
                 if box is None:
-                    proposal = propose_region(frame.bgr, point)
-                    if proposal["bbox"]:
-                        box = {key: value / frame.scale for key, value in proposal["bbox"].items()}
+                    box = self._box_from_tap(frame, point)
                 self._manual.select(frame, point, box)
                 self._pending_selection = False
             else:
@@ -245,6 +244,24 @@ class TrackingPipeline:
                 "reason": self._manual.debug["reason"], "tracked": False,
                 "bbox": None if self._manual.bbox is None else
                     {key: value / frame.scale for key, value in zip(("x", "y", "w", "h"), self._manual.bbox)}}
+
+    def _box_from_tap(self, frame: PreprocessedFrame, point: tuple[float, float]) -> dict | None:
+        """A box (client px) around the object under a tap without a drawn box, or None to
+        ask the user for one (selection_required). A stable flood-filled region is best on a
+        plain background; on a textured one it leaks or finds many outlines, and the object
+        is found by how it stands out from its surroundings instead."""
+        proposal = propose_region(frame.bgr, point)
+        found = None
+        if proposal["reason"] != "stable_seeded_region":
+            found = box_from_tap(frame, point)
+        if found is not None:
+            x, y, w, h = found
+        elif proposal["bbox"]:
+            x, y, w, h = (proposal["bbox"][k] for k in ("x", "y", "w", "h"))
+        else:
+            return None
+        s = frame.scale
+        return {"x": x / s, "y": y / s, "w": w / s, "h": h / s}
 
     def _pick_target(self, tracks: list[Track], frame: PreprocessedFrame) -> Track | None:
         """The object the app cares about: the one the user tapped (target_px), followed by

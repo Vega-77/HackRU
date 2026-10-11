@@ -70,6 +70,17 @@ def test_ambiguous_global_recovery_stays_lost():
     assert result["tracking_debug"]["reason"] == "ambiguous_match"
 
 
+def test_lookalike_does_not_replace_target_that_is_still_in_view():
+    pipe = selected()
+    for i in range(2, 8):
+        x = 80 + 12 * (i - 1)
+        result = pipe(preprocess_frame(scene([(x, 90, (180, 180, 180)),
+                                              (250, 150, (180, 180, 180))]), i, i * .2))
+        assert result["tracked"]
+        target = next(o for o in result["objects"] if o["target"])
+        assert target["pixel"]["x"] == pytest.approx(x, abs=3)
+
+
 def test_tap_on_textured_background_does_not_initialize_a_target():
     pipe = TrackingPipeline()
     pipe.apply_config({"type": "config", "target_px": {"x": 182, "y": 97}})

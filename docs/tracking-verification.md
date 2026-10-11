@@ -63,7 +63,7 @@ experiment, settings, error handling, log copying and landscape layout.
 | C-5 | PASS: generated sequences are explicitly synthetic; real experiments require validation. |
 | R-05 | PASS: actual calibration content dictates the existing layout. |
 | R-11 | PASS: ROI is rectangular to match frame coordinates; panel radii retained. |
-| R-15 | PASS: Confirm object, Retry selection, Select again and Start experiment name their actual actions. |
+| R-15 | PASS: Confirm object, Select again and Start experiment name their actual actions. |
 | R-16 | PASS: instructions name concrete gestures and expected behavior. |
 | R-20 | PASS: existing instrument identity retained through calibration marks and typography. |
 | R-21 | PASS: existing theme controls retained; no theme feature added or deferred. |

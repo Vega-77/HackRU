@@ -244,12 +244,6 @@ class _TopBar extends ConsumerWidget {
         ),
         const SizedBox(width: AppSpace.sm),
         _GlassIconButton(
-          icon: AppIcons.copy,
-          tooltip: 'Copy debug log',
-          onPressed: () => copyDebugLog(context),
-        ),
-        const SizedBox(width: AppSpace.sm),
-        _GlassIconButton(
           icon: paused ? AppIcons.play : AppIcons.pause,
           tooltip: paused ? 'Resume' : 'Pause',
           onPressed: switch (phase) {
@@ -322,10 +316,11 @@ class _StatusChip extends ConsumerWidget {
     final connection = ref.watch(sessionProvider.select((s) => s.connection));
     final latency = ref.watch(sessionProvider.select((s) => s.latencyMs));
 
+    // The broadcast icon already says live, so the round trip stands alone.
     final (IconData icon, String text) = switch (connection) {
       ConnectionStatus.live => (
         AppIcons.broadcast,
-        latency == null ? 'Live' : 'Live ${latency.round()} ms',
+        latency == null ? 'Live' : '${latency.round()} ms',
       ),
       ConnectionStatus.connecting => (AppIcons.arrowClockwise, 'Connecting'),
       ConnectionStatus.offline => (AppIcons.wifiSlash, 'Offline'),
@@ -334,7 +329,9 @@ class _StatusChip extends ConsumerWidget {
 
     return Semantics(
       liveRegion: true,
-      label: text,
+      label: connection == ConnectionStatus.live && latency != null
+          ? 'Live, $text round trip'
+          : text,
       excludeSemantics: true,
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: _maxWidth),
