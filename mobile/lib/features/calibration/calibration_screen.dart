@@ -16,6 +16,7 @@ import '../../state/calibration_controller.dart';
 import '../../state/experiment_settings.dart';
 import '../../state/session_controller.dart';
 import 'mass_steps.dart';
+import 'surface_copy.dart';
 import 'widgets/calibration_stage.dart';
 import 'widgets/measurement_chrome.dart';
 
@@ -696,42 +697,19 @@ class _SurfaceStepState extends ConsumerState<_SurfaceStep> {
     final surface = ref.watch(calibrationProvider.select((c) => c.surface));
     final mode = ref.watch(experimentSettingsProvider.select((s) => s.mode));
     final scheme = Theme.of(context).colorScheme;
-    // Gravity lies in a vertical board, so its 2D physics is exact there.
-    final wantsBoard = mode != ExperimentMode.collision;
-
-    final String status;
-    if (_missed) {
-      status =
-          'No surface found there. Move the phone slowly so it can map the '
-          'scene, then try again.';
-    } else if (surface == null) {
-      status = 'No surface yet';
-    } else if (surface.vertical) {
-      status = 'Using a vertical board';
-    } else if (wantsBoard) {
-      status =
-          'Using a table top. For this experiment, the board behind it '
-          'gives better forces.';
-    } else {
-      status = 'Using a table top';
-    }
 
     return _Step(
       number: widget.number,
       total: widget.total,
       title: 'Find the surface',
-      body: wantsBoard
-          ? 'Aim the middle of the picture at a board behind the experiment, '
-                'parallel to the motion, then tap Find.'
-          : 'Aim the middle of the picture at the table the carts roll on, '
-                'then tap Find.',
+      body: SurfaceCopy.instructions(mode),
       done: surface != null,
       trailing: TextButton(
         onPressed: _searching ? null : _find,
         child: Text(surface == null ? 'Find' : 'Find again'),
       ),
       footer: Text(
-        status,
+        SurfaceCopy.status(mode, surface, missed: _missed),
         style: AppType.readoutSmall.copyWith(color: scheme.onSurfaceVariant),
       ),
     );

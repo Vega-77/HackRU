@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'vec3.dart';
 
 /// The camera that took one frame, from ARKit on iOS. Lets the backend turn
@@ -93,6 +95,20 @@ class ArSurface {
   /// How far in front of the surface the object's centre is, such as a
   /// ball's radius. Keeps positions at the centre, not the contact point.
   final double offsetM;
+
+  /// Below this tilt a surface counts as level: a floor or table, not a
+  /// ramp. ARKit's estimated planes wobble by a degree or two.
+  static const double levelTiltDeg = 3;
+
+  /// Degrees between the surface and level ground: 0 for a table, 90 for
+  /// a wall.
+  double get tiltDeg {
+    final n = Vec3(normal[0], normal[1], normal[2]);
+    if (n.length == 0) return 0;
+    return math.acos((n.y.abs() / n.length).clamp(0.0, 1.0)) * 180 / math.pi;
+  }
+
+  bool get isLevel => tiltDeg < levelTiltDeg;
 
   ArSurface withOffset(double metres) => ArSurface(
     point: point,

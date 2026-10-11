@@ -101,11 +101,8 @@ class _TelemetryPanelState extends ConsumerState<TelemetryPanel> {
           ],
         ),
         const SizedBox(height: AppSpace.md),
-        if (settings.mode == ExperimentMode.ramp) ...[
-          _BodyPicker(sliding: settings.slidingBody),
-          const SizedBox(height: AppSpace.md),
-        ],
-        // Current measurements lead the panel; visibility controls follow.
+        // Current measurements and the theory check lead the panel, so they
+        // fit at the sheet's starting height; setup and visibility follow.
         _Readouts(
           mode: settings.mode,
           slidingBody: settings.slidingBody,
@@ -120,6 +117,10 @@ class _TelemetryPanelState extends ConsumerState<TelemetryPanel> {
             samples: samples,
           ),
         ),
+        if (settings.mode == ExperimentMode.ramp) ...[
+          const SizedBox(height: AppSpace.md),
+          _BodyPicker(sliding: settings.slidingBody),
+        ],
         const SizedBox(height: AppSpace.xl),
         const Divider(),
         const SizedBox(height: AppSpace.lg),
@@ -669,21 +670,22 @@ class _TheoryCard extends StatelessWidget {
         ? 'Within ${off.toStringAsFixed(0)}% of the prediction.'
         : '${off.toStringAsFixed(0)}% away from the prediction.';
 
-    Widget row(String label, String value) => Padding(
-      padding: const EdgeInsets.only(top: AppSpace.xs),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.baseline,
-        textBaseline: TextBaseline.alphabetic,
-        children: [
-          Expanded(child: Text(label, style: caption)),
-          Text(
-            value,
-            style: AppType.readoutSmall.copyWith(color: scheme.onSurface),
-          ),
-          const SizedBox(width: AppSpace.xs),
-          Text(check.unit, style: caption),
-        ],
-      ),
+    // Side by side, so the whole card fits at the sheet's starting height.
+    // On a narrow phone the pair wraps instead of cutting a value short.
+    Widget pair(String label, String value) => Row(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.baseline,
+      textBaseline: TextBaseline.alphabetic,
+      children: [
+        Text(label, style: caption),
+        const SizedBox(width: AppSpace.sm),
+        Text(
+          value,
+          style: AppType.readoutSmall.copyWith(color: scheme.onSurface),
+        ),
+        const SizedBox(width: AppSpace.xs),
+        Text(check.unit, style: caption),
+      ],
     );
 
     return Semantics(
@@ -723,8 +725,15 @@ class _TheoryCard extends StatelessWidget {
             ),
             const SizedBox(height: AppSpace.xs),
             Text(check.quantity, style: caption),
-            row('Measured', measured),
-            row('Predicted', predicted),
+            const SizedBox(height: AppSpace.xs),
+            Wrap(
+              spacing: AppSpace.xl,
+              runSpacing: AppSpace.xs,
+              children: [
+                pair('Measured', measured),
+                pair('Predicted', predicted),
+              ],
+            ),
             const SizedBox(height: AppSpace.sm),
             Text(
               verdict,

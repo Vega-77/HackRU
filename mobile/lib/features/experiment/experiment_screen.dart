@@ -33,7 +33,7 @@ class ExperimentScreen extends ConsumerStatefulWidget {
 
 class _ExperimentScreenState extends ConsumerState<ExperimentScreen> {
   static const _sheetMin = 0.28;
-  static const _sheetInitial = 0.42;
+  static const _sheetInitial = 0.52;
   static const _sheetMax = 0.88;
 
   late final SessionController _session;

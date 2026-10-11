@@ -87,7 +87,7 @@ final class ArSessionPlugin: NSObject, FlutterPlugin, ARSessionDelegate {
     case "surfaces":
       result(surfaces())
     case "setVectors":
-      vectors.update(args)
+      vectors.update(args, camera: session.currentFrame.map { simd_make_float3($0.camera.transform.columns.3) })
       follow(args)
       result(nil)
     case "hideVectors":
@@ -270,10 +270,20 @@ final class ArSessionPlugin: NSObject, FlutterPlugin, ARSessionDelegate {
     let direction = simd_normalize(simd_make_float3(m * inCamera))
     let origin = simd_make_float3(m.columns.3)
 
-    // A plane ARKit has already mapped beats a guess from feature points.
-    for target in [ARRaycastQuery.Target.existingPlaneGeometry, .estimatedPlane] {
-      let query = ARRaycastQuery(origin: origin, direction: direction, allowing: target, alignment: .any)
-      guard let hit = session.raycast(query).first else { continue }
+    let hits = [ARRaycastQuery.Target.existingPlaneGeometry, .estimatedPlane].compactMap { target in
+      session.raycast(ARRaycastQuery(origin: origin, direction: direction, allowing: target, alignment: .any)).first
+    }
+    func distance(_ hit: ARRaycastResult) -> Float {
+      simd_distance(simd_make_float3(hit.worldTransform.columns.3), origin)
+    }
+    // A plane ARKit has already mapped beats a guess from feature points, unless the
+    // guess is clearly nearer: something lying on the mapped floor, such as a ramp.
+    // ARKit only maps level and upright planes, so a ramp is never a mapped one.
+    var best = hits.first
+    if hits.count == 2, distance(hits[1]) < distance(hits[0]) - 0.01 {
+      best = hits[1]
+    }
+    if let hit = best {
       let t = hit.worldTransform
       // A raycast result's y axis is the surface normal.
       let normal = simd_normalize(simd_make_float3(t.columns.1))

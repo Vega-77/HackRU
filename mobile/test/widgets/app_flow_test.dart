@@ -527,12 +527,42 @@ void main() {
     expect(find.text('a = 5/7 g sin θ'), findsOneWidget);
     expect(find.text('Friction coefficient'), findsNothing);
 
+    // Below the theory check: a setup choice, not a measurement.
+    await tester.ensureVisible(find.text('Sliding block'));
+    await tester.pump();
     await tester.tap(find.text('Sliding block'));
     await tester.pump();
+    await tester.scrollUntilVisible(
+      find.text('Friction coefficient'),
+      -100,
+      scrollable: find
+          .descendant(
+            of: find.byType(TelemetryPanel),
+            matching: find.byType(Scrollable),
+          )
+          .first,
+    );
 
     expect(find.text('a = g sin θ'), findsOneWidget);
     expect(find.text('Friction coefficient'), findsOneWidget);
     expect(tester.takeException(), isNull);
+    await unmount(tester);
+  });
+
+  testWidgets('the theory check shows in full when the sheet opens', (
+    tester,
+  ) async {
+    await pumpApp(tester, at: Routes.experiment);
+    await tester.pump(const Duration(seconds: 1));
+
+    final card = find
+        .ancestor(
+          of: find.text('Theory check'),
+          matching: find.byType(Container),
+        )
+        .first;
+    final screen = tester.view.physicalSize / tester.view.devicePixelRatio;
+    expect(tester.getRect(card).bottom, lessThanOrEqualTo(screen.height));
     await unmount(tester);
   });
 

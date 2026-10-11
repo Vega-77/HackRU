@@ -27,7 +27,11 @@ import UIKit
 /// `occluder_radius` is the real ball's radius in metres. An invisible
 /// sphere that size fills the depth buffer before the arrows draw, so the
 /// ball hides the parts of them inside or behind it, as a real object
-/// would. Labels ignore depth and stay readable.
+/// would. Labels ignore depth and stay readable. An arrow pointing mostly
+/// towards or away from the camera, such as a normal force seen from above,
+/// would then be all inside the ball and leave only its label, so `update`
+/// lengthens it until its tip clears the ball on screen. Only those arrows
+/// are longer than to scale.
 final class ArVectorLayer {
   let root = SCNNode()
   /// At the object's centre; the arrows grow out of it.
@@ -47,6 +51,11 @@ final class ArVectorLayer {
   /// Dart sends 1 mm per pixel of the 2D overlay's 390 pt reference phone.
   private static let metresPerReferencePx: Float = 0.001
   private static let referenceWidthPt: Float = 390
+  /// How far an arrow's tip shows beyond the ball, in reference metres.
+  private static let clearanceM: Float = 0.03
+  /// An arrow pointing almost at the camera stops growing here instead of
+  /// shooting off the screen.
+  private static let minAcross: Float = 0.35
 
   init() {
     root.name = "handson.vectors"
@@ -69,13 +78,13 @@ final class ArVectorLayer {
     scene.rootNode.addChildNode(root)
   }
 
-  func update(_ args: [String: Any]) {
+  func update(_ args: [String: Any], camera: simd_float3? = nil) {
     guard let origin = vector3(args["origin"]) else { return }
     let ease = number(args["ease_s"]) ?? 0
     let showLabels = args["labels"] as? Bool ?? true
     let halo = UIColor(argb: args["halo"])
     let occluderRadius = Float(number(args["occluder_radius"]) ?? 0)
-    let specs = (args["arrows"] as? [[String: Any]] ?? []).compactMap(ArrowSpec.init)
+    var specs = (args["arrows"] as? [[String: Any]] ?? []).compactMap(ArrowSpec.init)
     let ids = Set(specs.map(\.id))
     backendOrigin = origin
     backendRadius = occluderRadius
@@ -97,6 +106,11 @@ final class ArVectorLayer {
       }
       occluder.isHidden = occluderRadius <= 0
       SCNTransaction.commit()
+    }
+    if let camera = camera {
+      let radius = occluder.isHidden ? 0 : occluder.simdScale.x
+      let centre = following ? anchor.simdPosition : origin
+      specs = specs.map { clearOfBall($0, centre: centre, radius: radius, camera: camera) }
     }
 
     for (id, node) in arrows where !ids.contains(id) {
@@ -129,6 +143,25 @@ final class ArVectorLayer {
       arrows[spec.id]?.apply(spec, label: showLabels ? labels.image(for: spec, halo: halo) : nil)
     }
     SCNTransaction.commit()
+  }
+
+  /// The spec, lengthened if its tip would be hidden by the ball as the
+  /// camera sees it.
+  private func clearOfBall(
+    _ spec: ArrowSpec, centre: simd_float3, radius: Float, camera: simd_float3
+  ) -> ArrowSpec {
+    let scale = anchor.simdScale.x
+    let toCamera = camera - centre
+    guard radius > 0, scale > 0, simd_length(toCamera) > radius else { return spec }
+    // How much of the arrow's length shows across the screen.
+    let across = simd_length(simd_cross(spec.direction, simd_normalize(toCamera)))
+    let needed =
+      (radius / scale + ArVectorLayer.clearanceM)
+      / max(across, ArVectorLayer.minAcross)
+    guard needed > spec.length else { return spec }
+    var longer = spec
+    longer.length = needed
+    return longer
   }
 
   /// Puts the arrows and the occluder on the object where on-device
@@ -200,7 +233,7 @@ final class ArVectorLayer {
 struct ArrowSpec {
   let id: String
   let direction: simd_float3
-  let length: Float
+  var length: Float
   let radius: Float
   let color: UIColor
   let symbol: String
