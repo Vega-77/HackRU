@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:image/image.dart' as img;
 import 'package:hands_on_physics/app.dart';
 import 'package:hands_on_physics/core/config/app_config.dart';
 import 'package:hands_on_physics/core/logging/debug_log.dart';
@@ -12,6 +13,9 @@ import 'package:hands_on_physics/models/experiment_mode.dart';
 import 'package:hands_on_physics/models/session_config.dart';
 import 'package:hands_on_physics/services/camera/frame_source.dart';
 import 'package:hands_on_physics/models/vec2.dart';
+import 'package:hands_on_physics/models/physics_state.dart';
+import 'package:hands_on_physics/services/network/acquisition_client.dart';
+import 'package:hands_on_physics/features/calibration/widgets/calibration_stage.dart';
 import 'package:hands_on_physics/state/calibration_controller.dart';
 import 'package:hands_on_physics/state/experiment_settings.dart';
 import 'package:hands_on_physics/state/session_controller.dart';
@@ -46,10 +50,28 @@ class _FakeCamera implements FrameSource {
   FrameSize? get frameSize => running ? const FrameSize(320, 240) : null;
 
   @override
-  Future<EncodedFrame?> capture({int width = 320}) async => null;
+  Future<EncodedFrame?> capture({int width = 320}) async => EncodedFrame(
+    jpeg: img.encodeJpg(img.Image(width: 320, height: 240)),
+    size: const FrameSize(320, 240),
+    captureTime: 1,
+  );
 
   @override
   Widget buildPreview(BuildContext context) => const SizedBox.expand();
+}
+
+class _Acquisition extends AcquisitionClient {
+  _Acquisition({this.fail = false});
+  final bool fail;
+  @override
+  Future<AcquisitionProposal> propose(
+    String url,
+    Vec2 point,
+    EncodedFrame frame,
+  ) async => AcquisitionProposal(
+    fail ? null : PixelRect(point.x - 16, point.y - 16, 32, 32),
+    fail ? 'no_clear_boundary' : 'enclosing_contour',
+  );
 }
 
 /// An ARKit camera: knows its pose and finds a board wherever it looks.
@@ -80,6 +102,7 @@ void main() {
   Future<ProviderContainer> pumpApp(
     WidgetTester tester, {
     String at = Routes.home,
+    AcquisitionClient? acquisition,
   }) async {
     tester.view.physicalSize = const Size(390, 844) * 3;
     tester.view.devicePixelRatio = 3;
@@ -89,6 +112,9 @@ void main() {
       ProviderScope(
         overrides: [
           frameSourceProvider.overrideWithValue(camera),
+          acquisitionClientProvider.overrideWithValue(
+            acquisition ?? _Acquisition(),
+          ),
           backendTestProvider.overrideWithValue(
             (url) async => const Duration(milliseconds: 12),
           ),
@@ -127,6 +153,19 @@ void main() {
     await tester.pump(const Duration(seconds: 1));
   }
 
+  Future<void> selectAndConfirm(WidgetTester tester) async {
+    await tester.pump();
+    await tester.tap(find.byType(CalibrationStage));
+    await tester.pump(const Duration(milliseconds: 100));
+    await tester.scrollUntilVisible(
+      find.text('Confirm object'),
+      100,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.tap(find.text('Confirm object'));
+    await tester.pump();
+  }
+
   testWidgets('home lists every experiment and picks one', (tester) async {
     final container = await pumpApp(tester);
 
@@ -156,6 +195,16 @@ void main() {
     expect(find.text('Start experiment'), findsOneWidget);
     expect(find.text('Set the scale'), findsOneWidget);
     expect(camera.isRunning, isTrue, reason: 'setup shows the camera');
+
+    expect(
+      tester
+          .widget<FilledButton>(
+            find.widgetWithText(FilledButton, 'Start experiment'),
+          )
+          .onPressed,
+      isNull,
+    );
+    await selectAndConfirm(tester);
 
     await tester.tap(find.text('Start experiment'));
     await tester.pump(const Duration(milliseconds: 600));
@@ -215,6 +264,7 @@ void main() {
     await tester.pump(const Duration(milliseconds: 600));
     expect(camera.isRunning, isTrue);
 
+    await selectAndConfirm(tester);
     await tester.tap(find.text('Start experiment'));
     await tester.pump(const Duration(milliseconds: 600));
     expect(container.read(sessionProvider).phase, SessionPhase.running);
@@ -258,6 +308,69 @@ void main() {
     expect(find.text('Using a vertical board'), findsOneWidget);
     expect(find.textContaining('Not needed while a surface'), findsOneWidget);
 
+    await unmount(tester);
+  });
+
+  testWidgets('failed tap requests a box and retry restores live selection', (
+    tester,
+  ) async {
+    final container = await pumpApp(
+      tester,
+      acquisition: _Acquisition(fail: true),
+    );
+    await tester.tap(find.textContaining('Set up'));
+    await tester.pump(const Duration(milliseconds: 600));
+    await tester.pump();
+    await tester.tap(find.byType(CalibrationStage));
+    await tester.pump(const Duration(milliseconds: 100));
+    expect(
+      container.read(calibrationProvider).selectionError,
+      contains('Draw a box'),
+    );
+    expect(container.read(calibrationProvider).targetBbox, isNull);
+    expect(
+      tester
+          .widget<FilledButton>(
+            find.widgetWithText(FilledButton, 'Start experiment'),
+          )
+          .onPressed,
+      isNull,
+    );
+    final held = container.read(calibrationProvider).selectionFrame;
+    final stage = find.byType(CalibrationStage);
+    final bounds = tester.getRect(stage);
+    final drag = await tester.startGesture(
+      bounds.topLeft + Offset(bounds.width * .2, bounds.height * .6),
+    );
+    await drag.moveTo(
+      bounds.topLeft + Offset(bounds.width * .3, bounds.height * .7),
+    );
+    await tester.pump();
+    await drag.moveTo(
+      bounds.topLeft + Offset(bounds.width * .5, bounds.height * .9),
+    );
+    await drag.up();
+    await tester.pump();
+    expect(container.read(calibrationProvider).targetBbox, isNotNull);
+    expect(container.read(calibrationProvider).selectionError, isNull);
+    expect(container.read(calibrationProvider).selectionFrame, same(held));
+    await tester.scrollUntilVisible(
+      find.text('Confirm object'),
+      100,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.tap(find.text('Confirm object'));
+    await tester.pump();
+    expect(container.read(calibrationProvider).selectionConfirmed, isTrue);
+    await tester.scrollUntilVisible(
+      find.text('Retry selection'),
+      100,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.tap(find.text('Retry selection'));
+    await tester.pump();
+    expect(container.read(calibrationProvider).selectionFrame, isNull);
+    expect(container.read(calibrationProvider).selectionError, isNull);
     await unmount(tester);
   });
 

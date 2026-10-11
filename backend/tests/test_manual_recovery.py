@@ -89,5 +89,5 @@ def test_diagnostics_are_opt_in_and_contain_no_image_data():
     result = pipe(preprocess_frame(scene(), 2, .4))
     assert set(result["tracking_debug"]) <= {
         "frame_id", "timestamp", "detections", "reason", "search", "global",
-        "score", "candidates", "missed", "bbox",
+        "score", "candidates", "missed", "bbox", "method",
     }

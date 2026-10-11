@@ -391,6 +391,13 @@ class _Banners extends ConsumerWidget {
           icon: AppIcons.warning,
           message: describeServerError(serverError, count: errorCount),
           actions: [
+            if (ref.watch(sessionProvider).phase == SessionPhase.failed)
+              (
+                'Select again',
+                () => context.canPop()
+                    ? context.pop()
+                    : context.go(Routes.calibrate),
+              ),
             ('Copy log', () => copyDebugLog(context)),
             ('Dismiss', ref.read(sessionProvider.notifier).dismissServerError),
           ],
@@ -500,13 +507,21 @@ class _StageMessage extends ConsumerWidget {
       sessionProvider.select((s) => s.latest?.tracked ?? false),
     );
     final connection = ref.watch(sessionProvider.select((s) => s.connection));
+    final trackingStatus = ref.watch(
+      sessionProvider.select((s) => s.latest?.trackingStatus),
+    );
 
     final (IconData, String)? message = switch (phase) {
       SessionPhase.starting => (AppIcons.circle, 'Starting'),
       SessionPhase.paused => (AppIcons.pause, 'Paused. Tap play to carry on.'),
       SessionPhase.running when hasState && !tracked => (
         AppIcons.crosshair,
-        'Looking for the object',
+        switch (trackingStatus) {
+          'selection_required' ||
+          'invalid_selection' => 'Return to setup and select an object region.',
+          'insufficient_contrast' => 'The selection has too little contrast. Return to setup and include the object outline.',
+          _ => 'Looking for the object',
+        },
       ),
       SessionPhase.running
           when !hasState && connection == ConnectionStatus.live =>

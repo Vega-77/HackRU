@@ -42,3 +42,8 @@ class LatestFrameSlot(Generic[T]):
     def close(self) -> None:
         self._closed = True
         self._event.set()
+
+    def discard(self) -> None:
+        if self._item is not None:
+            self.dropped += 1
+            self._item = None

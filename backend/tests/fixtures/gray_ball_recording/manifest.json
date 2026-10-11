@@ -1,0 +1,66 @@
+{
+  "source_sha256": "4b544f1b10e25750831c2f3eef31f06599ed6b638562e360dc887bdd1fb7ab0c",
+  "config": {
+    "target_px": {
+      "x": 235,
+      "y": 95
+    },
+    "target_bbox": {
+      "x": 201,
+      "y": 69,
+      "w": 68,
+      "h": 52
+    },
+    "frame_size": {
+      "w": 320,
+      "h": 180
+    }
+  },
+  "frames": [
+    {
+      "file": "20.png",
+      "frame_id": 0,
+      "timestamp": 20
+    },
+    {
+      "file": "45.png",
+      "frame_id": 1,
+      "timestamp": 45
+    },
+    {
+      "file": "58.png",
+      "frame_id": 2,
+      "timestamp": 58
+    },
+    {
+      "file": "65.png",
+      "frame_id": 3,
+      "timestamp": 65
+    },
+    {
+      "file": "68.5.png",
+      "frame_id": 4,
+      "timestamp": 68.5
+    },
+    {
+      "file": "68.6.png",
+      "frame_id": 5,
+      "timestamp": 68.6
+    },
+    {
+      "file": "68.7.png",
+      "frame_id": 6,
+      "timestamp": 68.7
+    },
+    {
+      "file": "68.8.png",
+      "frame_id": 7,
+      "timestamp": 68.8
+    },
+    {
+      "file": "69.1.png",
+      "frame_id": 8,
+      "timestamp": 69.1
+    }
+  ]
+}
