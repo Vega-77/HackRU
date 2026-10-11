@@ -55,7 +55,8 @@ def test_app_config_is_accepted_silently():
 def test_pipeline_keeps_session_settings():
     pipe = TrackingPipeline()
     settings = pipe.apply_config(APP_CONFIG)
-    assert settings["session"] == {**{k: v for k, v in APP_CONFIG.items() if k not in ("type", "detector")}, "target_bbox": None}
+    assert settings["session"] == {**{k: v for k, v in APP_CONFIG.items() if k not in ("type", "detector")},
+                                   "target_bbox": None, "second_target_px": None, "second_target_bbox": None}
 
 
 def test_objects_in_phone_pixels_with_px_per_m_position():

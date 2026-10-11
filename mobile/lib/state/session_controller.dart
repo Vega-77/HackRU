@@ -5,6 +5,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/config/app_config.dart';
 import '../core/logging/debug_log.dart';
+import '../models/calibration.dart';
+import '../models/experiment_mode.dart';
 import '../models/physics_state.dart';
 import '../models/session_config.dart';
 import '../services/camera/frame_source_factory.dart';
@@ -116,6 +118,10 @@ class SessionController extends Notifier<SessionState> {
   Timer? _statsTimer;
   bool _capturing = false;
   EncodedFrame? _selectionFrame;
+
+  /// The second collision object's picture, sent after [_selectionFrame]:
+  /// initializing the first object makes the backend forget the second.
+  EncodedFrame? _secondSelectionFrame;
   Future<void>? _stopInProgress;
   int _sessionEpoch = 0;
 
@@ -168,6 +174,9 @@ class SessionController extends Notifier<SessionState> {
       if (previous?.selectionFrame != next.selectionFrame ||
           previous?.targetBbox != next.targetBbox) {
         _selectionFrame = next.selectionFrame;
+        _secondSelectionFrame = _secondFrame(next);
+      } else if (previous?.second != next.second) {
+        _secondSelectionFrame = _secondFrame(next);
       }
       if (_socket != null) _sendConfig('calibration changed');
     });
@@ -235,6 +244,9 @@ class SessionController extends Notifier<SessionState> {
     final frameSize = _camera.frameSize;
     _selectionFrame = calibration.selectionFrame?.size == frameSize
         ? calibration.selectionFrame
+        : null;
+    _secondSelectionFrame = _secondFrame(calibration)?.size == frameSize
+        ? _secondFrame(calibration)
         : null;
     log.i(
       'Camera ready in ${opening.elapsedMilliseconds} ms, frames '
@@ -330,7 +342,9 @@ class SessionController extends Notifier<SessionState> {
       ..add(
         socket.statusChanges.listen((status) {
           if (status == ConnectionStatus.live) {
-            _selectionFrame = ref.read(calibrationProvider).selectionFrame;
+            final calibration = ref.read(calibrationProvider);
+            _selectionFrame = calibration.selectionFrame;
+            _secondSelectionFrame = _secondFrame(calibration);
           }
           state = state.copyWith(connection: status);
         }),
@@ -390,12 +404,14 @@ class SessionController extends Notifier<SessionState> {
     _capturing = true;
     final capturing = Stopwatch()..start();
     try {
-      if (_selectionFrame case final selected?) {
+      final second = _selectionFrame == null;
+      if (_selectionFrame ?? _secondSelectionFrame case final selected?) {
         try {
-          final ack = await socket.initialize(selected);
+          final ack = await socket.initialize(selected, second: second);
           if (!ref.mounted || socket != _socket) return;
           log.i(
-            'Initialization ${ack.status}: ${ack.reason}, frame ${ack.frameId}, capture ${selected.captureTime}',
+            '${second ? 'Second object initialization' : 'Initialization'} '
+            '${ack.status}: ${ack.reason}, frame ${ack.frameId}, capture ${selected.captureTime}',
           );
           if (ack.status != 'initialized') {
             _onServerError(
@@ -406,7 +422,11 @@ class SessionController extends Notifier<SessionState> {
             state = state.copyWith(phase: SessionPhase.failed);
             return;
           }
-          _selectionFrame = null;
+          if (second) {
+            _secondSelectionFrame = null;
+          } else {
+            _selectionFrame = null;
+          }
           _framesSent++;
           _framesSentThisSecond++;
         } catch (error, stack) {
@@ -500,9 +520,19 @@ class SessionController extends Notifier<SessionState> {
     _socket?.sendConfig(config);
   }
 
+  /// The second object's picture, when this experiment follows it.
+  EncodedFrame? _secondFrame(Calibration calibration) =>
+      _followsSecond(calibration) ? calibration.second!.frame : null;
+
+  bool _followsSecond(Calibration calibration) =>
+      ref.read(experimentSettingsProvider).mode == ExperimentMode.collision &&
+      calibration.selectionFrame != null &&
+      (calibration.second?.confirmed ?? false);
+
   SessionConfig _config() {
     final settings = ref.read(experimentSettingsProvider);
     final calibration = ref.read(calibrationProvider);
+    final second = _followsSecond(calibration) ? calibration.second : null;
     return SessionConfig(
       mode: settings.mode,
       massKg: settings.massKg,
@@ -510,6 +540,8 @@ class SessionController extends Notifier<SessionState> {
       pxPerM: calibration.pxPerM,
       targetPx: calibration.target,
       targetBbox: calibration.targetBbox,
+      secondTargetPx: second?.point,
+      secondTargetBbox: second?.box,
       debugTracking: const bool.fromEnvironment('TRACKING_DIAGNOSTICS'),
       initializationRequired: calibration.selectionFrame != null,
       surface: calibration.surface,

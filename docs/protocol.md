@@ -60,6 +60,7 @@ changes a setting.
 | `px_per_m` | number or null | from the ruler calibration, in **frame** pixels; null until calibrated |
 | `target_px` | `{x,y}` or null | where the user tapped the object, frame pixels; null means "auto-detect" |
 | `target_bbox` | `{x,y,w,h}` or null | optional box around the tapped object in frame pixels; helps track objects outside detector categories |
+| `second_target_px`, `second_target_bbox` | as above, optional | collision mode only: the other object, selected the same way. It is followed the same way as the first and reported in `objects` with `label: "selected_2"`; the first is `label: "selected"` and stays the `target` |
 | `debug_tracking` | boolean, optional | return numeric search bounds, candidate count, score and rejection reason; no images are stored |
 | `frame_size` | `{w,h}` | size of the JPEGs that follow |
 | `ar_plane` | object or null | iOS only: the surface the object moves on, from an ARKit raycast. `{"point": [x,y,z], "normal": [x,y,z], "offset_m": 0.0}` in ARKit world metres. `offset_m` moves it towards the camera, such as by a ball's radius. Takes priority over `px_per_m`; null removes it |
@@ -170,6 +171,10 @@ Coordinates are in the attached JPEG's pixels. Each request includes a
    pipeline lock. The reply is `type: "initialization"`, echoing the request IDs
    and timestamp, with `status: "initialized"` or `"failed"`, `reason`, `bbox`,
    and `tracked: false`. Wait for this acknowledgment before sending live frames.
+   In collision mode with a second object, send a second `initialize` with
+   `"target": "second"` and the picture that object was selected in, after the
+   first one is acknowledged (initializing the first clears the second). The
+   reply echoes `target`. Live frames wait until both are initialized.
 4. After success, send ordinary live frames. Only a subsequent image can report
    visual detection. After failure, stop live frames and offer reselection; a
    new config and initialization request can retry on the same connection.
@@ -266,6 +271,10 @@ gave the same error.
    a later version.
 
 ## Changelog
+
+- **v0.3, collisions**: collision mode can follow two selected objects:
+  `config` takes `second_target_px` and `second_target_bbox`, and
+  `initialize` takes `"target": "second"`. Clients that send neither see no change.
 
 - **v0.3, tracking fixes**: a tap without a box is boxed by the backend when the
   object stands out; the selected object keeps its `id` through misses and

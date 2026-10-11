@@ -23,6 +23,7 @@ class PhysicsState {
     this.screenAxes,
     this.trackingDebug = const {},
     this.trackingStatus,
+    this.partner,
   });
 
   /// Echo of the `frame_id` the client sent with the frame.
@@ -50,6 +51,43 @@ class PhysicsState {
   final ScreenAxes? screenAxes;
   final Map<String, dynamic> trackingDebug;
   final String? trackingStatus;
+
+  /// In a collision, the other object the user selected: where it is and,
+  /// once the backend knows, its velocity. No forces or energy.
+  final PhysicsState? partner;
+
+  /// The backend's label for the second selected object in `objects`.
+  static const partnerLabel = 'selected_2';
+
+  /// [partner] from a `state` or `frame` message, or null when it is not
+  /// in view this frame.
+  static PhysicsState? partnerFromJson(Map<String, dynamic> json) {
+    final objects = json['objects'];
+    if (objects is! List) return null;
+    final found = objects
+        .whereType<Map<String, dynamic>>()
+        .where((o) => o['label'] == partnerLabel)
+        .firstOrNull;
+    final pixel = found == null ? null : Vec2.tryParse(found['pixel']);
+    if (pixel == null) return null;
+    final moving = json['collision_objects'];
+    final motion = moving is List
+        ? moving
+              .whereType<Map<String, dynamic>>()
+              .where((o) => o['id'] == found!['id'])
+              .firstOrNull
+        : null;
+    return PhysicsState(
+      frameId: (json['frame_id'] as num?)?.toInt() ?? -1,
+      t: (json['timestamp'] as num?)?.toDouble() ?? 0,
+      tracked: true,
+      pixel: pixel,
+      bbox: PixelRect.tryParse(found!['bbox']),
+      position: Vec2.tryParse(found['position']),
+      velocity: motion == null ? null : Vec2.tryParse(motion['velocity']),
+      screenAxes: ScreenAxes.tryParse(found['screen_axes']),
+    );
+  }
 
   factory PhysicsState.fromJson(Map<String, dynamic> json) {
     final rawForces = json['forces'];
@@ -81,6 +119,7 @@ class PhysicsState {
       trackingDebug: json['tracking_debug'] is Map<String, dynamic>
           ? json['tracking_debug'] as Map<String, dynamic>
           : const {},
+      partner: partnerFromJson(json),
     );
   }
 
@@ -287,6 +326,7 @@ class FrameAckMessage extends ServerMessage {
               bbox: PixelRect.tryParse(followed!['bbox']),
               position: Vec2.tryParse(followed['position']),
               screenAxes: ScreenAxes.tryParse(followed['screen_axes']),
+              partner: PhysicsState.partnerFromJson(json),
             ),
     );
   }
