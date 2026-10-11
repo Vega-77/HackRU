@@ -66,6 +66,7 @@ class ArSurface {
     required this.normal,
     this.vertical = false,
     this.offsetM = 0,
+    this.id,
   });
 
   factory ArSurface.fromMap(Map<Object?, Object?> map) {
@@ -76,8 +77,12 @@ class ArSurface {
       point: v(map['point']),
       normal: v(map['normal']),
       vertical: map['vertical'] == true,
+      id: map['id'] as String?,
     );
   }
+
+  /// ARKit's anchor ID, for planes from `surfaces`. Null for a raycast hit.
+  final String? id;
 
   final List<double> point;
   final List<double> normal;
@@ -94,11 +99,19 @@ class ArSurface {
     normal: normal,
     vertical: vertical,
     offsetM: metres,
+    id: id,
   );
 
   Map<String, dynamic> toJson() => {
     'point': point,
     'normal': normal,
     'offset_m': offsetM,
+  };
+
+  /// As one of the config's `ar_surfaces`: a plane the object may rest on.
+  Map<String, dynamic> toSurfaceJson() => {
+    'id': ?id,
+    'point': point,
+    'normal': normal,
   };
 }

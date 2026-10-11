@@ -58,6 +58,10 @@ abstract interface class SurfaceFinder {
   /// The surface seen at [framePixel] (frame pixels), or null if ARKit has
   /// not found one there yet.
   Future<ArSurface?> findSurface(Vec2 framePixel);
+
+  /// Every plane ARKit has mapped so far (tables, floors, walls), so the
+  /// backend can tell what the object rests against.
+  Future<List<ArSurface>> allSurfaces();
 }
 
 /// A frame source whose preview can draw arrows anchored in the real

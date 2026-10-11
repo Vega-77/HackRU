@@ -44,6 +44,11 @@ class _ArCamera implements FrameSource, SurfaceFinder, ArVectorDisplay {
   Future<ArSurface?> findSurface(Vec2 framePixel) async =>
       const ArSurface(point: [0, 0, -1], normal: [0, 0, 1], vertical: true);
 
+  @override
+  Future<List<ArSurface>> allSurfaces() async => const [
+    ArSurface(point: [0, -0.5, -1], normal: [0, 1, 0], id: 'floor'),
+  ];
+
   final List<ArVectorScene?> shown = [];
 
   @override
@@ -64,6 +69,8 @@ void main() {
     expect(source.canFindSurfaces, isTrue);
     final surface = await source.findSurface(const Vec2(160, 213));
     expect(surface!.vertical, isTrue);
+    final planes = await source.allSurfaces();
+    expect(planes.single.id, 'floor');
   });
 
   test('the test video finds no surfaces', () async {
@@ -72,6 +79,7 @@ void main() {
     expect(source.usingTestVideo, isTrue);
     expect(source.canFindSurfaces, isFalse);
     expect(await source.findSurface(const Vec2(160, 120)), isNull);
+    expect(await source.allSurfaces(), isEmpty);
     await source.stop();
   });
 

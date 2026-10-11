@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hands_on_physics/features/experiment/widgets/overlay_frame.dart';
+import 'package:hands_on_physics/models/physics_state.dart';
 import 'package:hands_on_physics/models/vec2.dart';
 
 void main() {
@@ -18,6 +19,23 @@ void main() {
     expect(moved.velocity, target.velocity);
     expect(moved.forces, target.forces);
     expect(moved.visibility, 1);
+  });
+
+  test('a support pushing out of the screen becomes support', () {
+    const state = PhysicsState(
+      frameId: 1,
+      t: 0,
+      tracked: true,
+      pixel: Vec2(10, 10),
+      forces: [
+        ForceVector('gravity', Vec2(0, 0), z: -0.98),
+        ForceVector('normal', Vec2(0, 0), z: 0.98),
+      ],
+    );
+    expect(OverlayFrame.fromState(state).support, 0.98);
+    final half = OverlayFrame.fromState(state)
+        .approach(OverlayFrame.empty, vectorT: 0.5, positionT: 0.5);
+    expect(half.support, closeTo(0.49, 1e-9));
   });
 
   group('OverlayFrame.approach', () {

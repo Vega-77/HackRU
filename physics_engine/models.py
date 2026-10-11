@@ -53,9 +53,12 @@ def motion_model(
         normal = Vector2D(-sin(angle), cos(angle))
         normal_magnitude = mass_kg * GRAVITY_MPS2 * cos(angle)
         parallel_magnitude = -mass_kg * GRAVITY_MPS2 * sin(angle)
+        # A live session finds the normal force from contact instead (see contact.py),
+        # so it is only shown while the ball is actually on the ramp.
+        if not settings.get("normal_from_contacts"):
+            forces.append(_force("normal", normal.x * normal_magnitude, normal.y * normal_magnitude))
         forces.extend(
             [
-                _force("normal", normal.x * normal_magnitude, normal.y * normal_magnitude),
                 _force("gravity_parallel", tangent.x * parallel_magnitude, tangent.y * parallel_magnitude),
                 _force(
                     "gravity_perpendicular",

@@ -64,6 +64,9 @@ changes a setting.
 | `debug_tracking` | boolean, optional | return numeric search bounds, candidate count, score and rejection reason; no images are stored |
 | `frame_size` | `{w,h}` | size of the JPEGs that follow |
 | `ar_plane` | object or null | iOS only: the surface the object moves on, from an ARKit raycast. `{"point": [x,y,z], "normal": [x,y,z], "offset_m": 0.0}` in ARKit world metres. `offset_m` moves it towards the camera, such as by a ball's radius. Takes priority over `px_per_m`; null removes it |
+| `ar_surfaces` | list, optional | iOS only, with `ar_plane`: every plane ARKit has found, `[{"id": "...", "point": [x,y,z], "normal": [x,y,z]}]` in ARKit world metres (up to 32). Surfaces the object may rest against, for normal forces |
+| `surface_px` | list, optional | surface edges the user marked, `[{"a": {x,y}, "b": {x,y}}]` in frame pixels (up to 32). For clients with no ARKit, when an edge is too faint to find in the image |
+| `view` | `"side"` or `"top"`, optional | how the camera looks at the calibrated plane: side-on at a board (default; gravity points down the plane) or down at a table (gravity points into it). ARKit clients don't need it: the `ar_plane` says |
 
 The backend applies `config` separately from frame metadata. Valid settings
 apply from the next frame without an acknowledgement; invalid settings get an
@@ -137,6 +140,13 @@ the marker and the x(t) chart from the object marked `"target": true`:
   at the object, in frame pixels per metre (y down). The app draws a vector
   `(vx, vy)` along `vx * x + vy * y`, so arrows lie on a tilted surface.
 - `position_3d` (with an `ar_plane`): the same point in ARKit world space.
+- `width_m`, `height_m` (when calibrated): the object's size on the plane.
+- `surfaces` (target and second selected object, side-on views only): the
+  straight image edge the object most likely rests on, as
+  `[{"id": "edge", "source": "edge", "point": [x,y,0], "normal": [x,y,0]}]` in plane
+  metres. The reply's top-level `surfaces` lists `ar_surfaces` and `surface_px`
+  the same way, turned into plane coordinates (z is out of the plane, towards
+  the camera).
 - `source` identifies `motion`, `manual`, `color`, or `mediapipe` observations.
   `tracking_status` distinguishes `detected`, `low_confidence`, `searching`, and `lost`;
   a selected patch first reports `initialized` with `tracked: false` until a later
@@ -217,9 +227,11 @@ Replaces `frame` once the kinematics stage is in. This is what the app draws.
 | `tracked` | false means everything below may be missing or null |
 | `pixel`, `bbox` | client frame pixels |
 | `position`, `velocity`, `acceleration` | world space, SI, already smoothed |
-| `forces` | list; known names: `gravity`, `normal`, `friction`, `tension`, `gravity_parallel`, `gravity_perpendicular`, `net`. Unknown names are drawn in a neutral colour |
+| `forces` | list; known names: `gravity`, `normal`, `friction`, `tension`, `gravity_parallel`, `gravity_perpendicular`, `net`, plus `normal_2` (a second surface pushing, such as a wall) and `normal_contact` (another tracked object pushing). Unknown names are drawn in a neutral colour. Normal forces only appear while the object touches something, and carry `point` (where, plane metres) and, when the surface the object sits on is the plane itself (a table seen from above), `z`: newtons out of the plane, towards the camera |
+| `contacts` | what the target is touching this frame: `[{"name", "surface", "source", "point"}]`; `source` is `edge`, `path`, `ramp_angle`, `tap`, `ar_surface`, `ar_plane` or `object`. Missing in pendulum mode |
 | `screen_axes` | as in `frame` objects; the app draws vectors along them when present |
 | `position_3d`, `velocity_3d`, `acceleration_3d`, `forces_3d` | with an `ar_plane` only: the same vectors in ARKit world space, for a renderer that anchors arrows in 3D |
+| `collision_objects[].forces` | collision mode: the normal forces on each object, as in `forces` |
 | `energy` | joules; any key may be omitted |
 | `extras` | mode-specific values the app shows as readouts (`angle_deg`, `mu`, `theta_deg`, `momentum`, `restitution`, ...) |
 
@@ -271,6 +283,13 @@ gave the same error.
    a later version.
 
 ## Changelog
+
+- **v0.3, normal forces**: `config` may carry `ar_surfaces`, `surface_px` and
+  `view`. `frame` objects add `height_m` and `surfaces`; `state` adds `contacts`,
+  and normal forces may carry `point` and `z`. The ramp's `normal` force now
+  appears only while the ball is on the ramp, and every mode but pendulum gets
+  normal forces from whatever the object rests on. Clients that send none of the
+  new fields still get normal forces, from edges in the image and the object's path.
 
 - **v0.3, collisions**: collision mode can follow two selected objects:
   `config` takes `second_target_px` and `second_target_bbox`, and
