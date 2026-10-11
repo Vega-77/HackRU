@@ -15,6 +15,12 @@ from .models import GRAVITY_MPS2, collision_metrics, motion_model
 # passing over) keep it, so velocity doesn't drop out for a single missed frame.
 FORGET_AFTER_S = 0.5
 
+# Free fall bounds its history by time (0.35 s), not by count. Seven samples
+# at 30 fps span only 0.2 s, too short for the acceleration uncertainty gate
+# once the tracker jitters by a pixel or two, so most of a drop would show no
+# acceleration. Twelve covers the time window at 30 fps.
+FREE_FALL_MAX_SAMPLES = 12
+
 
 class PhysicsSession:
     """One physics history per WebSocket connection and tracked object ID."""
@@ -122,8 +128,12 @@ class PhysicsSession:
                 scales = [hypot(v["x"], v["y"]) for v in axes.values() if isinstance(v, dict)]
                 scale = min(scales) if scales else calibration.get("settings", {}).get("px_per_m")
                 self.engines[object_id] = KinematicsEngine(
-                    # A pendulum fit needs a little more of the swing to lock on.
-                    window_size=max(self.window_size, 9) if mode == "pendulum" else self.window_size, confidence_threshold=0.6,
+                    # Free fall keeps more samples so dropped frames still show gravity;
+                    # a pendulum fit needs a little more of the swing to lock on.
+                    window_size=(max(self.window_size, FREE_FALL_MAX_SAMPLES) if mode == "free_fall"
+                                 else max(self.window_size, 9) if mode == "pendulum"
+                                 else self.window_size),
+                    confidence_threshold=0.6,
                     max_window_seconds=0.35 if mode == "free_fall" else None,
                     min_acceleration_samples=4 if mode == "free_fall" else 3,
                     min_acceleration_span=0.12 if mode == "free_fall" else 0.0,

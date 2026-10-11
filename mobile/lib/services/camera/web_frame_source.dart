@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:js_interop';
+import 'dart:js_interop_unsafe';
 import 'dart:ui_web' as ui_web;
 
 import 'package:flutter/widgets.dart';
@@ -51,6 +52,15 @@ class WebFrameSource implements FrameSource {
   int? _frameCallback;
   double? _frameTime;
   double _frameAvailableAt = 0;
+  double _lastCallbackAt = 0;
+
+  /// Set when the browser has no frame callbacks, or sends none for a video
+  /// that is not on the page: [capture] then draws the current picture
+  /// itself, timed by the page clock, so frames keep flowing.
+  bool _drawOnCapture = false;
+
+  /// How long a playing camera may go without a frame callback.
+  static const Duration _callbackGrace = Duration(seconds: 1);
 
   @override
   bool get isRunning => _stream != null;
@@ -102,12 +112,29 @@ class WebFrameSource implements FrameSource {
       ..removeWhere((preview) => !preview.isConnected)
       ..forEach(_attach);
     _attach(_captureVideo);
-    _watchFrames();
+    _drawOnCapture = !_captureVideo.has('requestVideoFrameCallback');
+    if (_drawOnCapture) {
+      log.w('No video frame callbacks in this browser, drawing on capture');
+    } else {
+      _watchFrames();
+    }
     // videoWidth is 0 until the first frame's metadata arrives. A camera
     // another app holds can open and never deliver one.
     final waiting = Stopwatch()..start();
-    while (_frameTime == null) {
+    while (_drawOnCapture
+        ? _captureVideo.videoWidth == 0
+        : _frameTime == null) {
       if (_stream == null) return; // Stopped meanwhile.
+      if (!_drawOnCapture &&
+          _captureVideo.videoWidth > 0 &&
+          waiting.elapsed > _callbackGrace) {
+        log.w(
+          'The camera plays but sends no frame callbacks, drawing on capture',
+        );
+        _cancelFrameCallback();
+        _drawOnCapture = true;
+        break;
+      }
       if (waiting.elapsed > AppConfig.cameraFirstFrameTimeout) {
         log.w('The browser camera opened but sent no frame');
         await stop();
@@ -128,9 +155,7 @@ class WebFrameSource implements FrameSource {
   Future<void> stop() async {
     final stream = _stream;
     _stream = null;
-    final callback = _frameCallback;
-    if (callback != null) _captureVideo.cancelVideoFrameCallback(callback);
-    _frameCallback = null;
+    _cancelFrameCallback();
     _frameTime = null;
     if (stream == null) return;
     log.i('Stopping the browser camera');
@@ -147,8 +172,24 @@ class WebFrameSource implements FrameSource {
 
   @override
   Future<EncodedFrame?> capture({int width = AppConfig.frameWidth}) async {
+    if (!isRunning) return null;
+    if (!_drawOnCapture &&
+        _frameTime != null &&
+        web.window.performance.now() - _lastCallbackAt >
+            _callbackGrace.inMilliseconds) {
+      // A live camera never stops sending frames, so the callbacks did.
+      log.w('Video frame callbacks stopped, drawing on capture');
+      _cancelFrameCallback();
+      _drawOnCapture = true;
+    }
+    if (_drawOnCapture) {
+      if (_captureVideo.videoWidth == 0) return null;
+      _drawCurrentFrame();
+      _frameAvailableAt = web.window.performance.now();
+      _frameTime = _frameAvailableAt / 1000;
+    }
     final timestamp = _frameTime;
-    if (!isRunning || timestamp == null) return null;
+    if (timestamp == null) return null;
 
     final size = _sizeForWidth(width);
     var canvas = _canvas;
@@ -180,25 +221,43 @@ class WebFrameSource implements FrameSource {
   void _watchFrames() {
     _frameCallback = _captureVideo.requestVideoFrameCallback(
       ((double now, _VideoFrameTiming metadata) {
-        if (!isRunning) return;
-        final size = _sizeForWidth(AppConfig.frameWidth);
-        _canvas
-          ..width = size.width
-          ..height = size.height;
-        (_canvas.getContext('2d') as web.CanvasRenderingContext2D).drawImage(
-          _captureVideo,
-          0,
-          0,
-          size.width,
-          size.height,
-        );
-        // Copy pixels in the callback for this exact presentation timestamp.
-        // Encoding and network scheduling must not change motion time.
-        _frameTime = metadata.mediaTime;
-        _frameAvailableAt = metadata.captureTime ?? metadata.presentationTime;
+        if (!isRunning || _drawOnCapture) return;
+        _lastCallbackAt = now;
+        // The page clock: mediaTime of a live camera is not known to advance
+        // in every browser, and a repeated time stops the stream as
+        // duplicate frames.
+        final availableAt = metadata.captureTime ?? metadata.presentationTime;
+        final time = availableAt / 1000;
+        if (_frameTime == null || time > _frameTime!) {
+          // Copy pixels in the callback for this exact frame time. Encoding
+          // and network scheduling must not change motion time.
+          _drawCurrentFrame();
+          _frameTime = time;
+          _frameAvailableAt = availableAt;
+        }
         _watchFrames();
       }).toJS,
     );
+  }
+
+  void _drawCurrentFrame() {
+    final size = _sizeForWidth(AppConfig.frameWidth);
+    _canvas
+      ..width = size.width
+      ..height = size.height;
+    (_canvas.getContext('2d') as web.CanvasRenderingContext2D).drawImage(
+      _captureVideo,
+      0,
+      0,
+      size.width,
+      size.height,
+    );
+  }
+
+  void _cancelFrameCallback() {
+    final callback = _frameCallback;
+    if (callback != null) _captureVideo.cancelVideoFrameCallback(callback);
+    _frameCallback = null;
   }
 
   @override
