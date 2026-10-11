@@ -15,6 +15,7 @@ import '../../../state/session_controller.dart';
 import '../../../state/experiment_settings.dart';
 import '../../../services/network/acquisition_client.dart';
 import '../../experiment/widgets/coordinate_mapper.dart';
+import 'selection_region_painter.dart';
 
 /// The picture with the calibration marks on it:
 ///
@@ -203,14 +204,14 @@ class _CalibrationStageState extends ConsumerState<CalibrationStage> {
                   else
                     widget.background,
                   if (_boxStart != null && _boxEnd != null)
-                    Positioned.fromRect(
-                      rect: Rect.fromPoints(
-                        screen(_boxStart)!,
-                        screen(_boxEnd)!,
-                      ),
-                      child: DecoratedBox(
-                        decoration: BoxDecoration(
-                          border: Border.all(color: AppColors.vellum),
+                    IgnorePointer(
+                      child: CustomPaint(
+                        painter: SelectionRegionPainter(
+                          box: Rect.fromPoints(
+                            screen(_boxStart)!,
+                            screen(_boxEnd)!,
+                          ),
+                          drawing: true,
                         ),
                       ),
                     ),
@@ -225,6 +226,7 @@ class _CalibrationStageState extends ConsumerState<CalibrationStage> {
                       label: _lengthLabel(calibration.rulerLengthM),
                       active: _dragging,
                       snapped: _snapped,
+                      confirmed: calibration.selectionConfirmed,
                     ),
                   ),
                   if (active != null) _loupe(active, view),
@@ -457,6 +459,7 @@ class _MarksPainter extends CustomPainter {
     required this.label,
     required this.active,
     required this.snapped,
+    required this.confirmed,
   });
 
   final Offset? start;
@@ -466,28 +469,19 @@ class _MarksPainter extends CustomPainter {
   final String label;
   final _End? active;
   final bool snapped;
+  final bool confirmed;
 
   static const _ink = AppColors.vellum;
   static const _halo = Color(0x99000000);
 
   @override
   void paint(Canvas canvas, Size size) {
-    if (target != null) _paintTarget(canvas, target!);
+    if (target != null && targetBox == null) _paintTarget(canvas, target!);
     if (targetBox != null) {
-      canvas.drawRect(
-        targetBox!,
-        Paint()
-          ..color = _halo
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = 4,
-      );
-      canvas.drawRect(
-        targetBox!,
-        Paint()
-          ..color = _ink
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = 1.5,
-      );
+      SelectionRegionPainter(
+        box: targetBox!,
+        confirmed: confirmed,
+      ).paint(canvas, size);
     }
     if (start != null && end != null) _paintRuler(canvas, size, start!, end!);
   }
@@ -515,7 +509,7 @@ class _MarksPainter extends CustomPainter {
       }
     }
 
-    // The ends: a hollow ring you can grab, its centre exactly on the point.
+    // The centre remains the exact endpoint; the larger outline aids touch.
     for (final (point, which) in [(a, _End.start), (b, _End.end)]) {
       final grabbed = active == which;
       final radius = grabbed ? 13.0 : 10.0;
@@ -524,14 +518,38 @@ class _MarksPainter extends CustomPainter {
         point,
         radius,
         Paint()
-          ..color = _ink
+          ..color = grabbed ? AppColors.instrumentAccentDark : _ink
           ..style = PaintingStyle.stroke
           ..strokeWidth = 2,
       );
       canvas.drawCircle(point, 1.8, Paint()..color = _ink);
+      final endpoint = TextPainter(
+        text: TextSpan(
+          text: which == _End.start ? 'A' : 'B',
+          style: AppType.label.copyWith(color: _ink),
+        ),
+        textDirection: TextDirection.ltr,
+      )..layout();
+      final x = (point.dx - endpoint.width / 2)
+          .clamp(4.0, math.max(4.0, size.width - endpoint.width - 4))
+          .toDouble();
+      final y = (point.dy + 18)
+          .clamp(4.0, math.max(4.0, size.height - endpoint.height - 4))
+          .toDouble();
+      final tag = Rect.fromLTWH(
+        x - 4,
+        y - 2,
+        endpoint.width + 8,
+        endpoint.height + 4,
+      );
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(tag, const Radius.circular(3)),
+        Paint()..color = AppColors.graphiteDeep,
+      );
+      endpoint.paint(canvas, Offset(x, y));
     }
 
-    // The length, in a pill beside the middle of the line.
+    // Place the reference length beside the dimension, away from its ends.
     final text = TextPainter(
       text: TextSpan(
         text: label,
@@ -556,13 +574,17 @@ class _MarksPainter extends CustomPainter {
     if (size.width > pillSize.width) {
       centre = Offset(centre.dx.clamp(halfW, size.width - halfW), centre.dy);
     }
+    final halfH = pillSize.height / 2;
+    if (size.height > pillSize.height) {
+      centre = Offset(centre.dx, centre.dy.clamp(halfH, size.height - halfH));
+    }
     final pill = RRect.fromRectAndRadius(
       Rect.fromCenter(
         center: centre,
         width: pillSize.width,
         height: pillSize.height,
       ),
-      const Radius.circular(999),
+      const Radius.circular(4),
     );
     canvas.drawRRect(pill, Paint()..color = _ink);
     text.paint(canvas, centre - Offset(text.width / 2, text.height / 2));
@@ -580,15 +602,6 @@ class _MarksPainter extends CustomPainter {
       ..strokeWidth = 1.5;
     for (final paint in [halo, ink]) {
       canvas.drawCircle(p, r, paint);
-      // Crosshair ticks outside the ring, so the object itself stays visible.
-      for (final dir in const [
-        Offset(1, 0),
-        Offset(-1, 0),
-        Offset(0, 1),
-        Offset(0, -1),
-      ]) {
-        canvas.drawLine(p + dir * (r + 3), p + dir * (r + 10), paint);
-      }
     }
   }
 
@@ -600,5 +613,6 @@ class _MarksPainter extends CustomPainter {
       old.targetBox != targetBox ||
       old.label != label ||
       old.active != active ||
-      old.snapped != snapped;
+      old.snapped != snapped ||
+      old.confirmed != confirmed;
 }
