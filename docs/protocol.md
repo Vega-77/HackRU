@@ -231,6 +231,7 @@ Replaces `frame` once the kinematics stage is in. This is what the app draws.
 | `forces` | list; known names: `gravity`, `normal`, `friction`, `tension`, `gravity_parallel`, `gravity_perpendicular`, `net`, plus `normal_2` (a second surface pushing, such as a wall) and `normal_contact` (another tracked object pushing). Unknown names are drawn in a neutral colour. Normal forces only appear while the object touches something, and carry `point` (where, plane metres) and, when the surface the object sits on is the plane itself (a table seen from above), `z`: newtons out of the plane, towards the camera |
 | `contacts` | what the target is touching this frame: `[{"name", "surface", "source", "point"}]`; `source` is `edge`, `path`, `ramp_angle`, `tap`, `ar_surface`, `ar_plane` or `object`. Missing in pendulum mode |
 | `screen_axes` | as in `frame` objects; the app draws vectors along them when present |
+| `pivot_pixel` | pendulum mode, once the pivot is known: where it is in client frame pixels. The app draws the string from the bob to it and lays `tension` along that line |
 | `position_3d`, `velocity_3d`, `acceleration_3d`, `forces_3d` | with an `ar_plane` only: the same vectors in ARKit world space, for a renderer that anchors arrows in 3D |
 | `collision_objects[].forces` | collision mode: the normal forces on each object, as in `forces` |
 | `energy` | joules; any key may be omitted |

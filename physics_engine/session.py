@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
 from math import hypot, isfinite
 
 from .contact import Body, ContactTracker, Surface, gravity_in_plane, plane_support, ramp_surface
@@ -28,6 +29,10 @@ class PhysicsSession:
         self.window_size = window_size
         self.engines: dict[int, KinematicsEngine] = {}
         self.initial_energy: dict[int, float] = {}
+        # Pendulum pivot for each object, averaged over every circle fit so far. A pivot
+        # doesn't move, so averaging steadies it, and a swing point where the fit fails
+        # (too little arc in view) keeps the last one.
+        self._pivots: dict[int, dict] = {}
         self._last_seen: dict[int, float] = {}
         self._configuration: tuple | None = None
         self._calibration: tuple | None = None
@@ -38,6 +43,7 @@ class PhysicsSession:
     def reset(self) -> None:
         self.engines.clear()
         self.initial_energy.clear()
+        self._pivots.clear()
         self._last_seen.clear()
         self._pre_collision = None
         self._last_collision = None
@@ -87,6 +93,7 @@ class PhysicsSession:
         for gone_id in [i for i, seen in self._last_seen.items() if timestamp - seen > FORGET_AFTER_S]:
             self.engines.pop(gone_id, None)
             self.initial_energy.pop(gone_id, None)
+            self._pivots.pop(gone_id, None)
             self.contacts.forget(gone_id)
             del self._last_seen[gone_id]
         target = next((o for o in frame.get("objects", []) if o.get("target")), None)
@@ -121,8 +128,11 @@ class PhysicsSession:
                 scales = [hypot(v["x"], v["y"]) for v in axes.values() if isinstance(v, dict)]
                 scale = min(scales) if scales else calibration.get("settings", {}).get("px_per_m")
                 self.engines[object_id] = KinematicsEngine(
-                    window_size=(max(self.window_size, FREE_FALL_MAX_SAMPLES)
-                                 if mode == "free_fall" else self.window_size),
+                    # Free fall keeps more samples so dropped frames still show gravity;
+                    # a pendulum fit needs a little more of the swing to lock on.
+                    window_size=(max(self.window_size, FREE_FALL_MAX_SAMPLES) if mode == "free_fall"
+                                 else max(self.window_size, 9) if mode == "pendulum"
+                                 else self.window_size),
                     confidence_threshold=0.6,
                     max_window_seconds=0.35 if mode == "free_fall" else None,
                     min_acceleration_samples=4 if mode == "free_fall" else 3,
@@ -153,6 +163,27 @@ class PhysicsSession:
             "acceleration_valid": target_result.acceleration_valid,
         }
 
+        pivot = None
+        if mode == "pendulum" and target_result.velocity_valid:
+            pivot = settings.get("pendulum_pivot_m")
+            if pivot is None:
+                estimated_pivot = self.engines[int(target["id"])].estimate_circle_center()
+                if estimated_pivot is not None:
+                    self._pivots[int(target["id"])] = _blend_pivot(
+                        self._pivots.get(int(target["id"])), estimated_pivot,
+                    )
+                pivot = self._pivots.get(int(target["id"]))
+            if pivot is not None:
+                swing = self.engines[int(target["id"])].pendulum_estimate(
+                    Vector2D(float(pivot["x"]), float(pivot["y"])), GRAVITY_MPS2
+                )
+                if swing is not None:
+                    target_result = replace(
+                        target_result, velocity_mps=swing[0], speed_mps=swing[0].magnitude,
+                        acceleration_mps2=swing[1] if target_result.acceleration_valid else target_result.acceleration_mps2,
+                    )
+                    results[int(target["id"])] = target_result
+
         if target_result.velocity_valid:
             state["velocity"] = _vec(target_result.velocity_mps)
             state["speed_mps"] = target_result.speed_mps
@@ -169,10 +200,11 @@ class PhysicsSession:
             model_settings["normal_from_contacts"] = contact_forces is not None
             if mode == "ramp" and model_settings.get("ramp_angle_deg") is None:
                 model_settings["ramp_angle_deg"] = self.engines[target_id].trajectory_angle_deg()
-            if mode == "pendulum" and model_settings.get("pendulum_pivot_m") is None:
-                estimated_pivot = self.engines[target_id].estimate_circle_center()
-                if estimated_pivot is not None:
-                    model_settings["pendulum_pivot_m"] = _vec(estimated_pivot)
+            if mode == "pendulum" and pivot is not None:
+                model_settings["pendulum_pivot_m"] = pivot
+                pivot_pixel = _pivot_pixel(target, pivot)
+                if pivot_pixel is not None:
+                    state["pivot_pixel"] = pivot_pixel
             energy_at_start = self.initial_energy.get(target_id)
             model = motion_model(
                 mode,
@@ -315,6 +347,36 @@ def _plain_force(force: dict) -> dict:
 
 def _contact_summary(force: dict) -> dict:
     return {k: force[k] for k in ("name", "surface", "source", "point") if k in force}
+
+
+def _blend_pivot(held: dict | None, fitted: Vector2D) -> dict:
+    """Running average of pivot fits, so one noisy fit barely moves it."""
+
+    if held is None:
+        return {"x": fitted.x, "y": fitted.y, "fits": 1}
+    fits = held["fits"] + 1
+    weight = max(1.0 / fits, 0.05)
+    return {
+        "x": held["x"] + (fitted.x - held["x"]) * weight,
+        "y": held["y"] + (fitted.y - held["y"]) * weight,
+        "fits": fits,
+    }
+
+
+def _pivot_pixel(target: dict, pivot: dict) -> dict | None:
+    """Where the pendulum's pivot is in the client's frame pixels, so the app can draw
+    the string and lay the tension arrow along it. Steps from the bob using the plane's
+    screen axes at the bob, which is close enough over a string's length."""
+
+    axes, pixel, position = target.get("screen_axes"), target.get("pixel"), target.get("position")
+    if not axes or not pixel or not position:
+        return None
+    dx = float(pivot["x"]) - float(position["x"])
+    dy = float(pivot["y"]) - float(position["y"])
+    return {
+        "x": round(float(pixel["x"]) + axes["x"]["x"] * dx + axes["y"]["x"] * dy, 2),
+        "y": round(float(pixel["y"]) + axes["x"]["y"] * dx + axes["y"]["y"] * dy, 2),
+    }
 
 
 def _vec(vector: Vector2D) -> dict:
