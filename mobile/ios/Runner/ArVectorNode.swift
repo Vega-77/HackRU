@@ -134,8 +134,9 @@ final class ArrowNode: SCNNode {
     haloMaterial.cullMode = .front
     super.init()
     for (node, material) in [(shaftHalo, haloMaterial), (shaft, shaftMaterial), (headHalo, haloMaterial), (head, headMaterial)] {
-      node.geometry = node === shaft || node === shaftHalo
-        ? SCNCylinder(radius: 1, height: 1)
+      let isShaft = node === shaft || node === shaftHalo
+      node.geometry = isShaft
+        ? SCNCylinder(radius: 1, height: 1) as SCNGeometry
         : SCNCone(topRadius: 0, bottomRadius: 1, height: 1)
       node.geometry?.firstMaterial = material
       addChildNode(node)

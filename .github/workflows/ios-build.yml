@@ -1,0 +1,43 @@
+# Compiles the iOS app on a Mac, so Swift and Xcode project mistakes show
+# up without anyone needing the team's Mac or iPhone. It doesn't sign or
+# install anything, and it can't run ARKit: that still needs a real phone.
+name: iOS build
+
+on:
+  push:
+    branches: [Dev1, main]
+    paths: [mobile/ios/**, mobile/pubspec.*, .github/workflows/ios-build.yml]
+  pull_request:
+    branches: [main]
+    paths: [mobile/ios/**, mobile/pubspec.*, .github/workflows/ios-build.yml]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ios-build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-ios:
+    runs-on: macos-15
+    timeout-minutes: 40
+    defaults:
+      run:
+        working-directory: mobile
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: 3.47.7
+          channel: stable
+          cache: true
+
+      - run: xcodebuild -version
+      - run: flutter pub get
+
+      # A device build, unsigned: compiles the Dart, the plugins and our
+      # Swift (ArSessionPlugin, ArVectorNode) against the iPhone SDK.
+      - run: flutter build ios --debug --no-codesign
