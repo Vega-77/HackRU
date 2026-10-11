@@ -13,14 +13,25 @@ import UIKit
 /// live camera pose every screen refresh and they stay on the object while
 /// the phone moves. One layer is shared by every AR preview; the newest
 /// preview shows it.
+///
+/// Lengths arrive at 1 mm per reference pixel. Every frame, keepScreenSize
+/// scales them by the object's distance, so arrows look as long as the 2D
+/// overlay's whether the ball is 30 cm or 3 m away.
 final class ArVectorLayer {
   let root = SCNNode()
+  /// At the object's centre; the arrows grow out of it.
+  private let anchor = SCNNode()
   private var arrows: [String: ArrowNode] = [:]
   private let labels = LabelImages()
+
+  /// Dart sends 1 mm per pixel of the 2D overlay's 390 pt reference phone.
+  private static let metresPerReferencePx: Float = 0.001
+  private static let referenceWidthPt: Float = 390
 
   init() {
     root.name = "handson.vectors"
     root.opacity = 0
+    root.addChildNode(anchor)
   }
 
   func attach(to scene: SCNScene) {
@@ -36,6 +47,14 @@ final class ArVectorLayer {
     let specs = (args["arrows"] as? [[String: Any]] ?? []).compactMap(ArrowSpec.init)
     let ids = Set(specs.map(\.id))
 
+    // Hidden arrows jump to the new object instead of gliding across the room.
+    if root.opacity == 0 {
+      SCNTransaction.begin()
+      SCNTransaction.disableActions = true
+      anchor.simdPosition = origin
+      SCNTransaction.commit()
+    }
+
     for (id, node) in arrows where !ids.contains(id) {
       node.removeFromParentNode()
       arrows[id] = nil
@@ -46,18 +65,37 @@ final class ArVectorLayer {
     SCNTransaction.disableActions = true
     for spec in specs where arrows[spec.id] == nil {
       let node = ArrowNode(halo: halo)
-      root.addChildNode(node)
+      anchor.addChildNode(node)
       arrows[spec.id] = node
-      node.apply(spec, origin: origin, label: showLabels ? labels.image(for: spec, halo: halo) : nil)
+      node.apply(spec, label: showLabels ? labels.image(for: spec, halo: halo) : nil)
     }
     SCNTransaction.commit()
 
     SCNTransaction.begin()
     SCNTransaction.animationDuration = ease
     root.opacity = 1
+    anchor.simdPosition = origin
     for spec in specs {
-      arrows[spec.id]?.apply(spec, origin: origin, label: showLabels ? labels.image(for: spec, halo: halo) : nil)
+      arrows[spec.id]?.apply(spec, label: showLabels ? labels.image(for: spec, halo: halo) : nil)
     }
+    SCNTransaction.commit()
+  }
+
+  /// Called on SceneKit's render thread before each frame.
+  func keepScreenSize(camera: SCNNode?) {
+    guard let camera = camera, let projection = camera.camera?.projectionTransform
+    else { return }
+    let distance = simd_distance(camera.simdWorldPosition, anchor.simdWorldPosition)
+    // At distance d the view's width covers 2d / m11 metres, and the 2D
+    // overlay draws one reference pixel as width / 390 points, so the
+    // view's width drops out.
+    let xScale = Float(projection.m11)
+    guard distance > 0, xScale > 0 else { return }
+    let metresPerReferencePx = 2 * distance / (xScale * ArVectorLayer.referenceWidthPt)
+    let scale = min(max(metresPerReferencePx / ArVectorLayer.metresPerReferencePx, 0.2), 25)
+    SCNTransaction.begin()
+    SCNTransaction.disableActions = true
+    anchor.simdScale = simd_float3(repeating: scale)
     SCNTransaction.commit()
   }
 
@@ -160,8 +198,7 @@ final class ArrowNode: SCNNode {
     fatalError("ArrowNode is built in code")
   }
 
-  func apply(_ spec: ArrowSpec, origin: simd_float3, label image: UIImage?) {
-    simdPosition = origin
+  func apply(_ spec: ArrowSpec, label image: UIImage?) {
     simdOrientation = ArrowNode.rotation(to: spec.direction)
 
     // Proportions follow the 2D overlay's arrow head.

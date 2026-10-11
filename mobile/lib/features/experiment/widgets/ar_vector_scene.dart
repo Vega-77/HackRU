@@ -10,12 +10,13 @@ import 'vector_overlay_painter.dart';
 /// Turns a backend reply into the arrows the native AR view draws.
 ///
 /// Lengths come from [ArrowScale] at its reference size, with one screen
-/// pixel there drawn as [metresPerPx] in the world: a 1 m/s velocity is a
-/// 12 cm arrow and the object's weight is 9 cm. Forces share one scale, so
-/// a free-body diagram still adds up, exactly as in the 2D overlay.
+/// pixel there sent as [metresPerPx]. The native view then scales them by
+/// the object's distance every frame (ArVectorNode.swift), so they look as
+/// long as the 2D overlay's arrows whether the object is near or far.
+/// Forces share one scale, so a free-body diagram still adds up.
 abstract final class ArVectorSceneBuilder {
-  /// World length of one reference pixel. Tune on a device: bigger reads
-  /// better from far away, smaller crowds a tabletop less.
+  /// World length of one reference pixel, before the native distance
+  /// scaling. ArVectorNode.swift assumes this value.
   static const double metresPerPx = 0.001;
 
   /// Shaft radius per pixel of the 2D overlay's stroke width.

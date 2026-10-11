@@ -260,20 +260,27 @@ final class ArPreviewFactory: NSObject, FlutterPlatformViewFactory {
 /// The live camera feed. ARSCNView fills its bounds like BoxFit.cover, which
 /// is what the Flutter overlay assumes when it maps frame pixels to screen.
 /// The same view draws the 3D arrows, from the session's live camera pose.
-final class ArPreview: NSObject, FlutterPlatformView {
+final class ArPreview: NSObject, FlutterPlatformView, ARSCNViewDelegate {
   private let sceneView: ARSCNView
+  private let vectors: ArVectorLayer
 
   init(frame: CGRect, session: ARSession, vectors: ArVectorLayer) {
     sceneView = ARSCNView(frame: frame)
+    self.vectors = vectors
     sceneView.session = session
     sceneView.scene = SCNScene()
     sceneView.automaticallyUpdatesLighting = false
     sceneView.antialiasingMode = .multisampling4X
     vectors.attach(to: sceneView.scene)
     super.init()
+    sceneView.delegate = self
   }
 
   func view() -> UIView {
     sceneView
+  }
+
+  func renderer(_ renderer: SCNSceneRenderer, updateAtTime time: TimeInterval) {
+    vectors.keepScreenSize(camera: renderer.pointOfView)
   }
 }
