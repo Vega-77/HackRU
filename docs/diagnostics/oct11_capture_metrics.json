@@ -1,0 +1,208 @@
+{
+  "method": "Original exported analysis compared with serial replay of exact JPEGs and capture timestamps; worker timing is not RTT and runs are not controlled speed benchmarks.",
+  "captures": [
+    {
+      "source": "HandsOnPhysics-2026-10-11T22-34-05-920Z.hop.json",
+      "source_sha256": "712a47ac3ab0988f94d550c7998676ae8d0f8529ca41190bc266af6bfa4b36a4",
+      "capture": {
+        "frame_count": 91,
+        "duration_s": 2.9879999999999427,
+        "fps": 30.12048192771142,
+        "max_gap_ms": 39.59999999995034
+      },
+      "scale_px_per_m": 426.6666666666667,
+      "scale_verified": false,
+      "exported_tracked": 45,
+      "replay_tracked": 18,
+      "changed_pixel_frame_ids": [
+        65,
+        66,
+        67,
+        68,
+        69,
+        70,
+        71,
+        72,
+        73,
+        74,
+        75,
+        76,
+        77,
+        78,
+        79,
+        80,
+        81,
+        82,
+        83,
+        84,
+        85,
+        86,
+        87,
+        88,
+        89,
+        90,
+        91
+      ],
+      "accepted_moving_frame_ids": [
+        19,
+        20
+      ],
+      "accepted_moving_span_s": 0.03309999999999036,
+      "exported_processing_median_ms": 43.29,
+      "exported_processing_p95_ms": 52.13,
+      "exported_queue_median_ms": 0.04,
+      "exported_queue_p95_ms": 0.06,
+      "replay_worker_metrics": {
+        "frames": 91,
+        "tracked": 18,
+        "worker_median_ms": 43.6679579999999,
+        "worker_p95_ms": 51.1016250000001
+      },
+      "fall_before_after": [
+        {
+          "frame_id": 19,
+          "timestamp": 890.0535,
+          "pixel": {
+            "x": 204.5,
+            "y": 93.5
+          },
+          "exported_acceleration": {
+            "x": -0.4141504841052212,
+            "y": -3.95231874661671
+          },
+          "replay_acceleration": null,
+          "replay_quality": {
+            "reason": "insufficient_time_span",
+            "samples": 1,
+            "span_s": 0.0,
+            "position_residual_m": 0.0,
+            "acceleration_std_mps2": null,
+            "velocity_valid": false,
+            "acceleration_valid": false
+          }
+        },
+        {
+          "frame_id": 20,
+          "timestamp": 890.0866,
+          "pixel": {
+            "x": 202.5,
+            "y": 118.5
+          },
+          "exported_acceleration": {
+            "x": -0.5875327789709817,
+            "y": -5.804849319817901
+          },
+          "replay_acceleration": null,
+          "replay_quality": {
+            "reason": "insufficient_time_span",
+            "samples": 2,
+            "span_s": 0.03309999999999036,
+            "position_residual_m": 0.0,
+            "acceleration_std_mps2": null,
+            "velocity_valid": true,
+            "acceleration_valid": false
+          }
+        }
+      ]
+    },
+    {
+      "source": "HandsOnPhysics-2026-10-11T22-34-36-849Z.hop.json",
+      "source_sha256": "5ddcb60557ff8d559bb9a29edf73ae2006b62d276393582e8429f47b8a5b1ae1",
+      "capture": {
+        "frame_count": 90,
+        "duration_s": 3.006599999999935,
+        "fps": 29.601543271470074,
+        "max_gap_ms": 67.29999999993197
+      },
+      "scale_px_per_m": 426.6666666666667,
+      "scale_verified": false,
+      "exported_tracked": 63,
+      "replay_tracked": 63,
+      "changed_pixel_frame_ids": [],
+      "accepted_moving_frame_ids": [
+        61,
+        62,
+        63
+      ],
+      "accepted_moving_span_s": 0.06989999999996144,
+      "exported_processing_median_ms": 13.685,
+      "exported_processing_p95_ms": 44.961999999999996,
+      "exported_queue_median_ms": 0.04,
+      "exported_queue_p95_ms": 0.06,
+      "replay_worker_metrics": {
+        "frames": 90,
+        "tracked": 63,
+        "worker_median_ms": 10.88579150000002,
+        "worker_p95_ms": 43.87359784999991
+      },
+      "fall_before_after": [
+        {
+          "frame_id": 61,
+          "timestamp": 922.4131,
+          "pixel": {
+            "x": 217,
+            "y": 62.5
+          },
+          "exported_acceleration": {
+            "x": -0.24252732006059105,
+            "y": -1.0854834706925633
+          },
+          "replay_acceleration": null,
+          "replay_quality": {
+            "reason": "insufficient_time_span",
+            "samples": 1,
+            "span_s": 0.0,
+            "position_residual_m": 0.0,
+            "acceleration_std_mps2": null,
+            "velocity_valid": false,
+            "acceleration_valid": false
+          }
+        },
+        {
+          "frame_id": 62,
+          "timestamp": 922.4467,
+          "pixel": {
+            "x": 216,
+            "y": 76.5
+          },
+          "exported_acceleration": {
+            "x": -0.5043709829932899,
+            "y": -2.4037318566199426
+          },
+          "replay_acceleration": null,
+          "replay_quality": {
+            "reason": "insufficient_time_span",
+            "samples": 2,
+            "span_s": 0.033599999999978536,
+            "position_residual_m": 0.0,
+            "acceleration_std_mps2": null,
+            "velocity_valid": true,
+            "acceleration_valid": false
+          }
+        },
+        {
+          "frame_id": 63,
+          "timestamp": 922.483,
+          "pixel": {
+            "x": 212.5,
+            "y": 97.5
+          },
+          "exported_acceleration": {
+            "x": -0.7999093784657703,
+            "y": -4.567169128155675
+          },
+          "replay_acceleration": null,
+          "replay_quality": {
+            "reason": "insufficient_time_span",
+            "samples": 3,
+            "span_s": 0.06989999999996144,
+            "position_residual_m": 3.668541136759071e-16,
+            "acceleration_std_mps2": 6.6582574172059195,
+            "velocity_valid": true,
+            "acceleration_valid": false
+          }
+        }
+      ]
+    }
+  ]
+}

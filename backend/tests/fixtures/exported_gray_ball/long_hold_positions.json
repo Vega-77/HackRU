@@ -1,0 +1,849 @@
+{
+  "source": "HandsOnPhysics-2026-10-11T22-34-36-849Z.hop.json",
+  "config": {
+    "type": "config",
+    "mode": "free_fall",
+    "mass_kg": 0.1,
+    "px_per_m": 426.6666666666667,
+    "target_px": {
+      "x": 216.18777087135038,
+      "y": 48.900547445255484
+    },
+    "target_bbox": {
+      "x": 199.32367700729927,
+      "y": 31.835652372262775,
+      "w": 33.7281877281022,
+      "h": 34.12979014598541
+    },
+    "second_target_px": null,
+    "second_target_bbox": null,
+    "frame_size": {
+      "w": 320,
+      "h": 180
+    },
+    "ar_plane": null,
+    "debug_tracking": true,
+    "initialization_required": true
+  },
+  "observations": [
+    {
+      "frame_id": 1,
+      "timestamp": 920.3801,
+      "tracked": true,
+      "pixel": {
+        "x": 219,
+        "y": 52
+      },
+      "position": {
+        "x": 0.5133,
+        "y": 0.3
+      }
+    },
+    {
+      "frame_id": 2,
+      "timestamp": 920.4127,
+      "tracked": true,
+      "pixel": {
+        "x": 219,
+        "y": 52.5
+      },
+      "position": {
+        "x": 0.5133,
+        "y": 0.2988
+      }
+    },
+    {
+      "frame_id": 3,
+      "timestamp": 920.4459,
+      "tracked": true,
+      "pixel": {
+        "x": 219,
+        "y": 51.5
+      },
+      "position": {
+        "x": 0.5133,
+        "y": 0.3012
+      }
+    },
+    {
+      "frame_id": 4,
+      "timestamp": 920.4771,
+      "tracked": true,
+      "pixel": {
+        "x": 219,
+        "y": 51.5
+      },
+      "position": {
+        "x": 0.5133,
+        "y": 0.3012
+      }
+    },
+    {
+      "frame_id": 5,
+      "timestamp": 920.5106,
+      "tracked": true,
+      "pixel": {
+        "x": 219,
+        "y": 51.5
+      },
+      "position": {
+        "x": 0.5133,
+        "y": 0.3012
+      }
+    },
+    {
+      "frame_id": 6,
+      "timestamp": 920.5429,
+      "tracked": true,
+      "pixel": {
+        "x": 219,
+        "y": 51.5
+      },
+      "position": {
+        "x": 0.5133,
+        "y": 0.3012
+      }
+    },
+    {
+      "frame_id": 7,
+      "timestamp": 920.5783,
+      "tracked": true,
+      "pixel": {
+        "x": 219,
+        "y": 51.5
+      },
+      "position": {
+        "x": 0.5133,
+        "y": 0.3012
+      }
+    },
+    {
+      "frame_id": 8,
+      "timestamp": 920.6168,
+      "tracked": true,
+      "pixel": {
+        "x": 219,
+        "y": 51.5
+      },
+      "position": {
+        "x": 0.5133,
+        "y": 0.3012
+      }
+    },
+    {
+      "frame_id": 9,
+      "timestamp": 920.6494,
+      "tracked": true,
+      "pixel": {
+        "x": 219,
+        "y": 51.5
+      },
+      "position": {
+        "x": 0.5133,
+        "y": 0.3012
+      }
+    },
+    {
+      "frame_id": 10,
+      "timestamp": 920.6843,
+      "tracked": true,
+      "pixel": {
+        "x": 219,
+        "y": 51.5
+      },
+      "position": {
+        "x": 0.5133,
+        "y": 0.3012
+      }
+    },
+    {
+      "frame_id": 11,
+      "timestamp": 920.7171,
+      "tracked": true,
+      "pixel": {
+        "x": 219,
+        "y": 50.5
+      },
+      "position": {
+        "x": 0.5133,
+        "y": 0.3035
+      }
+    },
+    {
+      "frame_id": 12,
+      "timestamp": 920.7514,
+      "tracked": true,
+      "pixel": {
+        "x": 219,
+        "y": 53
+      },
+      "position": {
+        "x": 0.5133,
+        "y": 0.2977
+      }
+    },
+    {
+      "frame_id": 13,
+      "timestamp": 920.7855,
+      "tracked": true,
+      "pixel": {
+        "x": 219,
+        "y": 51.5
+      },
+      "position": {
+        "x": 0.5133,
+        "y": 0.3012
+      }
+    },
+    {
+      "frame_id": 14,
+      "timestamp": 920.8195,
+      "tracked": true,
+      "pixel": {
+        "x": 219,
+        "y": 51.5
+      },
+      "position": {
+        "x": 0.5133,
+        "y": 0.3012
+      }
+    },
+    {
+      "frame_id": 15,
+      "timestamp": 920.8525,
+      "tracked": true,
+      "pixel": {
+        "x": 219,
+        "y": 51.5
+      },
+      "position": {
+        "x": 0.5133,
+        "y": 0.3012
+      }
+    },
+    {
+      "frame_id": 16,
+      "timestamp": 920.8859,
+      "tracked": true,
+      "pixel": {
+        "x": 219,
+        "y": 51.5
+      },
+      "position": {
+        "x": 0.5133,
+        "y": 0.3012
+      }
+    },
+    {
+      "frame_id": 17,
+      "timestamp": 920.9153,
+      "tracked": true,
+      "pixel": {
+        "x": 219,
+        "y": 51.5
+      },
+      "position": {
+        "x": 0.5133,
+        "y": 0.3012
+      }
+    },
+    {
+      "frame_id": 18,
+      "timestamp": 920.9473,
+      "tracked": true,
+      "pixel": {
+        "x": 219,
+        "y": 51.5
+      },
+      "position": {
+        "x": 0.5133,
+        "y": 0.3012
+      }
+    },
+    {
+      "frame_id": 19,
+      "timestamp": 920.983,
+      "tracked": true,
+      "pixel": {
+        "x": 219,
+        "y": 51.5
+      },
+      "position": {
+        "x": 0.5133,
+        "y": 0.3012
+      }
+    },
+    {
+      "frame_id": 20,
+      "timestamp": 921.0194,
+      "tracked": true,
+      "pixel": {
+        "x": 219,
+        "y": 51.5
+      },
+      "position": {
+        "x": 0.5133,
+        "y": 0.3012
+      }
+    },
+    {
+      "frame_id": 21,
+      "timestamp": 921.0532,
+      "tracked": true,
+      "pixel": {
+        "x": 219,
+        "y": 51.5
+      },
+      "position": {
+        "x": 0.5133,
+        "y": 0.3012
+      }
+    },
+    {
+      "frame_id": 22,
+      "timestamp": 921.0871999999999,
+      "tracked": true,
+      "pixel": {
+        "x": 219,
+        "y": 51.5
+      },
+      "position": {
+        "x": 0.5133,
+        "y": 0.3012
+      }
+    },
+    {
+      "frame_id": 23,
+      "timestamp": 921.12,
+      "tracked": true,
+      "pixel": {
+        "x": 219,
+        "y": 51.5
+      },
+      "position": {
+        "x": 0.5133,
+        "y": 0.3012
+      }
+    },
+    {
+      "frame_id": 24,
+      "timestamp": 921.1532,
+      "tracked": true,
+      "pixel": {
+        "x": 219,
+        "y": 51.5
+      },
+      "position": {
+        "x": 0.5133,
+        "y": 0.3012
+      }
+    },
+    {
+      "frame_id": 25,
+      "timestamp": 921.1848,
+      "tracked": true,
+      "pixel": {
+        "x": 219,
+        "y": 51.5
+      },
+      "position": {
+        "x": 0.5133,
+        "y": 0.3012
+      }
+    },
+    {
+      "frame_id": 26,
+      "timestamp": 921.2201,
+      "tracked": true,
+      "pixel": {
+        "x": 219,
+        "y": 51.5
+      },
+      "position": {
+        "x": 0.5133,
+        "y": 0.3012
+      }
+    },
+    {
+      "frame_id": 27,
+      "timestamp": 921.2542,
+      "tracked": true,
+      "pixel": {
+        "x": 219,
+        "y": 51.5
+      },
+      "position": {
+        "x": 0.5133,
+        "y": 0.3012
+      }
+    },
+    {
+      "frame_id": 28,
+      "timestamp": 921.2879,
+      "tracked": true,
+      "pixel": {
+        "x": 219,
+        "y": 51.5
+      },
+      "position": {
+        "x": 0.5133,
+        "y": 0.3012
+      }
+    },
+    {
+      "frame_id": 29,
+      "timestamp": 921.3207,
+      "tracked": true,
+      "pixel": {
+        "x": 219,
+        "y": 51.5
+      },
+      "position": {
+        "x": 0.5133,
+        "y": 0.3012
+      }
+    },
+    {
+      "frame_id": 30,
+      "timestamp": 921.3554,
+      "tracked": true,
+      "pixel": {
+        "x": 219,
+        "y": 51.5
+      },
+      "position": {
+        "x": 0.5133,
+        "y": 0.3012
+      }
+    },
+    {
+      "frame_id": 31,
+      "timestamp": 921.3881,
+      "tracked": true,
+      "pixel": {
+        "x": 219,
+        "y": 51.5
+      },
+      "position": {
+        "x": 0.5133,
+        "y": 0.3012
+      }
+    },
+    {
+      "frame_id": 32,
+      "timestamp": 921.4214000000001,
+      "tracked": true,
+      "pixel": {
+        "x": 219,
+        "y": 51.5
+      },
+      "position": {
+        "x": 0.5133,
+        "y": 0.3012
+      }
+    },
+    {
+      "frame_id": 33,
+      "timestamp": 921.4555,
+      "tracked": true,
+      "pixel": {
+        "x": 219,
+        "y": 51.5
+      },
+      "position": {
+        "x": 0.5133,
+        "y": 0.3012
+      }
+    },
+    {
+      "frame_id": 34,
+      "timestamp": 921.4883000000001,
+      "tracked": true,
+      "pixel": {
+        "x": 219,
+        "y": 51.5
+      },
+      "position": {
+        "x": 0.5133,
+        "y": 0.3012
+      }
+    },
+    {
+      "frame_id": 35,
+      "timestamp": 921.521,
+      "tracked": true,
+      "pixel": {
+        "x": 219,
+        "y": 51.5
+      },
+      "position": {
+        "x": 0.5133,
+        "y": 0.3012
+      }
+    },
+    {
+      "frame_id": 36,
+      "timestamp": 921.5548,
+      "tracked": true,
+      "pixel": {
+        "x": 219,
+        "y": 51.5
+      },
+      "position": {
+        "x": 0.5133,
+        "y": 0.3012
+      }
+    },
+    {
+      "frame_id": 37,
+      "timestamp": 921.5869,
+      "tracked": true,
+      "pixel": {
+        "x": 219,
+        "y": 51.5
+      },
+      "position": {
+        "x": 0.5133,
+        "y": 0.3012
+      }
+    },
+    {
+      "frame_id": 38,
+      "timestamp": 921.6204,
+      "tracked": true,
+      "pixel": {
+        "x": 219,
+        "y": 51.5
+      },
+      "position": {
+        "x": 0.5133,
+        "y": 0.3012
+      }
+    },
+    {
+      "frame_id": 39,
+      "timestamp": 921.6493,
+      "tracked": true,
+      "pixel": {
+        "x": 219,
+        "y": 51.5
+      },
+      "position": {
+        "x": 0.5133,
+        "y": 0.3012
+      }
+    },
+    {
+      "frame_id": 40,
+      "timestamp": 921.6784,
+      "tracked": true,
+      "pixel": {
+        "x": 219,
+        "y": 51.5
+      },
+      "position": {
+        "x": 0.5133,
+        "y": 0.3012
+      }
+    },
+    {
+      "frame_id": 41,
+      "timestamp": 921.7121,
+      "tracked": true,
+      "pixel": {
+        "x": 219,
+        "y": 51.5
+      },
+      "position": {
+        "x": 0.5133,
+        "y": 0.3012
+      }
+    },
+    {
+      "frame_id": 42,
+      "timestamp": 921.749,
+      "tracked": true,
+      "pixel": {
+        "x": 219,
+        "y": 51.5
+      },
+      "position": {
+        "x": 0.5133,
+        "y": 0.3012
+      }
+    },
+    {
+      "frame_id": 43,
+      "timestamp": 921.7819000000001,
+      "tracked": true,
+      "pixel": {
+        "x": 219,
+        "y": 51.5
+      },
+      "position": {
+        "x": 0.5133,
+        "y": 0.3012
+      }
+    },
+    {
+      "frame_id": 44,
+      "timestamp": 921.811,
+      "tracked": true,
+      "pixel": {
+        "x": 219,
+        "y": 51.5
+      },
+      "position": {
+        "x": 0.5133,
+        "y": 0.3012
+      }
+    },
+    {
+      "frame_id": 45,
+      "timestamp": 921.8433,
+      "tracked": true,
+      "pixel": {
+        "x": 219,
+        "y": 51.5
+      },
+      "position": {
+        "x": 0.5133,
+        "y": 0.3012
+      }
+    },
+    {
+      "frame_id": 46,
+      "timestamp": 921.8791,
+      "tracked": true,
+      "pixel": {
+        "x": 219,
+        "y": 51.5
+      },
+      "position": {
+        "x": 0.5133,
+        "y": 0.3012
+      }
+    },
+    {
+      "frame_id": 47,
+      "timestamp": 921.9137,
+      "tracked": true,
+      "pixel": {
+        "x": 219,
+        "y": 51.5
+      },
+      "position": {
+        "x": 0.5133,
+        "y": 0.3012
+      }
+    },
+    {
+      "frame_id": 48,
+      "timestamp": 921.9461,
+      "tracked": true,
+      "pixel": {
+        "x": 219,
+        "y": 51.5
+      },
+      "position": {
+        "x": 0.5133,
+        "y": 0.3012
+      }
+    },
+    {
+      "frame_id": 49,
+      "timestamp": 921.9826999999999,
+      "tracked": true,
+      "pixel": {
+        "x": 219,
+        "y": 51.5
+      },
+      "position": {
+        "x": 0.5133,
+        "y": 0.3012
+      }
+    },
+    {
+      "frame_id": 50,
+      "timestamp": 922.0218000000001,
+      "tracked": true,
+      "pixel": {
+        "x": 219,
+        "y": 51.5
+      },
+      "position": {
+        "x": 0.5133,
+        "y": 0.3012
+      }
+    },
+    {
+      "frame_id": 51,
+      "timestamp": 922.0562,
+      "tracked": true,
+      "pixel": {
+        "x": 219,
+        "y": 51.5
+      },
+      "position": {
+        "x": 0.5133,
+        "y": 0.3012
+      }
+    },
+    {
+      "frame_id": 52,
+      "timestamp": 922.0921999999999,
+      "tracked": true,
+      "pixel": {
+        "x": 220,
+        "y": 54.5
+      },
+      "position": {
+        "x": 0.5156,
+        "y": 0.2941
+      }
+    },
+    {
+      "frame_id": 53,
+      "timestamp": 922.1209,
+      "tracked": true,
+      "pixel": {
+        "x": 219,
+        "y": 52.5
+      },
+      "position": {
+        "x": 0.5133,
+        "y": 0.2988
+      }
+    },
+    {
+      "frame_id": 54,
+      "timestamp": 922.1573000000001,
+      "tracked": true,
+      "pixel": {
+        "x": 219,
+        "y": 52.5
+      },
+      "position": {
+        "x": 0.5133,
+        "y": 0.2988
+      }
+    },
+    {
+      "frame_id": 55,
+      "timestamp": 922.1934,
+      "tracked": true,
+      "pixel": {
+        "x": 219,
+        "y": 52.5
+      },
+      "position": {
+        "x": 0.5133,
+        "y": 0.2988
+      }
+    },
+    {
+      "frame_id": 56,
+      "timestamp": 922.2246,
+      "tracked": true,
+      "pixel": {
+        "x": 220,
+        "y": 52.5
+      },
+      "position": {
+        "x": 0.5156,
+        "y": 0.2988
+      }
+    },
+    {
+      "frame_id": 57,
+      "timestamp": 922.2568,
+      "tracked": true,
+      "pixel": {
+        "x": 220,
+        "y": 51.5
+      },
+      "position": {
+        "x": 0.5156,
+        "y": 0.3012
+      }
+    },
+    {
+      "frame_id": 58,
+      "timestamp": 922.3240999999999,
+      "tracked": true,
+      "pixel": {
+        "x": 220,
+        "y": 51.5
+      },
+      "position": {
+        "x": 0.5156,
+        "y": 0.3012
+      }
+    },
+    {
+      "frame_id": 59,
+      "timestamp": 922.3546,
+      "tracked": true,
+      "pixel": {
+        "x": 220,
+        "y": 52.5
+      },
+      "position": {
+        "x": 0.5156,
+        "y": 0.2988
+      }
+    },
+    {
+      "frame_id": 60,
+      "timestamp": 922.3823000000001,
+      "tracked": true,
+      "pixel": {
+        "x": 219,
+        "y": 53.5
+      },
+      "position": {
+        "x": 0.5133,
+        "y": 0.2965
+      }
+    },
+    {
+      "frame_id": 61,
+      "timestamp": 922.4131,
+      "tracked": true,
+      "pixel": {
+        "x": 217,
+        "y": 62.5
+      },
+      "position": {
+        "x": 0.5086,
+        "y": 0.2754
+      }
+    },
+    {
+      "frame_id": 62,
+      "timestamp": 922.4467,
+      "tracked": true,
+      "pixel": {
+        "x": 216,
+        "y": 76.5
+      },
+      "position": {
+        "x": 0.5062,
+        "y": 0.2426
+      }
+    },
+    {
+      "frame_id": 63,
+      "timestamp": 922.483,
+      "tracked": true,
+      "pixel": {
+        "x": 212.5,
+        "y": 97.5
+      },
+      "position": {
+        "x": 0.498,
+        "y": 0.1934
+      }
+    }
+  ]
+}

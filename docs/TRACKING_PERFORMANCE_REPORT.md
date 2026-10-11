@@ -251,3 +251,69 @@ Antislop delivery gate for the changed recording controls:
 - Craftsmanship **PASS**: concrete action label, wrapped controls, retry after download failure tested, original data preserved; no invented performance/accuracy claims. Phone/Safari download behavior remains a documented validation step after approved deployment.
 
 After deployment approval: deploy the reviewed commit through the existing process, reload Pages, verify the build and backend endpoint, make a new trial, download its bundle and extract it using the commands above. Compare frame count/FPS/timestamps against Copy Debug Log; inspect release/missing/reacquired JPEGs before diagnosing identity or computing free-flight acceleration. Do not push main just to test the browser download.
+
+## October 11: exported short and long holds
+
+These two original camera bundles are now the primary evidence for this follow-up. Their JPEGs, capture timestamps, frozen configuration and exported observations were inspected directly. The earlier screen recording is longer than three seconds and remains separate evidence; these are the new **Record 3 s** exports.
+
+| Measurement | Short hold (`22-34-05-920Z`) | Long hold (`22-34-36-849Z`) |
+| --- | --- | --- |
+| Frames / capture duration | 91 / 2.988 s | 90 / 3.0066 s |
+| Capture FPS / largest gap | 30.12 / 39.6 ms | 29.60 / 67.3 ms |
+| Approximate visible release | 0.5 s into capture | 2.0 s into capture |
+| Exported processing median / p95 | 43.29 / 52.13 ms | 13.685 / 44.962 ms |
+| Exported queue median / p95 | 0.04 / 0.06 ms | 0.04 / 0.06 ms |
+| Accepted moving samples before loss | Frames 19–20, span 33.1 ms | Frames 61–63, span 69.9 ms |
+| Hair detections when ball absent, before → after | 27 → 0 | 0 → 0 |
+| Total detections before → after | 45 → 18 | 63 → 63 |
+| Falling acceleration previously reported | −3.95, −5.80 m/s² | −1.09, −2.40, −4.57 m/s² |
+| Falling acceleration after replay | Withheld: insufficient fresh span | Withheld: insufficient fresh span |
+
+Both analyses completed without an error and contain a result for every captured frame. Missing target observations are CV rejection, not missing captured JPEGs. Before modifications, replay reproduced **every exported pixel result** in both bundles. After modifications, the only changed pixel results are short-hold frames 65–91: all are rejected. The original ball detections and their coordinates are preserved in both captures. This establishes the specific regression result, not general tracking recall or precision.
+
+![Original exported observations compared with current replay](diagnostics/oct11_capture_comparison.png)
+
+The [machine-readable metrics](diagnostics/oct11_capture_metrics.json) include source filenames, SHA-256 hashes, capture statistics and per-frame comparisons for the accepted moving samples. The plot uses capture time; disconnected traces represent unavailable observations. Release markers are visual approximations, not independently measured loss of hand contact.
+
+### Causes demonstrated by these captures
+
+1. **Exposure allowance admitted a darker identity in a brighter scene.** At short-hold frame 65 the gray-ball reference has Lab lightness 94, the estimated scene shift is +24, and the hair candidate has lightness 41. The old absolute-shift allowance expands the permitted difference from 30 to 54; the darker candidate's difference of 53 passes. Shape/template verification also passes, so tracking continues on hair through frame 91. All 27 original JPEGs were inspected: the ball is absent and the detected region is hair.
+2. **A fit mixed held and moving samples.** The original falling results use windows of roughly 0.33 s, although their accepted moving observations span only 0.0331 or 0.0699 s. Earlier held-ball observations satisfy the existing span and sample-count gates. A low numerical fit uncertainty does not establish a valid free-flight interval. Holding longer leaves the same transition problem in the recent window.
+3. **Blur rejection and leaving the image remain real tracking limits.** In the short capture, frames 17–18 and 21 miss the moving ball; in the long capture, frame 64 misses a visibly blurred ball and frame 65 shows it near the bottom edge. Both balls subsequently leave the image. The stricter identity check does not recover these missing flight positions. The short capture spends more time in global search after loss, explaining its larger processing median; increasing acceptance indiscriminately would risk another wrong identity.
+4. **Physical scale is not established.** Both bundles retain the setup ruler endpoints `(96, 63)` and `(224, 63)`, entered length 0.3 m, and scale 426.67 px/m. The images do not show a matching measured ruler. The exported calibration status describes an available mapping; it does not verify that this default mapping matches the scene. These clips cannot establish absolute gravitational accuracy.
+
+The observed 30 FPS and negligible queue times do not demonstrate Render's 250–300 ms RTT. Recorded analysis is serial and preserves every captured timestamp. Exported processing includes the original worker's stages; current replay worker timings exclude transport. Current median / p95 worker times were **43.67 / 51.10 ms** (short) and **10.89 / 43.87 ms** (long). These are separate runs with uncontrolled machine load, not a controlled speed comparison. No FPS or latency improvement is claimed for this follow-up. Rejecting hair also keeps global search active longer after the ball disappears, which can increase work relative to following a false target.
+
+### Implemented changes
+
+- `backend/cv_engine/foreground.py`: widen lightness matching for scene exposure changes only when candidate lightness changes in the same direction. Keep the existing base tolerance, chroma, spread and template checks. Synthetic tests cover brighter and darker scene shifts; existing ball recovery tests remain passing.
+- `physics_engine/kinematics.py`, `physics_engine/session.py`: in Free Fall, reset derivative history when an established stationary window starts moving beyond three pixels of position uncertainty. Allow for the backend's four-decimal coordinate rounding. The new interval must independently meet the existing sample-count, 0.12 s span and uncertainty gates. Other experiment modes retain their previous history behavior. This detects a clear stationary-to-motion transition; it is not a universal detector of hand release, impact or ideal free flight. It may miss transitions after a noisy hold or react to sufficiently large held-ball movement.
+- `backend/analyze_capture_bundle.py`: replay a complete `.hop.json` through the current backend CV **and physics** functions, explicitly initialize from its selected JPEG, preserve frame IDs/capture times/calibration, and emit source hash, observations and worker timing. It runs locally without WebSockets or latest-frame dropping. The original export is never overwritten.
+- `backend/tests/test_exported_gray_ball.py` and `backend/tests/fixtures/exported_gray_ball/`: exact original JPEGs for the short capture's held/falling interval and initial hair reacquisition, plus the long capture's original calibrated positions. These fixtures were not reconstructed from screen pixels. Tests assert preserved ball detections, rejected hair, derivative-history reset in both real captures, directional exposure matching and replay metadata preservation.
+- `backend/tests/test_capture_physics.py`: test both hold lengths followed by motion at −9.81 and −3.4 m/s². With sufficient new samples, the fit measures either acceleration; it does not substitute gravity for measured motion.
+
+The two original `.hop.json` files under `diagnostics/logs` remain untouched and ignored by Git. This section, the plot and metrics are the report changes. The existing Xcode change is excluded. Three bounded implementation/testing revisions resolved identity-check compatibility and coordinate-rounding issues; no additional speculative blur retuning was undertaken.
+
+### Verification and local reproduction
+
+Backend and physics verification: `backend/.venv/bin/python -m pytest backend/tests tests -q` — **263 passed**, 15 dependency deprecation warnings, 22.45 s. This includes existing tracking recovery, recorded transport, calibration, protocol and experiment-mode coverage, along with the new physical-capture regressions. Missing acceleration after release is intentional; held-ball acceleration near zero remains a valid position derivative.
+
+Run from the repository root:
+
+```sh
+backend/.venv/bin/python backend/analyze_capture_bundle.py diagnostics/logs/HandsOnPhysics-2026-10-11T22-34-05-920Z.hop.json --out /tmp/hop-short-analysis.json
+backend/.venv/bin/python backend/analyze_capture_bundle.py diagnostics/logs/HandsOnPhysics-2026-10-11T22-34-36-849Z.hop.json --out /tmp/hop-long-analysis.json
+backend/.venv/bin/python -m pytest backend/tests/test_exported_gray_ball.py backend/tests/test_capture_physics.py -q
+```
+
+Inspect `observations`: short frames 19–20 and long frames 61–63 must have no acceleration; short frames 65–91 must be untracked. Compare original `analysis.observations` for the old results. To inspect JPEGs, use the extraction command above with a new output directory. A fit must use capture timestamps, never the time the analysis finishes.
+
+No frontend source changes were needed for these fixes. This follow-up ran the relevant Flutter recorded-analysis, socket, controller and experiment-preview tests: **46 passed**. A fresh `flutter analyze` reports **no issues**. The previous Chrome download test and release Web build apply to the unchanged frontend; neither was repeated in this backend-only follow-up. Physical iPhone/Safari behavior remains unverified. The local backend was restarted on port 8002 with the tested source, and `/health` returns OK; the existing export frontend remains on port 8086.
+
+### Remaining Free Fall work and the next physical trial
+
+Use the local frontend at `http://127.0.0.1:8086/` and backend at `ws://127.0.0.1:8002/ws/frames`, with the backend restarted to load these changes. Start a new calibration/session. Place a real ruler in the motion plane and explicitly align its endpoints. Move the camera back so the entire measured drop plus the ball radius fits inside the image; keep the camera fixed. Use brighter diffuse light to reduce blur. Record 3 s, hold briefly, release without pushing, and download the capture. A longer hold alone does not supply more flight observations. Enough **accepted moving samples over at least 0.12 s**, with valid identity and uncertainty, are required; physical calibration and separation from hand contact/impact still need verification.
+
+Future work, not implemented: inspect and label original blurred JPEGs for a bounded detector experiment, comparing localization and false-identity rates before changing acceptance thresholds. Edge-inferred contact normals can also appear in Free Fall outputs; those inferred surfaces are not physically verified in these clips, so these bundles do not validate force arrows or contact classification. Worker offloading, broader tracker changes and Render hosting changes remain proposals. These captures justify no Render plan or region change.
+
+After deployment approval, deploy through the existing process, verify the backend commit at `/health`, reload Pages and repeat the calibrated trial on desktop and phone. Download the `.hop.json` and debug log, inspect release/loss/reacquisition frames, then compare physical free-flight results and capture FPS with local results. No push, production deployment or infrastructure change is part of this follow-up.

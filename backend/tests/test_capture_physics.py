@@ -49,6 +49,29 @@ def test_window_excludes_held_ball_once_sufficient_fall_is_observed():
     assert state['acceleration']['y'] == pytest.approx(-9.81, abs=1e-6)
 
 
+@pytest.mark.parametrize('hold_s', [.5, 2.0])
+@pytest.mark.parametrize('acceleration', [-9.81, -3.4])
+def test_motion_after_a_hold_earns_its_own_derivative_span(hold_s, acceleration):
+    session = PhysicsSession()
+    settings = {'mode': 'free_fall'}
+    for index in range(round(hold_s * 30) + 1):
+        session.process_frame(observation(index / 30, 2), settings)
+    restarted = False
+    measured = []
+    for index in range(1, 13):
+        flight = index / 30
+        state = session.process_frame(observation(hold_s + flight, 2 + .5 * acceleration * flight**2), settings)
+        quality = state['physics_quality']
+        if quality['samples'] == 1:
+            restarted = True
+        if restarted and quality['span_s'] < .12:
+            assert 'acceleration' not in state
+        if restarted and 'acceleration' in state:
+            measured.append(state['acceleration']['y'])
+    assert restarted and measured
+    assert measured == pytest.approx([acceleration] * len(measured), abs=1e-6)
+
+
 @pytest.mark.parametrize('fps', [30, 60])
 def test_high_rate_drop_with_pixel_jitter_still_measures_gravity(fps):
     # A 1 m drop at 220 px/m, tracked at 30 fps with 2 px of jitter. A

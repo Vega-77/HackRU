@@ -140,6 +140,9 @@ class PhysicsSession:
                     min_acceleration_span=0.12 if mode == "free_fall" else 0.0,
                     position_noise_m=1.0 / scale if scale and scale > 0 else 0.0,
                     max_acceleration_std=2.0 if mode == "free_fall" else None,
+                    reset_on_motion=mode == "free_fall",
+                    # Spatial coordinates are rounded to four decimal places.
+                    position_quantization_m=0.0001,
                 )
             engine = self.engines[object_id]
             result = engine.add_world_sample(

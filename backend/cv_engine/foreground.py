@@ -141,10 +141,11 @@ class RoundReference:
             return False
         lab = cv2.cvtColor(image, cv2.COLOR_BGR2LAB).astype(np.float32)
         chroma_delta = np.median(lab[interior, 1:], axis=0) - self.chroma
+        lightness_delta = float(np.median(lab[interior, 0])) - self.lightness
+        exposure_allowance = abs(lightness_shift) if lightness_delta * lightness_shift >= 0 else 0.0
         return (np.linalg.norm(chroma_delta) <= 12
                 and np.linalg.norm(chroma_delta / self.chroma_spread) <= 3
-                # Exposure can shift the whole scene. A dark lookalike in an
-                # unchanged scene must not get the same allowance.
-                and abs(float(np.median(lab[interior, 0])) - self.lightness)
-                <= max(30, min(45, 0.75 * self.spread)) + abs(lightness_shift)
+                # Only shifts in the scene's exposure direction widen the match.
+                and abs(lightness_delta)
+                <= max(30, min(45, 0.75 * self.spread)) + exposure_allowance
                 and float(np.diff(np.percentile(lab[interior, 0], [25, 75]))[0]) <= self.spread + 15)
