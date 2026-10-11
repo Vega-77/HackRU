@@ -209,15 +209,19 @@ Then the arrows are drawn in 3D instead of 2D:
    the camera preview, anchored at the object. SceneKit redraws them from
    the live camera pose every screen refresh, so they stay on the object
    while the phone moves, and they glide between replies.
-3. The 2D overlay keeps the marker and trail, and stops drawing arrows.
+3. An invisible sphere the size of the ball (from its bounding box) sits
+   at the anchor and fills only the depth buffer, so the real ball hides
+   the parts of the arrows inside or behind it. On phones that support
+   it, ARKit people occlusion does the same for hands.
+4. The 2D overlay keeps the marker and trail, and stops drawing arrows.
 
-Lengths use the 2D proportions, at 1 mm per reference pixel: 1 m/s is a
-12 cm arrow and the object's weight is 9 cm. If arrows look too big or too
-small on a real table, change `ArVectorSceneBuilder.metresPerPx`.
+Lengths use the 2D proportions: every frame the native side scales the
+arrows by the object's distance, so they look as long on screen as the 2D
+overlay's, near or far. Shaft thickness is
+`ArVectorSceneBuilder.radiusPerWidthPx`.
 
 On Chrome, devices without ARKit, without a surface, or if the native side
-fails, the 2D arrows are used as before. The native code has not been run
-on a device yet, so check it first on a Mac.
+fails, the 2D arrows are used as before.
 
 ## Design rules
 

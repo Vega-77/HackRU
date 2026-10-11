@@ -61,6 +61,7 @@ class ArVectorScene {
     required this.haloArgb,
     this.easeSeconds = 0,
     this.showLabels = true,
+    this.objectRadiusPx = 0,
   });
 
   /// The object's centre, ARKit world metres.
@@ -77,12 +78,19 @@ class ArVectorScene {
   final double easeSeconds;
   final bool showLabels;
 
+  /// The object's radius in the frame, pixels; 0 when unknown. The native
+  /// view hides the parts of the arrows the real object would cover.
+  final double objectRadiusPx;
+
   /// The `setVectors` arguments on the `handson/arkit` channel.
-  Map<String, Object> toMap() => {
+  /// [occluderRadiusM] is [objectRadiusPx] in world metres at [origin];
+  /// 0 draws the arrows over the object.
+  Map<String, Object> toMap({double occluderRadiusM = 0}) => {
     'origin': origin.toList(),
     'ease_s': easeSeconds,
     'labels': showLabels,
     'halo': haloArgb,
+    'occluder_radius': occluderRadiusM,
     'arrows': [for (final a in arrows) a.toMap()],
   };
 }

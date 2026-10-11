@@ -168,6 +168,18 @@ void main() {
         return switch (call.method) {
           'isSupported' => true,
           'start' => {'width': 320, 'height': 427},
+          // At the world origin, looking down -z.
+          'capture' => {
+            'jpeg': Uint8List.fromList([1]),
+            'width': 320,
+            'height': 427,
+            'timestamp': 1.0,
+            'intrinsics': [250.0, 250.0, 160.0, 213.5],
+            'camera_to_world': List<double>.generate(
+              16,
+              (i) => i % 5 == 0 ? 1 : 0,
+            ),
+          },
           _ => null,
         };
       });
@@ -187,6 +199,25 @@ void main() {
       final args = vectorCalls.first.arguments as Map;
       expect(args['origin'], [0.0, 0.5, -1.0]);
       expect((args['arrows'] as List).single['id'], 'velocity');
+      // No frame yet to measure the ball with.
+      expect(args['occluder_radius'], 0);
+    });
+
+    test('sizes the ball from the newest frame', () async {
+      final source = await started();
+      await source.capture();
+      await source.showArVectors(
+        ArVectorScene(
+          origin: scene.origin,
+          arrows: scene.arrows,
+          haloArgb: scene.haloArgb,
+          objectRadiusPx: 25,
+        ),
+      );
+      final args =
+          calls.singleWhere((c) => c.method == 'setVectors').arguments as Map;
+      // 25 px at 1 m in front of a 250 px focal length is 10 cm.
+      expect(args['occluder_radius'], closeTo(0.1, 1e-9));
     });
 
     test('a native failure falls back to the 2D arrows', () async {

@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/painting.dart' show Color;
 
 import '../../../core/theme/tokens.dart';
@@ -14,16 +16,24 @@ import 'vector_overlay_painter.dart';
 /// the object's distance every frame (ArVectorNode.swift), so they look as
 /// long as the 2D overlay's arrows whether the object is near or far.
 /// Forces share one scale, so a free-body diagram still adds up.
+///
+/// The object's size goes along too, so the real ball hides the parts of
+/// the arrows inside or behind it.
 abstract final class ArVectorSceneBuilder {
   /// World length of one reference pixel, before the native distance
   /// scaling. ArVectorNode.swift assumes this value.
   static const double metresPerPx = 0.001;
 
   /// Shaft radius per pixel of the 2D overlay's stroke width.
-  static const double radiusPerWidthPx = 0.0008;
+  static const double radiusPerWidthPx = 0.0016;
 
   /// About one backend reply at 15 fps, so arrows glide between replies.
   static const double easeSeconds = 0.1;
+
+  /// The share of the bounding box's half-size taken as the object's
+  /// radius. Boxes run a little loose, so arrows start at the ball's edge
+  /// instead of in the air beside it.
+  static const double boxRadiusFactor = 0.9;
 
   /// Null when there is nothing to anchor: the object is lost, or the
   /// reply has no `position_3d` (no AR surface was picked).
@@ -108,12 +118,16 @@ abstract final class ArVectorSceneBuilder {
       );
     }
 
+    final box = state.bbox;
     return ArVectorScene(
       origin: origin,
       arrows: arrows,
       haloArgb: AppColors.graphiteDeep.toARGB32(),
       easeSeconds: reduceMotion ? 0 : easeSeconds,
       showLabels: showLabels,
+      objectRadiusPx: box == null
+          ? 0
+          : math.min(box.w, box.h) / 2 * boxRadiusFactor,
     );
   }
 }

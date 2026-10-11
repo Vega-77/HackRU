@@ -5,8 +5,9 @@ import UIKit
 /// built by `ArVectorSceneBuilder` (lib/features/experiment/widgets).
 ///
 /// Channel `handson/arkit`:
-/// * `setVectors {origin: [3], ease_s, labels, halo (ARGB), arrows: [{id,
-///   direction: [3], length, radius, color (ARGB), symbol, subscript, dashed}]}`
+/// * `setVectors {origin: [3], ease_s, labels, halo (ARGB), occluder_radius,
+///   arrows: [{id, direction: [3], length, radius, color (ARGB), symbol,
+///   subscript, dashed}]}`
 /// * `hideVectors`
 ///
 /// Positions are ARKit world metres, so SceneKit redraws the arrows from the
@@ -17,10 +18,17 @@ import UIKit
 /// Lengths arrive at 1 mm per reference pixel. Every frame, keepScreenSize
 /// scales them by the object's distance, so arrows look as long as the 2D
 /// overlay's whether the ball is 30 cm or 3 m away.
+///
+/// `occluder_radius` is the real ball's radius in metres. An invisible
+/// sphere that size fills the depth buffer before the arrows draw, so the
+/// ball hides the parts of them inside or behind it, as a real object
+/// would. Labels ignore depth and stay readable.
 final class ArVectorLayer {
   let root = SCNNode()
   /// At the object's centre; the arrows grow out of it.
   private let anchor = SCNNode()
+  /// True size, so it sits beside the scaled anchor, not under it.
+  private let occluder = SCNNode(geometry: SCNSphere(radius: 1))
   private var arrows: [String: ArrowNode] = [:]
   private let labels = LabelImages()
 
@@ -32,6 +40,16 @@ final class ArVectorLayer {
     root.name = "handson.vectors"
     root.opacity = 0
     root.addChildNode(anchor)
+
+    let depthOnly = SCNMaterial()
+    depthOnly.colorBufferWriteMask = []
+    depthOnly.writesToDepthBuffer = true
+    depthOnly.readsFromDepthBuffer = true
+    depthOnly.lightingModel = .constant
+    occluder.geometry?.firstMaterial = depthOnly
+    occluder.renderingOrder = -1
+    occluder.isHidden = true
+    root.addChildNode(occluder)
   }
 
   func attach(to scene: SCNScene) {
@@ -44,16 +62,26 @@ final class ArVectorLayer {
     let ease = number(args["ease_s"]) ?? 0
     let showLabels = args["labels"] as? Bool ?? true
     let halo = UIColor(argb: args["halo"])
+    let occluderRadius = Float(number(args["occluder_radius"]) ?? 0)
     let specs = (args["arrows"] as? [[String: Any]] ?? []).compactMap(ArrowSpec.init)
     let ids = Set(specs.map(\.id))
 
     // Hidden arrows jump to the new object instead of gliding across the room.
+    // A hidden occluder takes its size at once instead of shrinking from 1 m.
+    let snapOccluder = root.opacity == 0 || occluder.isHidden
+    SCNTransaction.begin()
+    SCNTransaction.disableActions = true
     if root.opacity == 0 {
-      SCNTransaction.begin()
-      SCNTransaction.disableActions = true
       anchor.simdPosition = origin
-      SCNTransaction.commit()
     }
+    if snapOccluder {
+      occluder.simdPosition = origin
+      if occluderRadius > 0 {
+        occluder.simdScale = simd_float3(repeating: occluderRadius)
+      }
+    }
+    occluder.isHidden = occluderRadius <= 0
+    SCNTransaction.commit()
 
     for (id, node) in arrows where !ids.contains(id) {
       node.removeFromParentNode()
@@ -75,6 +103,10 @@ final class ArVectorLayer {
     SCNTransaction.animationDuration = ease
     root.opacity = 1
     anchor.simdPosition = origin
+    occluder.simdPosition = origin
+    if occluderRadius > 0 {
+      occluder.simdScale = simd_float3(repeating: occluderRadius)
+    }
     for spec in specs {
       arrows[spec.id]?.apply(spec, label: showLabels ? labels.image(for: spec, halo: halo) : nil)
     }
@@ -164,7 +196,7 @@ final class ArrowNode: SCNNode {
 
   /// The outline is a slightly bigger copy drawn inside out, so only its
   /// rim shows around the arrow.
-  private static let haloScale: Float = 1.7
+  private static let haloScale: Float = 1.4
 
   init(halo: UIColor) {
     haloMaterial = ArrowNode.flat()
@@ -212,7 +244,7 @@ final class ArrowNode: SCNNode {
     shaftHalo.simdPosition = shaft.simdPosition
     head.simdScale = simd_float3(headRadius, headLength, headRadius)
     head.simdPosition = simd_float3(0, spec.length - headLength / 2, 0)
-    headHalo.simdScale = simd_float3(headRadius * 1.3, headLength * 1.25, headRadius * 1.3)
+    headHalo.simdScale = simd_float3(headRadius * 1.15, headLength * 1.12, headRadius * 1.15)
     headHalo.simdPosition = head.simdPosition
 
     shaftMaterial.diffuse.contents = spec.color

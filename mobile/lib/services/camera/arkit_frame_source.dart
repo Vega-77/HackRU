@@ -37,6 +37,9 @@ class ArKitFrameSource implements FrameSource, SurfaceFinder, ArVectorDisplay {
   bool _vectorsShown = false;
   bool _vectorsFailed = false;
 
+  /// The newest frame's camera, to size the object for [showArVectors].
+  CameraPose? _pose;
+
   bool get _useFallback => _supported == false;
 
   @override
@@ -104,11 +107,12 @@ class ArKitFrameSource implements FrameSource, SurfaceFinder, ArVectorDisplay {
       'quality': AppConfig.jpegQuality,
     });
     if (frame == null) return null;
+    final pose = _pose = CameraPose.fromMap(frame);
     return EncodedFrame(
       jpeg: frame['jpeg']! as Uint8List,
       size: FrameSize(frame['width']! as int, frame['height']! as int),
       captureTime: (frame['timestamp']! as num).toDouble(),
-      pose: CameraPose.fromMap(frame),
+      pose: pose,
     );
   }
 
@@ -142,7 +146,10 @@ class ArKitFrameSource implements FrameSource, SurfaceFinder, ArVectorDisplay {
       } else {
         if (!_vectorsShown) log.i('Showing 3D arrows');
         _vectorsShown = true;
-        await _channel.invokeMethod<void>('setVectors', scene.toMap());
+        await _channel.invokeMethod<void>(
+          'setVectors',
+          scene.toMap(occluderRadiusM: _occluderRadius(scene)),
+        );
       }
     } on PlatformException catch (e, stack) {
       // The 2D overlay would be hidden, so stop sending and say why.
@@ -152,6 +159,14 @@ class ArKitFrameSource implements FrameSource, SurfaceFinder, ArVectorDisplay {
       _vectorsFailed = true;
       log.e('This build has no 3D arrow support', e, stack);
     }
+  }
+
+  /// The object's real radius at its anchor, from its size in the newest
+  /// frame. 0 before any frame, which draws the arrows over the object.
+  double _occluderRadius(ArVectorScene scene) {
+    final pose = _pose;
+    if (pose == null || scene.objectRadiusPx <= 0) return 0;
+    return pose.metresAcross(scene.objectRadiusPx, scene.origin);
   }
 
   @override

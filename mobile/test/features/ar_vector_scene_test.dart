@@ -14,6 +14,7 @@ PhysicsState _state({
     ForceVector3('gravity', Vec3(0, -0.981, 0)),
     ForceVector3('gravity_parallel', Vec3(0.49, -0.49, 0)),
   ],
+  PixelRect? bbox,
 }) => PhysicsState(
   frameId: 9,
   t: 1,
@@ -22,6 +23,7 @@ PhysicsState _state({
   velocity3d: velocity,
   acceleration3d: acceleration,
   forces3d: forces,
+  bbox: bbox,
 );
 
 void main() {
@@ -58,6 +60,27 @@ void main() {
     expect(byId['velocity']!.direction, const Vec3(1, 0, 0));
     expect(byId['acceleration']!.direction, const Vec3(0, -1, 0));
     expect(byId['force:gravity_parallel']!.direction.length, closeTo(1, 1e-9));
+
+    expect(
+      byId['velocity']!.radiusM,
+      closeTo(3.5 * ArVectorSceneBuilder.radiusPerWidthPx, 1e-12),
+    );
+  });
+
+  test('carries the object size so the ball can hide arrows', () {
+    expect(
+      ArVectorSceneBuilder.build(_state(), massKg: mass)!.objectRadiusPx,
+      0,
+    );
+    final scene = ArVectorSceneBuilder.build(
+      _state(bbox: const PixelRect(100, 80, 40, 50)),
+      massKg: mass,
+    )!;
+    // The smaller side, halved, a little inside a loose box.
+    expect(
+      scene.objectRadiusPx,
+      closeTo(20 * ArVectorSceneBuilder.boxRadiusFactor, 1e-9),
+    );
   });
 
   test('colours and labels follow the 2D overlay', () {
@@ -112,6 +135,7 @@ void main() {
     expect(map['ease_s'], ArVectorSceneBuilder.easeSeconds);
     expect(map['labels'], isTrue);
     expect(map['halo'], AppColors.graphiteDeep.toARGB32());
+    expect(map['occluder_radius'], 0);
     final arrow = (map['arrows']! as List).single as Map;
     expect(arrow.keys, [
       'id',
