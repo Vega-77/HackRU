@@ -124,6 +124,7 @@ class MeasurementSection extends StatelessWidget {
   const MeasurementSection({
     super.key,
     required this.number,
+    required this.total,
     required this.title,
     required this.body,
     required this.done,
@@ -132,6 +133,7 @@ class MeasurementSection extends StatelessWidget {
     this.last = false,
   });
   final int number;
+  final int total;
   final String title, body;
   final bool done, last;
   final Widget? trailing, footer;
@@ -139,7 +141,7 @@ class MeasurementSection extends StatelessWidget {
   Widget build(BuildContext context) => Semantics(
     container: true,
     explicitChildNodes: true,
-    label: 'Measurement $number${done ? ', available' : ', incomplete'}',
+    label: 'Step $number of $total${done ? ', done' : ', incomplete'}',
     child: AnimatedContainer(
       duration: MediaQuery.disableAnimationsOf(context)
           ? Duration.zero

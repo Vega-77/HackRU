@@ -67,7 +67,11 @@ def test_manual_box_maps_back_to_client_pixels_after_resize():
     out = pipe(preprocess_frame(img, 1, 0.1, working_width=320))
     obj = out["objects"][0]
     assert obj["pixel"] == pytest.approx({"x": 400, "y": 240}, abs=1)
-    assert obj["bbox"] == pytest.approx({"x": 370, "y": 210, "w": 60, "h": 60}, abs=1)
+    # The box hugs the ball (radius 22) inside the user's looser box, in client pixels.
+    box = obj["bbox"]
+    assert box["x"] + box["w"] / 2 == pytest.approx(400, abs=1)
+    assert box["y"] + box["h"] / 2 == pytest.approx(240, abs=1)
+    assert 44 <= box["w"] <= 60 and 44 <= box["h"] <= 60
     assert obj["position"] == pytest.approx({"x": 0.4, "y": 0.24}, abs=0.001)
 
 

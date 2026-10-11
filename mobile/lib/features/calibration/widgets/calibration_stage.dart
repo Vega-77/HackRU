@@ -69,8 +69,15 @@ class _CalibrationStageState extends ConsumerState<CalibrationStage> {
   @override
   void initState() {
     super.initState();
-    _previewFrame = ref.read(calibrationProvider).selectionFrame;
+    // Back from an experiment, a confirmed selection's picture is old: show
+    // the live camera rather than a still that looks frozen.
+    _previewFrame = _heldFrame(ref.read(calibrationProvider));
   }
+
+  /// The picture to hold when no gesture is in progress: the selection's,
+  /// while it waits for the user to confirm it, else none (live camera).
+  static EncodedFrame? _heldFrame(Calibration c) =>
+      c.target == null || c.selectionConfirmed ? null : c.selectionFrame;
 
   KeyEventResult _onKey(
     KeyEvent event,
@@ -145,6 +152,14 @@ class _CalibrationStageState extends ConsumerState<CalibrationStage> {
       return null;
     }
     if (!mounted || epoch != _selectionEpoch) return null;
+    if (frame == null) {
+      ref
+          .read(calibrationProvider.notifier)
+          .acquisitionFailed(
+            'The camera has no picture yet. Wait a moment, then try again.',
+          );
+      return null;
+    }
     setState(() => _previewFrame = frame);
     return frame;
   }
@@ -153,8 +168,13 @@ class _CalibrationStageState extends ConsumerState<CalibrationStage> {
   Widget build(BuildContext context) {
     final calibration = ref.watch(calibrationProvider);
     ref.listen(calibrationProvider, (previous, next) {
-      if (next.target == null) {
+      if (previous?.target != null && next.target == null) {
         _selectionEpoch++;
+        setState(() => _previewFrame = null);
+      } else if (next.selectionConfirmed &&
+          !(previous?.selectionConfirmed ?? false)) {
+        // Confirmed: back to the live camera, to check the object is in
+        // view before starting.
         setState(() => _previewFrame = null);
       }
     });
@@ -193,7 +213,7 @@ class _CalibrationStageState extends ConsumerState<CalibrationStage> {
                   _dragging = null;
                   _boxStart = null;
                   _boxEnd = null;
-                  _previewFrame = calibration.selectionFrame;
+                  _previewFrame = _heldFrame(calibration);
                 });
               },
               child: Stack(
@@ -397,17 +417,25 @@ class _CalibrationStageState extends ConsumerState<CalibrationStage> {
         _boxStart = null;
         _boxEnd = null;
       });
-      if (start == null || end == null || frame == null) return;
-      final x = math.min(start.x, end.x), y = math.min(start.y, end.y);
-      final w = (start.x - end.x).abs(), h = (start.y - end.y).abs();
-      if (w < 8 || h < 8) return;
+      final box = start == null || end == null
+          ? null
+          : PixelRect(
+              math.min(start.x, end.x),
+              math.min(start.y, end.y),
+              (start.x - end.x).abs(),
+              (start.y - end.y).abs(),
+            );
+      if (frame == null || box == null || box.w < 8 || box.h < 8) {
+        // Too small to be a box, or no picture: let go of the picture held
+        // for drawing, or the stage stays on it.
+        setState(
+          () => _previewFrame = _heldFrame(ref.read(calibrationProvider)),
+        );
+        return;
+      }
       ref
           .read(calibrationProvider.notifier)
-          .selectObject(
-            Vec2(x + w / 2, y + h / 2),
-            PixelRect(x, y, w, h),
-            frame,
-          );
+          .selectObject(Vec2(box.x + box.w / 2, box.y + box.h / 2), box, frame);
       return;
     }
     setState(() {

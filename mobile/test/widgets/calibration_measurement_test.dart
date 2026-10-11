@@ -95,11 +95,11 @@ void main() {
         );
         expect(find.text('Region confirmed'), findsWidgets);
         await tester.scrollUntilVisible(
-          find.text('Retry selection'),
+          find.text('Select again'),
           100,
           scrollable: find.byType(Scrollable).first,
         );
-        await tester.tap(find.text('Retry selection'));
+        await tester.tap(find.text('Select again'));
         await tester.pump();
         expect(container.read(calibrationProvider).selectionFrame, isNull);
         controller.beginAcquisition(const Vec2(160, 160), camera.frame);

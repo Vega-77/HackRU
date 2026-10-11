@@ -83,7 +83,7 @@ class _SectionTitle extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.fromLTRB(
         AppSpace.xs,
-        AppSpace.lg,
+        AppSpace.xl,
         0,
         AppSpace.md,
       ),
@@ -371,7 +371,7 @@ class _DebugLogState extends State<_DebugLog> {
             runSpacing: AppSpace.sm,
             crossAxisAlignment: WrapCrossAlignment.center,
             children: [
-              FilledButton.tonalIcon(
+              OutlinedButton.icon(
                 onPressed: () async {
                   await copyDebugLog(context);
                   _update();

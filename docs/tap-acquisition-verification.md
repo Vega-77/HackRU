@@ -63,7 +63,7 @@ Phone layout tests caught and resolved a confirmation-control overflow.
 2. Hold the gray ball still and visible, then tap its center in calibration.
 3. Inspect the proposed box on the frozen image. Confirm object only if it contains
    the whole ball with little background. Otherwise draw a better box, or choose
-   Retry selection to return to the live image and tap again.
+   Select again to return to the live image and tap again.
 4. Start experiment, keep the ball visible until a later image confirms detection,
    then test vertical and horizontal motion and the pendulum swing.
 5. Copy the diagnostic log, noting whether automatic proposal and subsequent
