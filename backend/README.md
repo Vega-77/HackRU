@@ -52,6 +52,11 @@ python -m pip install -r requirements.txt
 uvicorn app:app --host 0.0.0.0 --port 8000 --ws-max-size 1048576
 ```
 
+For the app on a phone on the same Wi-Fi, `python serve_lan.py` starts the
+same server and prints the `ws://` address to enter in the app's Settings,
+with what to check if the phone can't connect. A frame's round trip on
+Wi-Fi is about 20-40 ms, against 100-300 ms to the hosted free-tier server.
+
 Then, in another terminal, stream frames to it the way the app will:
 
 ```bash

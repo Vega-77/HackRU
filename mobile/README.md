@@ -70,13 +70,44 @@ pick this repo. If the URL Render gives is not
 `handson-physics-backend.onrender.com`, update `defaultBackendUrl` in
 `lib/core/config/app_config.dart`.
 
-To use a backend on a laptop instead:
+#### Faster: a laptop on the same Wi-Fi
 
-1. Put the laptop running the backend and the phone on the **same Wi-Fi**.
-2. Find the laptop's IP (`ipconfig` on Windows, `ipconfig getifaddr en0` on
-   a Mac).
-3. In Settings, enter `ws://<that IP>:8000/ws/frames`. Press **Test connection**. **Use the
-   hosted backend** switches back.
+The hosted server is free, so it is slow: a frame takes 100 to 300 ms to
+come back and the app gets 4 to 9 frames a second, which loses a ball
+thrown at any real speed. A laptop on the same Wi-Fi answers in 20 to 40 ms
+at the full 30 frames a second.
+
+1. Put the laptop and the phone on the **same Wi-Fi**.
+2. On the laptop, after the backend's setup (`../backend/README.md`), run
+   this from `backend/`:
+
+   ```bash
+   python serve_lan.py
+   ```
+
+   It prints the address to use, like `ws://192.168.1.20:8000/ws/frames`.
+3. In the app's Settings, enter that address (`192.168.1.20` on its own is
+   enough) and press **Test connection**. **Use the hosted backend**
+   switches back.
+
+If the test fails:
+
+- Open `http://192.168.1.20:8000/health` (with the laptop's address) in the
+  phone's browser. If that fails too, the phone can't reach the laptop.
+- On Windows, allow Python through the firewall on private networks, and
+  set the Wi-Fi to Private (Settings > Network & internet).
+- Venue Wi-Fi often keeps devices apart. Turn on Mobile Hotspot on the
+  Windows laptop, join it from the phone, and use `192.168.137.1`.
+
+This needs the iPhone app. The web app on GitHub Pages is an https page,
+and browsers don't let one open an unencrypted `ws://` connection to
+another computer, so Settings says so. Chrome on the laptop itself can use
+`ws://localhost:8000/ws/frames`.
+
+Wherever it can, the camera runs at 60 frames a second, and on iOS 16 or
+newer the iPhone keeps each exposure to 1/120 s or less, so a moving ball
+smears less. In a dim room the picture gets darker or grainier; more light
+fixes that.
 
 To set the address at build time instead:
 
@@ -167,8 +198,9 @@ app from the bottom up.
 
 1. `SessionController.start()` opens the camera, builds a `SessionConfig`
    from the settings and calibration, and opens a `PhysicsSocket`.
-2. It grabs a camera frame about 15 times a second, keeping at
-   most 2 frames waiting for an answer, so the picture never lags behind.
+2. It sends the newest camera frame up to 30 times a second (the camera
+   itself runs at 60), keeping at most 4 frames waiting for an answer. The
+   backend works on the newest frame only, so the picture never lags behind.
 3. Each `state` message from the backend lands in `SessionState.latest` and
    in the `TelemetryBuffer`.
 4. `ExperimentStage` maps the backend's frame pixels to screen pixels
