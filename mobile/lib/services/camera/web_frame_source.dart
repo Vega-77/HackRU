@@ -88,6 +88,8 @@ class WebFrameSource implements FrameSource {
         'facingMode': {'ideal': 'environment'},
         'width': {'ideal': 1280},
         'height': {'ideal': 720},
+        // A hint: most laptop webcams stop at 30.
+        'frameRate': {'ideal': AppConfig.captureFps},
       }.jsify()!,
     );
 

@@ -102,14 +102,17 @@ WebSocket session.
 
 ### Flow control
 
-The client keeps **at most 2 frames in flight**: it sends a new frame only when
-fewer than 2 are awaiting a reply. The server keeps only the newest frame and
-drops older ones while busy, so a reply to frame N tells the client that every
-frame up to N is settled. A frame with no reply after 1 s is forgotten.
+The client starts with **2 frames in flight**, then keeps enough in flight to
+cover one measured round trip at 30 fps: 1 + RTT x 30 / 1000 frames, at most
+32. It sends a new frame only when fewer than that are awaiting a reply. The
+server keeps only the newest frame and drops older ones while busy, so a reply
+to frame N tells the client that every frame up to N is settled, and more
+frames in flight do not add lag. A frame with no reply after 1 s, or three
+round trips if that is longer, is forgotten.
 
 So the server must reply to **every frame it processes**, even when nothing is
-tracked (`"tracked": false`). Otherwise the client sends at most 2 frames per
-second.
+tracked (`"tracked": false`). Otherwise only the timeout frees a frame, and the
+stream drops to a few frames per second.
 
 ## Server to client
 

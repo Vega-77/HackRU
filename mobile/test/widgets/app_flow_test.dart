@@ -313,12 +313,12 @@ void main() {
     );
     expect(find.text('Use the hosted backend'), findsNothing);
 
-    await tester.enterText(find.byType(TextField), 'http://10.0.0.5:8000');
+    await tester.enterText(find.byType(TextField), 'ftp://10.0.0.5:8000');
     await tester.pump(const Duration(seconds: 1));
-    expect(find.text('Use ws:// or wss://, not http://'), findsOneWidget);
+    expect(find.text('Use ws:// or wss://, not ftp://'), findsOneWidget);
     expect(
       container.read(experimentSettingsProvider).backendUrl,
-      isNot('http://10.0.0.5:8000'),
+      isNot('ftp://10.0.0.5:8000'),
       reason: 'an invalid address is never saved',
     );
 
@@ -327,6 +327,26 @@ void main() {
     expect(
       container.read(experimentSettingsProvider).backendUrl,
       'ws://10.0.0.5:8000/ws',
+    );
+
+    // A laptop's bare address is filled in, and testing shows it in full.
+    await tester.enterText(find.byType(TextField), '10.0.0.6');
+    await tester.pump(const Duration(seconds: 1));
+    expect(
+      container.read(experimentSettingsProvider).backendUrl,
+      'ws://10.0.0.6:8000/ws/frames',
+    );
+    await tester.tap(find.text('Test connection'));
+    await tester.pump(const Duration(milliseconds: 400));
+    expect(find.text('ws://10.0.0.6:8000/ws/frames'), findsOneWidget);
+    expect(find.text('Connected in 12 ms'), findsOneWidget);
+
+    // So is a tunnel's, which needs wss.
+    await tester.enterText(find.byType(TextField), 'name.trycloudflare.com');
+    await tester.pump(const Duration(seconds: 1));
+    expect(
+      container.read(experimentSettingsProvider).backendUrl,
+      'wss://name.trycloudflare.com/ws/frames',
     );
 
     await tester.tap(find.text('Use the hosted backend'));
