@@ -155,7 +155,7 @@ app from the bottom up.
 
 | Folder | What lives there |
 |---|---|
-| `lib/models/` | Plain Dart types that mirror `docs/protocol.md`: `PhysicsState`, `SessionConfig`, `Calibration`, `Vec2`. No Flutter. |
+| `lib/models/` | Plain Dart types that mirror `docs/protocol.md`: `PhysicsState`, `SessionConfig`, `Calibration`, `Vec2`, `Vec3`, and the `ArVectorScene` sent to the native AR view. No Flutter. |
 | `lib/services/camera/` | `FrameSource`: start the camera, grab a JPEG frame, show a preview. One version for iOS (`native_`), one for Chrome (`web_`), and a drawn test video (`test_video_`) for devices with no camera. |
 | `lib/services/network/` | `PhysicsSocket`: the WebSocket client, with reconnect and flow control. |
 | `lib/state/` | Riverpod controllers: experiment settings, calibration, the running session, and the rolling telemetry buffer for charts. |
@@ -174,6 +174,29 @@ app from the bottom up.
 4. `ExperimentStage` maps the backend's frame pixels to screen pixels
    (`CoordinateMapper`), eases the arrows towards the new values
    (`OverlayFrame`), and paints them (`VectorOverlayPainter`).
+
+### 3D arrows on an iPhone
+
+With ARKit and a picked surface, the backend also sends `position_3d`,
+`velocity_3d`, `acceleration_3d` and `forces_3d` in ARKit world metres.
+Then the arrows are drawn in 3D instead of 2D:
+
+1. `ArVectorLayer` turns each reply into an `ArVectorScene`
+   (`ArVectorSceneBuilder`) and sends it over the `setVectors` channel
+   method.
+2. `ios/Runner/ArVectorNode.swift` draws each arrow as SceneKit nodes in
+   the camera preview, anchored at the object. SceneKit redraws them from
+   the live camera pose every screen refresh, so they stay on the object
+   while the phone moves, and they glide between replies.
+3. The 2D overlay keeps the marker and trail, and stops drawing arrows.
+
+Lengths use the 2D proportions, at 1 mm per reference pixel: 1 m/s is a
+12 cm arrow and the object's weight is 9 cm. If arrows look too big or too
+small on a real table, change `ArVectorSceneBuilder.metresPerPx`.
+
+On Chrome, devices without ARKit, without a surface, or if the native side
+fails, the 2D arrows are used as before. The native code has not been run
+on a device yet, so check it first on a Mac.
 
 ## Design rules
 

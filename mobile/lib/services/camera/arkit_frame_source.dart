@@ -3,6 +3,7 @@ import 'package:flutter/widgets.dart';
 
 import '../../core/config/app_config.dart';
 import '../../core/logging/debug_log.dart';
+import '../../models/ar_vectors.dart';
 import '../../models/camera_pose.dart';
 import '../../models/session_config.dart';
 import '../../models/vec2.dart';
@@ -14,9 +15,12 @@ import 'frame_source.dart';
 /// the backend can turn a 2D centroid into a 3D point on a real surface. On
 /// devices without ARKit world tracking it hands everything to [fallback].
 ///
+/// The preview also draws arrows anchored in the world ([showArVectors]),
+/// so they stay on the object while the phone moves.
+///
 /// ARKit owns the camera while it runs, so this never runs at the same time
 /// as the `camera` plugin.
-class ArKitFrameSource implements FrameSource, SurfaceFinder {
+class ArKitFrameSource implements FrameSource, SurfaceFinder, ArVectorDisplay {
   ArKitFrameSource({required this.fallback});
 
   static const _channel = MethodChannel('handson/arkit');
@@ -28,6 +32,11 @@ class ArKitFrameSource implements FrameSource, SurfaceFinder {
   bool _running = false;
   FrameSize? _frameSize;
 
+  /// Whether the native view has arrows on screen, so a hide is sent once
+  /// and a failure is logged once, not on every reply.
+  bool _vectorsShown = false;
+  bool _vectorsFailed = false;
+
   bool get _useFallback => _supported == false;
 
   @override
@@ -38,6 +47,10 @@ class ArKitFrameSource implements FrameSource, SurfaceFinder {
 
   @override
   bool get canFindSurfaces => _running && _supported == true;
+
+  @override
+  bool get canShowArVectors =>
+      _running && _supported == true && !_vectorsFailed;
 
   @override
   FrameSize? get frameSize => _useFallback ? fallback.frameSize : _frameSize;
@@ -76,6 +89,8 @@ class ArKitFrameSource implements FrameSource, SurfaceFinder {
     if (_useFallback) return fallback.stop();
     if (!_running) return;
     _running = false;
+    // The native side hides the arrows when it stops.
+    _vectorsShown = false;
     log.i('Stopping the ARKit session');
     await _channel.invokeMethod<void>('stop');
   }
@@ -114,6 +129,29 @@ class ArKitFrameSource implements FrameSource, SurfaceFinder {
                 'point ${surface.point}, normal ${surface.normal}',
     );
     return surface;
+  }
+
+  @override
+  Future<void> showArVectors(ArVectorScene? scene) async {
+    if (!canShowArVectors) return;
+    if (scene == null && !_vectorsShown) return;
+    try {
+      if (scene == null) {
+        _vectorsShown = false;
+        await _channel.invokeMethod<void>('hideVectors');
+      } else {
+        if (!_vectorsShown) log.i('Showing 3D arrows');
+        _vectorsShown = true;
+        await _channel.invokeMethod<void>('setVectors', scene.toMap());
+      }
+    } on PlatformException catch (e, stack) {
+      // The 2D overlay would be hidden, so stop sending and say why.
+      _vectorsFailed = true;
+      log.e('The AR view could not draw arrows: ${e.code}', e, stack);
+    } on MissingPluginException catch (e, stack) {
+      _vectorsFailed = true;
+      log.e('This build has no 3D arrow support', e, stack);
+    }
   }
 
   @override

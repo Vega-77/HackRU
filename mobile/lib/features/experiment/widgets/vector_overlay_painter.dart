@@ -20,6 +20,13 @@ class OverlayLayers {
     this.forces = true,
   });
 
+  /// Only the marker and trail, as when the AR view draws the arrows.
+  static const none = OverlayLayers(
+    velocity: false,
+    acceleration: false,
+    forces: false,
+  );
+
   final bool velocity;
   final bool acceleration;
   final bool forces;

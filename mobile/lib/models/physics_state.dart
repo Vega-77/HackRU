@@ -1,12 +1,14 @@
 import 'dart:convert';
 
 import 'vec2.dart';
+import 'vec3.dart';
 
 /// Everything the backend tells us about one video frame.
 ///
 /// Mirrors the `state` message in `docs/protocol.md`. Physical vectors are in
 /// world space (SI units, y up); [pixel] and [bbox] are in frame pixels
-/// (y down).
+/// (y down). With an ARKit surface the `*3d` fields repeat them in ARKit
+/// world space, for arrows anchored in the scene.
 class PhysicsState {
   const PhysicsState({
     required this.frameId,
@@ -23,6 +25,10 @@ class PhysicsState {
     this.screenAxes,
     this.trackingDebug = const {},
     this.trackingStatus,
+    this.position3d,
+    this.velocity3d,
+    this.acceleration3d,
+    this.forces3d = const [],
   });
 
   /// Echo of the `frame_id` the client sent with the frame.
@@ -51,9 +57,17 @@ class PhysicsState {
   final Map<String, dynamic> trackingDebug;
   final String? trackingStatus;
 
+  /// The object's centre in ARKit world space (metres). Null without an
+  /// `ar_plane`.
+  final Vec3? position3d;
+  final Vec3? velocity3d;
+  final Vec3? acceleration3d;
+  final List<ForceVector3> forces3d;
+
   factory PhysicsState.fromJson(Map<String, dynamic> json) {
     final rawForces = json['forces'];
     final rawExtras = json['extras'];
+    final rawForces3d = json['forces_3d'];
     return PhysicsState(
       frameId: (json['frame_id'] as num?)?.toInt() ?? -1,
       t: (json['timestamp'] as num?)?.toDouble() ?? 0,
@@ -77,6 +91,15 @@ class PhysicsState {
                 if (e.value is num) '${e.key}': (e.value as num).toDouble(),
             }
           : const {},
+      position3d: Vec3.tryParse(json['position_3d']),
+      velocity3d: Vec3.tryParse(json['velocity_3d']),
+      acceleration3d: Vec3.tryParse(json['acceleration_3d']),
+      forces3d: rawForces3d is List
+          ? rawForces3d
+                .map(ForceVector3.tryParse)
+                .whereType<ForceVector3>()
+                .toList()
+          : const [],
       screenAxes: ScreenAxes.tryParse(json['screen_axes']),
       trackingDebug: json['tracking_debug'] is Map<String, dynamic>
           ? json['tracking_debug'] as Map<String, dynamic>
@@ -98,6 +121,11 @@ class PhysicsState {
     if (energy != null) 'energy': energy!.toJson(),
     'extras': extras,
     if (screenAxes != null) 'screen_axes': screenAxes!.toJson(),
+    if (position3d != null) 'position_3d': position3d!.toJson(),
+    if (velocity3d != null) 'velocity_3d': velocity3d!.toJson(),
+    if (acceleration3d != null) 'acceleration_3d': acceleration3d!.toJson(),
+    if (forces3d.isNotEmpty)
+      'forces_3d': [for (final f in forces3d) f.toJson()],
   };
 }
 
@@ -142,6 +170,24 @@ class ForceVector {
     if (json is! Map || json['name'] is! String) return null;
     final vector = Vec2.tryParse(json);
     return vector == null ? null : ForceVector(json['name'] as String, vector);
+  }
+
+  Map<String, dynamic> toJson() => {'name': name, ...vector.toJson()};
+}
+
+/// A [ForceVector] in ARKit world space, from `forces_3d`.
+class ForceVector3 {
+  const ForceVector3(this.name, this.vector);
+
+  final String name;
+
+  /// Newtons, ARKit world axes.
+  final Vec3 vector;
+
+  static ForceVector3? tryParse(Object? json) {
+    if (json is! Map || json['name'] is! String) return null;
+    final vector = Vec3.tryParse(json);
+    return vector == null ? null : ForceVector3(json['name'] as String, vector);
   }
 
   Map<String, dynamic> toJson() => {'name': name, ...vector.toJson()};
@@ -286,6 +332,7 @@ class FrameAckMessage extends ServerMessage {
               pixel: pixel,
               bbox: PixelRect.tryParse(followed!['bbox']),
               position: Vec2.tryParse(followed['position']),
+              position3d: Vec3.tryParse(followed['position_3d']),
               screenAxes: ScreenAxes.tryParse(followed['screen_axes']),
             ),
     );

@@ -51,22 +51,31 @@ class ArrowScale {
   double get maxPx => _maxPx * unit;
   double get minPx => _minPx * unit;
 
-  double velocity(Vec2 v) => _eased(v.length * velocityPxPerMps * unit);
+  double velocity(Vec2 v) => velocityLength(v.length);
 
-  double acceleration(Vec2 a) =>
-      _eased(a.length * accelerationPxPerMps2 * unit);
+  double acceleration(Vec2 a) => accelerationLength(a.length);
 
   /// Lengths for a set of forces, by name, sharing one linear scale.
-  Map<String, double> forces(Map<String, Vec2> forces) {
+  Map<String, double> forces(Map<String, Vec2> forces) =>
+      forceLengths({for (final e in forces.entries) e.key: e.value.length});
+
+  /// For a speed in m/s.
+  double velocityLength(double speed) =>
+      _eased(speed * velocityPxPerMps * unit);
+
+  /// For a magnitude in m/s².
+  double accelerationLength(double magnitude) =>
+      _eased(magnitude * accelerationPxPerMps2 * unit);
+
+  /// For force magnitudes in newtons, by name.
+  Map<String, double> forceLengths(Map<String, double> newtons) {
     final pxPerN = weightPx * unit / weightN;
-    final longest = forces.values.fold<double>(
+    final longest = newtons.values.fold<double>(
       0,
-      (longest, f) => math.max(longest, f.length * pxPerN),
+      (longest, f) => math.max(longest, f * pxPerN),
     );
     final shrink = longest > maxPx ? maxPx / longest : 1.0;
-    return {
-      for (final e in forces.entries) e.key: e.value.length * pxPerN * shrink,
-    };
+    return {for (final e in newtons.entries) e.key: e.value * pxPerN * shrink};
   }
 
   /// Whether an arrow of [length] px is worth drawing.

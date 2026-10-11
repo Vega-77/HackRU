@@ -1,8 +1,10 @@
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:hands_on_physics/models/ar_vectors.dart';
 import 'package:hands_on_physics/models/session_config.dart';
 import 'package:hands_on_physics/models/vec2.dart';
+import 'package:hands_on_physics/models/vec3.dart';
 import 'package:hands_on_physics/services/camera/arkit_frame_source.dart';
 import 'package:hands_on_physics/services/camera/frame_source.dart';
 
@@ -140,5 +142,69 @@ void main() {
         ),
       ),
     );
+  });
+
+  group('3D arrows', () {
+    const scene = ArVectorScene(
+      origin: Vec3(0, 0.5, -1),
+      haloArgb: 0xFF000000,
+      arrows: [
+        ArArrow(
+          id: 'velocity',
+          direction: Vec3(1, 0, 0),
+          lengthM: 0.12,
+          radiusM: 0.003,
+          argb: 0xFF2FBF71,
+          symbol: 'v',
+        ),
+      ],
+    );
+
+    Future<ArKitFrameSource> started({bool fail = false}) async {
+      answer((call) {
+        if (fail && call.method == 'setVectors') {
+          throw PlatformException(code: 'boom');
+        }
+        return switch (call.method) {
+          'isSupported' => true,
+          'start' => {'width': 320, 'height': 427},
+          _ => null,
+        };
+      });
+      final source = ArKitFrameSource(fallback: fallback);
+      await source.start();
+      return source;
+    }
+
+    test('sends scenes and hides them', () async {
+      final source = await started();
+      expect(source.canShowArVectors, isTrue);
+      await source.showArVectors(scene);
+      await source.showArVectors(null);
+      await source.showArVectors(null);
+      final vectorCalls = calls.where((c) => c.method.contains('Vectors'));
+      expect(vectorCalls.map((c) => c.method), ['setVectors', 'hideVectors']);
+      final args = vectorCalls.first.arguments as Map;
+      expect(args['origin'], [0.0, 0.5, -1.0]);
+      expect((args['arrows'] as List).single['id'], 'velocity');
+    });
+
+    test('a native failure falls back to the 2D arrows', () async {
+      final source = await started(fail: true);
+      await source.showArVectors(scene);
+      expect(source.canShowArVectors, isFalse);
+      await source.showArVectors(scene);
+      expect(calls.where((c) => c.method == 'setVectors'), hasLength(1));
+    });
+
+    test('nothing is sent before start or without ARKit', () async {
+      answer((call) => call.method == 'isSupported' ? false : null);
+      final source = ArKitFrameSource(fallback: fallback);
+      expect(source.canShowArVectors, isFalse);
+      await source.start();
+      expect(source.canShowArVectors, isFalse);
+      await source.showArVectors(scene);
+      expect(calls.map((c) => c.method), ['isSupported']);
+    });
   });
 }

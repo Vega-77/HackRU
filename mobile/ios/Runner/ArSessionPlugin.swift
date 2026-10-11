@@ -13,6 +13,7 @@ import UIKit
 /// * `capture {width, quality}` -> {jpeg, width, height, timestamp,
 ///   intrinsics: [fx, fy, cx, cy], camera_to_world: [16, row-major]} or nil
 /// * `raycast {x, y, width}` -> {point: [3], normal: [3], vertical} or nil
+/// * `setVectors {...}` and `hideVectors`: 3D arrows, see `ArVectorLayer`
 ///
 /// Frames, intrinsics and pose all describe the image as the user sees it
 /// (upright for the current interface orientation), scaled to `width`.
@@ -25,10 +26,12 @@ final class ArSessionPlugin: NSObject, FlutterPlugin {
     let channel = FlutterMethodChannel(name: "handson/arkit", binaryMessenger: registrar.messenger())
     let instance = ArSessionPlugin()
     registrar.addMethodCallDelegate(instance, channel: channel)
-    registrar.register(ArPreviewFactory(session: instance.session), withId: "handson/arkit_view")
+    registrar.register(
+      ArPreviewFactory(session: instance.session, vectors: instance.vectors), withId: "handson/arkit_view")
   }
 
   let session = ARSession()
+  let vectors = ArVectorLayer()
   private let ciContext = CIContext()
   private let encodeQueue = DispatchQueue(label: "handson.arkit.encode", qos: .userInitiated)
   private var running = false
@@ -46,6 +49,7 @@ final class ArSessionPlugin: NSObject, FlutterPlugin {
       // during setup is still valid when the experiment starts.
       session.pause()
       running = false
+      vectors.hide(animated: false)
       result(nil)
     case "capture":
       capture(width: width, quality: args["quality"] as? Double ?? 0.7, result: result)
@@ -55,6 +59,12 @@ final class ArSessionPlugin: NSObject, FlutterPlugin {
         return
       }
       result(raycast(x: x, y: y, width: width))
+    case "setVectors":
+      vectors.update(args)
+      result(nil)
+    case "hideVectors":
+      vectors.hide()
+      result(nil)
     default:
       result(FlutterMethodNotImplemented)
     }
@@ -235,26 +245,31 @@ struct OrientedCamera {
 
 final class ArPreviewFactory: NSObject, FlutterPlatformViewFactory {
   private let session: ARSession
+  private let vectors: ArVectorLayer
 
-  init(session: ARSession) {
+  init(session: ARSession, vectors: ArVectorLayer) {
     self.session = session
+    self.vectors = vectors
   }
 
   func create(withFrame frame: CGRect, viewIdentifier viewId: Int64, arguments args: Any?) -> FlutterPlatformView {
-    ArPreview(frame: frame, session: session)
+    ArPreview(frame: frame, session: session, vectors: vectors)
   }
 }
 
 /// The live camera feed. ARSCNView fills its bounds like BoxFit.cover, which
 /// is what the Flutter overlay assumes when it maps frame pixels to screen.
+/// The same view draws the 3D arrows, from the session's live camera pose.
 final class ArPreview: NSObject, FlutterPlatformView {
   private let sceneView: ARSCNView
 
-  init(frame: CGRect, session: ARSession) {
+  init(frame: CGRect, session: ARSession, vectors: ArVectorLayer) {
     sceneView = ARSCNView(frame: frame)
     sceneView.session = session
     sceneView.scene = SCNScene()
     sceneView.automaticallyUpdatesLighting = false
+    sceneView.antialiasingMode = .multisampling4X
+    vectors.attach(to: sceneView.scene)
     super.init()
   }
 

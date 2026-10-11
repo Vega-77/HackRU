@@ -1,12 +1,14 @@
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:hands_on_physics/models/ar_vectors.dart';
 import 'package:hands_on_physics/models/camera_pose.dart';
 import 'package:hands_on_physics/models/session_config.dart';
 import 'package:hands_on_physics/models/vec2.dart';
+import 'package:hands_on_physics/models/vec3.dart';
 import 'package:hands_on_physics/services/camera/camera_or_test_video.dart';
 import 'package:hands_on_physics/services/camera/frame_source.dart';
 
-class _ArCamera implements FrameSource, SurfaceFinder {
+class _ArCamera implements FrameSource, SurfaceFinder, ArVectorDisplay {
   @override
   String get name => 'fake camera';
 
@@ -40,6 +42,14 @@ class _ArCamera implements FrameSource, SurfaceFinder {
   @override
   Future<ArSurface?> findSurface(Vec2 framePixel) async =>
       const ArSurface(point: [0, 0, -1], normal: [0, 0, 1], vertical: true);
+
+  final List<ArVectorScene?> shown = [];
+
+  @override
+  bool get canShowArVectors => running;
+
+  @override
+  Future<void> showArVectors(ArVectorScene? scene) async => shown.add(scene);
 }
 
 void main() {
@@ -59,5 +69,22 @@ void main() {
     expect(source.canFindSurfaces, isFalse);
     expect(await source.findSurface(const Vec2(160, 120)), isNull);
     await source.stop();
+  });
+
+  test('passes 3D arrows through to an AR camera only', () async {
+    const scene = ArVectorScene(origin: Vec3.zero, arrows: [], haloArgb: 0);
+    final camera = _ArCamera();
+    final source = CameraOrTestVideo(camera);
+    await source.start();
+    expect(source.canShowArVectors, isTrue);
+    await source.showArVectors(scene);
+    await source.showArVectors(null);
+    expect(camera.shown, [scene, null]);
+
+    final video = CameraOrTestVideo(_ArCamera()..hasCamera = false);
+    await video.start();
+    expect(video.canShowArVectors, isFalse);
+    await video.showArVectors(scene);
+    await video.stop();
   });
 }
