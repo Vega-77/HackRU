@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:isolate';
 import 'dart:typed_data';
 
@@ -22,6 +23,7 @@ import 'frame_source.dart';
 /// orientation, so frames are upright in both portrait and landscape.
 class NativeFrameSource implements FrameSource {
   CameraController? _controller;
+  Future<void>? _starting;
   CameraImage? _latest;
   double _latestTime = 0;
   final Stopwatch _clock = Stopwatch()..start();
@@ -39,8 +41,13 @@ class NativeFrameSource implements FrameSource {
     return _sizeForWidth(image, AppConfig.frameWidth);
   }
 
+  /// Setup and the session both start the camera; a second call while the
+  /// first is still opening waits for it instead of opening the camera twice.
   @override
-  Future<void> start() async {
+  Future<void> start() =>
+      _starting ??= _start().whenComplete(() => _starting = null);
+
+  Future<void> _start() async {
     if (isRunning) return;
 
     final List<CameraDescription> cameras;
@@ -88,6 +95,7 @@ class NativeFrameSource implements FrameSource {
 
     _controller = controller;
     log.i('Camera preview is ${controller.value.previewSize}');
+    final firstFrame = Completer<void>();
     await controller.startImageStream((image) {
       if (_latest == null) {
         log.i(
@@ -97,7 +105,21 @@ class NativeFrameSource implements FrameSource {
       }
       _latest = image;
       _latestTime = _clock.elapsedMicroseconds / 1e6;
+      if (!firstFrame.isCompleted) firstFrame.complete();
     });
+    // frameSize comes from the first frame, and setup lays out the stage
+    // with it, so the camera has not started until there is one.
+    try {
+      await firstFrame.future.timeout(AppConfig.cameraFirstFrameTimeout);
+    } on TimeoutException {
+      if (!identical(_controller, controller)) return; // Stopped meanwhile.
+      log.w('The camera opened but sent no frame');
+      await stop();
+      throw const CameraUnavailableException(
+        'It opened but sent no picture. Close other apps using the camera, '
+        'then try again.',
+      );
+    }
   }
 
   @override

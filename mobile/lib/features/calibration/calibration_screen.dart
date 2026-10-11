@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../core/logging/debug_log.dart';
 import '../../core/routing/router.dart';
 import '../../core/theme/app_icons.dart';
 import '../../core/theme/tokens.dart';
@@ -37,6 +38,10 @@ class _CalibrationScreenState extends ConsumerState<CalibrationScreen> {
   FrameSize? _cameraFrame;
   String? _cameraError;
 
+  /// Only the latest start may update the screen; Try again can start a new
+  /// one while an old one is still waiting.
+  int _cameraAttempt = 0;
+
   @override
   void initState() {
     super.initState();
@@ -51,15 +56,30 @@ class _CalibrationScreenState extends ConsumerState<CalibrationScreen> {
   }
 
   Future<void> _startCamera() async {
+    final attempt = ++_cameraAttempt;
     setState(() => _cameraError = null);
+    // Any failure has to reach the screen: an uncaught one would leave it
+    // on "Starting camera" for good.
+    String? error;
     try {
       await _camera.start();
     } on CameraUnavailableException catch (e) {
-      if (mounted) setState(() => _cameraError = e.message);
+      error = e.message;
+    } catch (e, stack) {
+      log.e('The camera failed to start', e, stack);
+      error = 'Close other apps using the camera, then try again.';
+    }
+    if (!mounted || attempt != _cameraAttempt) return;
+    final frame = _camera.frameSize;
+    if (error == null && frame == null) {
+      log.w('The camera started without a picture size');
+      error = 'It opened but sent no picture. Try again.';
+    }
+    if (error != null) {
+      setState(() => _cameraError = error);
       return;
     }
-    if (!mounted) return;
-    setState(() => _cameraFrame = _camera.frameSize);
+    setState(() => _cameraFrame = frame);
     _placeDefaults();
   }
 
@@ -211,7 +231,9 @@ class _Stage extends StatelessWidget {
         onAction: onRetry,
       );
     } else if (frame == null) {
-      content = const _CameraMessage(text: 'Starting camera');
+      content = const _CameraMessage(
+        text: 'Starting camera. If asked, allow camera access.',
+      );
     } else {
       content = CalibrationStage(
         frameSize: frame,

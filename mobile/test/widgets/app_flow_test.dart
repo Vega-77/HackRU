@@ -29,9 +29,16 @@ class _FakeCamera implements FrameSource {
   int stops = 0;
   bool running = false;
 
+  /// What the next start throws, as a broken camera plugin might.
+  Object? startError;
+
+  /// Opens without a picture yet, so it has no frame size.
+  bool sizeless = false;
+
   @override
   Future<void> start() async {
     if (running) return;
+    if (startError case final error?) throw error;
     starts++;
     running = true;
   }
@@ -47,7 +54,8 @@ class _FakeCamera implements FrameSource {
   bool get isRunning => running;
 
   @override
-  FrameSize? get frameSize => running ? const FrameSize(320, 240) : null;
+  FrameSize? get frameSize =>
+      running && !sizeless ? const FrameSize(320, 240) : null;
 
   @override
   Future<EncodedFrame?> capture({int width = 320}) async => EncodedFrame(
@@ -284,6 +292,46 @@ void main() {
     expect(camera.isRunning, isTrue);
     expect(camera.starts, 1);
     expect(camera.stops, 0);
+
+    await unmount(tester);
+  });
+
+  testWidgets('setup offers a retry when the camera fails to start', (
+    tester,
+  ) async {
+    camera.startError = StateError('plugin crashed');
+    await pumpApp(tester);
+    await tester.tap(find.textContaining('Set up'));
+    await tester.pump(const Duration(milliseconds: 600));
+    await tester.pump(); // the start's outcome lands after that frame
+    expect(find.textContaining('Starting camera'), findsNothing);
+    expect(find.textContaining('The camera did not start'), findsOneWidget);
+
+    camera.startError = null;
+    await tester.tap(find.text('Try again'));
+    await tester.pump(const Duration(milliseconds: 100));
+    await tester.pump();
+    expect(find.textContaining('The camera did not start'), findsNothing);
+    expect(find.byType(CalibrationStage), findsOneWidget);
+
+    await unmount(tester);
+  });
+
+  testWidgets('setup offers a retry when the camera sends no picture', (
+    tester,
+  ) async {
+    camera.sizeless = true;
+    await pumpApp(tester);
+    await tester.tap(find.textContaining('Set up'));
+    await tester.pump(const Duration(milliseconds: 600));
+    await tester.pump(); // the start's outcome lands after that frame
+    expect(find.textContaining('sent no picture'), findsOneWidget);
+
+    camera.sizeless = false;
+    await tester.tap(find.text('Try again'));
+    await tester.pump(const Duration(milliseconds: 100));
+    await tester.pump();
+    expect(find.byType(CalibrationStage), findsOneWidget);
 
     await unmount(tester);
   });

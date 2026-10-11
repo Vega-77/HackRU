@@ -47,6 +47,7 @@ class WebFrameSource implements FrameSource {
   final Set<web.HTMLVideoElement> _previews = {};
   final web.HTMLCanvasElement _canvas = web.HTMLCanvasElement();
   web.MediaStream? _stream;
+  Future<void>? _starting;
 
   @override
   bool get isRunning => _stream != null;
@@ -57,8 +58,13 @@ class WebFrameSource implements FrameSource {
     return _sizeForWidth(AppConfig.frameWidth);
   }
 
+  /// A second call while the first is still opening waits for it, so the
+  /// browser is not asked for the camera twice.
   @override
-  Future<void> start() async {
+  Future<void> start() =>
+      _starting ??= _start().whenComplete(() => _starting = null);
+
+  Future<void> _start() async {
     if (isRunning) return;
 
     final devices = web.window.navigator.mediaDevices;
@@ -93,8 +99,19 @@ class WebFrameSource implements FrameSource {
       ..removeWhere((preview) => !preview.isConnected)
       ..forEach(_attach);
     _attach(_captureVideo);
-    // videoWidth is 0 until the first frame's metadata arrives.
+    // videoWidth is 0 until the first frame's metadata arrives. A camera
+    // another app holds can open and never deliver one.
+    final waiting = Stopwatch()..start();
     while (_captureVideo.videoWidth == 0) {
+      if (_stream == null) return; // Stopped meanwhile.
+      if (waiting.elapsed > AppConfig.cameraFirstFrameTimeout) {
+        log.w('The browser camera opened but sent no frame');
+        await stop();
+        throw const CameraUnavailableException(
+          'It opened but sent no picture. Close other tabs or apps using '
+          'the camera, then try again.',
+        );
+      }
       await Future<void>.delayed(const Duration(milliseconds: 30));
     }
     log.i(

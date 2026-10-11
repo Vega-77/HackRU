@@ -20,6 +20,10 @@ abstract final class AppConfig {
   static const Duration frameTimeout = Duration(seconds: 1);
   static const Duration reconnectDelay = Duration(seconds: 2);
 
+  /// How long an opened camera may take to deliver its first picture before
+  /// setup says so, instead of waiting on a blank stage.
+  static const Duration cameraFirstFrameTimeout = Duration(seconds: 6);
+
   // Experiment defaults.
   static const double defaultMassKg = 0.1;
   static const double defaultRulerLengthM = 0.30;
