@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/config/app_config.dart';
 import '../../../core/theme/tokens.dart';
 import '../../../models/experiment_mode.dart';
 import '../../../models/physics_state.dart';
@@ -78,9 +79,32 @@ class _TelemetryPanelState extends ConsumerState<TelemetryPanel> {
           const _Handle()
         else
           const SizedBox(height: AppSpace.lg),
-        _LayerToggles(settings: settings),
-        const SizedBox(height: AppSpace.xl),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            Expanded(
+              child: Text(
+                'Measurements',
+                style: Theme.of(context).textTheme.titleLarge,
+              ),
+            ),
+            Text(
+              settings.mode.label,
+              style: AppType.caption.copyWith(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: AppSpace.md),
+        // Current measurements lead the panel; visibility controls follow.
         _Readouts(mode: settings.mode, state: latest),
+        const SizedBox(height: AppSpace.xl),
+        const Divider(),
+        const SizedBox(height: AppSpace.lg),
+        Text('Camera overlays', style: Theme.of(context).textTheme.titleMedium),
+        const SizedBox(height: AppSpace.md),
+        _LayerToggles(settings: settings),
         const SizedBox(height: AppSpace.xl),
         const Divider(),
         const SizedBox(height: AppSpace.lg),
@@ -89,12 +113,57 @@ class _TelemetryPanelState extends ConsumerState<TelemetryPanel> {
           onChanged: (q) => setState(() => _quantity = q),
         ),
         const SizedBox(height: AppSpace.md),
-        SizedBox(
-          height: 168,
-          child: TelemetryChart(samples: samples, quantity: _quantity),
+        DecoratedBox(
+          decoration: BoxDecoration(
+            color: AppColors.graphiteDeep,
+            border: Border.all(color: AppColors.ruleDark),
+            borderRadius: const BorderRadius.all(Radius.circular(8)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(
+                  AppSpace.md,
+                  AppSpace.md,
+                  AppSpace.md,
+                  0,
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        '${_quantity.label} over time',
+                        style: AppType.label.copyWith(
+                          color: Theme.of(context).colorScheme.onSurface,
+                        ),
+                      ),
+                    ),
+                    Text(
+                      'Last ${AppConfig.telemetryWindow.inSeconds} s',
+                      style: AppType.readoutSmall.copyWith(
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              SizedBox(
+                height: 168,
+                child: TelemetryChart(samples: samples, quantity: _quantity),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(
+                  AppSpace.md,
+                  0,
+                  AppSpace.md,
+                  AppSpace.md,
+                ),
+                child: _ChartLegend(quantity: _quantity),
+              ),
+            ],
+          ),
         ),
-        const SizedBox(height: AppSpace.sm),
-        _ChartLegend(quantity: _quantity),
         const SizedBox(height: AppSpace.xl),
         const Divider(),
         const SizedBox(height: AppSpace.lg),
@@ -199,7 +268,8 @@ class _LayerToggle extends StatelessWidget {
       excludeSemantics: true,
       child: Material(
         color: on ? color.withValues(alpha: 0.16) : Colors.transparent,
-        shape: StadiumBorder(
+        shape: RoundedRectangleBorder(
+          borderRadius: const BorderRadius.all(Radius.circular(6)),
           side: BorderSide(
             color: on ? color.withValues(alpha: 0.7) : scheme.outline,
             width: 1.5,
@@ -303,15 +373,13 @@ class _Readouts extends StatelessWidget {
 
     return LayoutBuilder(
       builder: (context, constraints) {
-        // Up to four across; wraps to a second row on narrow screens.
-        final perRow = items.length <= 3
-            ? items.length
-            : (constraints.maxWidth > 340 ? 4 : 2);
+        // Two columns keep the quantity names and instrument values readable.
+        final perRow = constraints.maxWidth < 280 ? 1 : 2;
         final width =
-            (constraints.maxWidth - AppSpace.lg * (perRow - 1)) / perRow;
+            (constraints.maxWidth - AppSpace.md * (perRow - 1)) / perRow;
         return Wrap(
-          spacing: AppSpace.lg,
-          runSpacing: AppSpace.lg,
+          spacing: AppSpace.md,
+          runSpacing: AppSpace.md,
           children: [
             for (final item in items) SizedBox(width: width, child: item),
           ],
@@ -357,40 +425,69 @@ class _Readout extends StatelessWidget {
     return Semantics(
       label: v == null ? '$spoken not available' : '$spoken $text $spokenUnit',
       excludeSemantics: true,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.baseline,
-            textBaseline: TextBaseline.alphabetic,
-            children: [
-              PhysicsSymbol(symbol, color: color ?? scheme.onSurface, size: 17),
-              if (unit.isNotEmpty) ...[
-                const SizedBox(width: 6),
-                Flexible(
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(
+          AppSpace.md,
+          AppSpace.md,
+          AppSpace.sm,
+          AppSpace.md,
+        ),
+        decoration: BoxDecoration(
+          // The quantity color identifies the value; the recessed neutral
+          // surface keeps the number readable against the telemetry sheet.
+          color: AppColors.graphiteDeep,
+          border: Border(
+            left: BorderSide(color: color ?? scheme.outline, width: 2),
+            bottom: BorderSide(color: scheme.outline.withValues(alpha: 0.65)),
+          ),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                PhysicsSymbol(
+                  symbol,
+                  color: color ?? scheme.onSurface,
+                  size: 17,
+                ),
+                const SizedBox(width: AppSpace.sm),
+                Expanded(
                   child: Text(
-                    unit,
+                    spoken,
+                    maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: AppType.readoutSmall.copyWith(
+                    style: AppType.caption.copyWith(
                       color: scheme.onSurfaceVariant,
                     ),
                   ),
                 ),
               ],
-            ],
-          ),
-          const SizedBox(height: AppSpace.xs),
-          FittedBox(
-            fit: BoxFit.scaleDown,
-            alignment: Alignment.centerLeft,
-            child: Text(
-              text,
-              style: AppType.readout.copyWith(
-                color: v == null ? scheme.onSurfaceVariant : scheme.onSurface,
-              ),
             ),
-          ),
-        ],
+            const SizedBox(height: AppSpace.sm),
+            Wrap(
+              crossAxisAlignment: WrapCrossAlignment.end,
+              spacing: 6,
+              children: [
+                Text(
+                  text,
+                  style: AppType.readout.copyWith(
+                    color: v == null
+                        ? scheme.onSurfaceVariant
+                        : scheme.onSurface,
+                  ),
+                ),
+                if (unit.isNotEmpty)
+                  Text(
+                    unit,
+                    style: AppType.readoutSmall.copyWith(
+                      color: scheme.onSurfaceVariant,
+                    ),
+                  ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -405,6 +502,13 @@ class _QuantityPicker extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+    // Match the selected control to the plotted series without using physics
+    // colors for unrelated interface chrome.
+    final quantityColor = switch (value) {
+      ChartQuantity.position => scheme.onSurface,
+      ChartQuantity.velocity => AppColors.velocity,
+      ChartQuantity.acceleration => AppColors.acceleration,
+    };
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
       child: Row(
@@ -416,10 +520,13 @@ class _QuantityPicker extends StatelessWidget {
               label: 'Chart ${q.label.toLowerCase()}',
               excludeSemantics: true,
               child: Material(
-                color: q == value ? scheme.onSurface : Colors.transparent,
-                shape: StadiumBorder(
+                color: q == value
+                    ? quantityColor.withValues(alpha: 0.15)
+                    : Colors.transparent,
+                shape: RoundedRectangleBorder(
+                  borderRadius: const BorderRadius.all(Radius.circular(6)),
                   side: BorderSide(
-                    color: q == value ? scheme.onSurface : scheme.outline,
+                    color: q == value ? quantityColor : scheme.outline,
                     width: 1.5,
                   ),
                 ),
@@ -433,9 +540,7 @@ class _QuantityPicker extends StatelessWidget {
                     ),
                     child: Text(
                       q.label,
-                      style: AppType.label.copyWith(
-                        color: q == value ? scheme.surface : scheme.onSurface,
-                      ),
+                      style: AppType.label.copyWith(color: scheme.onSurface),
                     ),
                   ),
                 ),

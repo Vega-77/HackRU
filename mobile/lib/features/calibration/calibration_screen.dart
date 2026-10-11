@@ -267,6 +267,55 @@ class _CameraMessage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (action != null) {
+      return Center(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(AppSpace.lg),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 380),
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                color: AppColors.graphiteRaised,
+                borderRadius: AppRadii.panelAll,
+                border: Border.all(color: AppColors.ruleDark),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.all(AppSpace.md),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Icon(
+                      AppIcons.cameraSlash,
+                      size: 20,
+                      color: AppColors.instrumentAccentDark,
+                    ),
+                    const SizedBox(height: AppSpace.sm),
+                    Text(
+                      text,
+                      style: AppType.body.copyWith(color: AppColors.vellum),
+                    ),
+                    const SizedBox(height: AppSpace.sm),
+                    OutlinedButton(
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: AppColors.vellum,
+                        side: const BorderSide(
+                          color: AppColors.ruleDark,
+                          width: 1.5,
+                        ),
+                      ),
+                      onPressed: onAction,
+                      child: Text(action!),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(AppSpace.xl),
