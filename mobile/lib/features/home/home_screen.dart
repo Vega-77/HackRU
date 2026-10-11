@@ -9,8 +9,8 @@ import '../../models/experiment_mode.dart';
 import '../../state/experiment_settings.dart';
 import 'widgets/experiment_preview.dart';
 
-/// Pick an experiment. The selected one plays live in the panel at the top,
-/// drawn by the same overlay the experiment screen uses.
+//// Pick an experiment. The selected one plays live at the top, drawn by
+/// the same overlay the experiment screen uses.
 class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
 
@@ -19,7 +19,6 @@ class HomeScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final mode = ref.watch(experimentSettingsProvider.select((s) => s.mode));
-    final scheme = Theme.of(context).colorScheme;
 
     return Scaffold(
       body: SafeArea(
@@ -32,76 +31,39 @@ class HomeScreen extends ConsumerWidget {
                 SliverPadding(
                   padding: const EdgeInsets.fromLTRB(
                     AppSpace.xl,
-                    AppSpace.lg,
-                    AppSpace.md,
-                    0,
+                    AppSpace.sm,
+                    AppSpace.sm,
+                    AppSpace.sm,
                   ),
                   sliver: SliverToBoxAdapter(
                     child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
                         Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'HANDSON PHYSICS',
-                                style: AppType.label.copyWith(
-                                  color: scheme.primary,
-                                  fontSize: 12,
-                                ),
-                              ),
-                              const SizedBox(height: AppSpace.xs),
-                              Semantics(
-                                header: true,
-                                child: Text(
-                                  'Motion lab',
-                                  style: Theme.of(context)
-                                      .textTheme
-                                      .displaySmall,
-                                ),
-                              ),
-                            ],
+                          child: Semantics(
+                            header: true,
+                            child: Text(
+                              'HandsOn Physics',
+                              style: Theme.of(context).textTheme.titleLarge,
+                            ),
                           ),
                         ),
-                        DecoratedBox(
-                          decoration: BoxDecoration(
-                            border: Border.all(color: scheme.outline),
-                            borderRadius: AppRadii.controlAll,
-                          ),
-                          child: IconButton(
-                            onPressed: () => context.push(Routes.settings),
-                            tooltip: 'Settings',
-                            iconSize: 22,
-                            padding: const EdgeInsets.all(AppSpace.md),
-                            icon: const Icon(AppIcons.gear),
-                          ),
+                        IconButton(
+                          onPressed: () => context.push(Routes.settings),
+                          tooltip: 'Settings',
+                          icon: const Icon(AppIcons.gear),
                         ),
                       ],
                     ),
                   ),
                 ),
                 SliverPadding(
-                  padding: const EdgeInsets.fromLTRB(
-                    AppSpace.xl,
-                    AppSpace.md,
-                    AppSpace.xl,
-                    AppSpace.xl,
-                  ),
-                  sliver: SliverToBoxAdapter(
-                    child: Text(
-                      'Follow position, velocity and force as an experiment moves.',
-                      style: AppType.body.copyWith(
-                        fontSize: 17,
-                        color: scheme.onSurfaceVariant,
-                      ),
-                    ),
-                  ),
+                  padding: const EdgeInsets.symmetric(horizontal: AppSpace.lg),
+                  sliver: SliverToBoxAdapter(child: _Preview(mode: mode)),
                 ),
                 SliverPadding(
                   padding: const EdgeInsets.fromLTRB(
                     AppSpace.xl,
-                    AppSpace.lg,
+                    AppSpace.xl,
                     AppSpace.xl,
                     AppSpace.sm,
                   ),
@@ -110,14 +72,10 @@ class HomeScreen extends ConsumerWidget {
                       header: true,
                       child: Text(
                         'Choose an experiment',
-                        style: Theme.of(context).textTheme.titleLarge,
+                        style: Theme.of(context).textTheme.titleMedium,
                       ),
                     ),
                   ),
-                ),
-                SliverPadding(
-                  padding: const EdgeInsets.symmetric(horizontal: AppSpace.lg),
-                  sliver: SliverToBoxAdapter(child: _Hero(mode: mode)),
                 ),
                 SliverList.list(
                   children: [
@@ -166,103 +124,42 @@ String _blurb(ExperimentMode mode) => switch (mode) {
         'force spikes.',
 };
 
-/// The selected experiment, running live on the instrument display, with
-/// the colour key underneath (inside, it would hide the lowest arrows).
-class _Hero extends StatelessWidget {
-  const _Hero({required this.mode});
+/// The selected experiment running on the instrument display, with the
+/// colour key underneath (inside, it would hide the lowest arrows).
+class _Preview extends StatelessWidget {
+  const _Preview({required this.mode});
 
   final ExperimentMode mode;
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    final index = HomeScreen._order.indexOf(mode) + 1;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        // The edge keeps the display apart from a dark page.
         DecoratedBox(
+          position: DecorationPosition.foreground,
           decoration: BoxDecoration(
-            color: scheme.surfaceContainerLow,
-            border: Border.all(color: scheme.outline),
             borderRadius: AppRadii.panelAll,
+            border: Border.all(color: Theme.of(context).colorScheme.outline),
           ),
-          child: Padding(
-            padding: const EdgeInsets.all(AppSpace.md),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(
-                    AppSpace.xs,
-                    AppSpace.xs,
-                    AppSpace.xs,
-                    AppSpace.md,
-                  ),
-                  child: Row(
-                    children: [
-                      Container(
-                        width: 7,
-                        height: 7,
-                        decoration: BoxDecoration(
-                          color: scheme.primary,
-                          shape: BoxShape.circle,
-                        ),
-                      ),
-                      const SizedBox(width: AppSpace.sm),
-                      Text('MODEL PREVIEW', style: AppType.label),
-                      const Spacer(),
-                      Text(
-                        '${index.toString().padLeft(2, '0')}  /  04',
-                        style: AppType.readoutSmall.copyWith(
-                          color: scheme.onSurfaceVariant,
-                        ),
-                      ),
-                    ],
-                  ),
+          child: ClipRRect(
+            borderRadius: AppRadii.panelAll,
+            child: AspectRatio(
+              aspectRatio: 4 / 3,
+              child: ColoredBox(
+                color: AppColors.graphiteDeep,
+                child: AnimatedSwitcher(
+                  duration: AppMotion.slow,
+                  switchInCurve: AppMotion.ease,
+                  child: ExperimentPreview(key: ValueKey(mode), mode: mode),
                 ),
-                ClipRRect(
-                  borderRadius: const BorderRadius.all(Radius.circular(10)),
-                  child: AspectRatio(
-                    aspectRatio: 4 / 3,
-                    child: ColoredBox(
-                      color: AppColors.graphiteDeep,
-                      child: AnimatedSwitcher(
-                        duration: AppMotion.slow,
-                        switchInCurve: AppMotion.ease,
-                        child: ExperimentPreview(
-                          key: ValueKey(mode),
-                          mode: mode,
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: AppSpace.md),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: AppSpace.xs),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        mode.label,
-                        style: Theme.of(context).textTheme.titleLarge,
-                      ),
-                      const SizedBox(height: AppSpace.xs),
-                      Text(
-                        _blurb(mode),
-                        style: AppType.body.copyWith(
-                          color: scheme.onSurfaceVariant,
-                        ),
-                      ),
-                      const SizedBox(height: AppSpace.md),
-                      const _Legend(),
-                    ],
-                  ),
-                ),
-              ],
+              ),
             ),
           ),
         ),
+        const SizedBox(height: AppSpace.sm),
+        const _Legend(),
       ],
     );
   }
@@ -301,6 +198,7 @@ class _Legend extends StatelessWidget {
   }
 }
 
+/// One experiment in the list, picked like a radio button.
 class _ModeRow extends StatelessWidget {
   const _ModeRow({
     required this.mode,
@@ -320,11 +218,13 @@ class _ModeRow extends StatelessWidget {
       button: true,
       inMutuallyExclusiveGroup: true,
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: AppSpace.lg),
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpace.sm,
+          vertical: 2,
+        ),
         child: AnimatedContainer(
           duration: AppMotion.quick,
           curve: AppMotion.ease,
-          padding: const EdgeInsets.all(AppSpace.sm),
           decoration: BoxDecoration(
             color: selected
                 ? scheme.primary.withValues(alpha: 0.07)
@@ -334,63 +234,45 @@ class _ModeRow extends StatelessWidget {
               color: selected ? scheme.primary : Colors.transparent,
             ),
           ),
-          child: InkWell(
-            onTap: onTap,
-            borderRadius: AppRadii.controlAll,
-            child: Row(
-              children: [
-                AnimatedContainer(
-                  duration: AppMotion.quick,
-                  width: 88,
-                  height: 66,
-                  decoration: BoxDecoration(
-                    borderRadius: const BorderRadius.all(Radius.circular(10)),
-                    border: Border.all(
-                      color: selected ? scheme.primary : Colors.transparent,
-                      width: 2,
+          // Ink paints on the nearest Material: give it one above the
+          // tinted box, not the page's underneath it.
+          child: Material(
+            type: MaterialType.transparency,
+            child: InkWell(
+              onTap: onTap,
+              borderRadius: AppRadii.controlAll,
+              child: Padding(
+                padding: const EdgeInsets.all(AppSpace.md),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.only(top: 2),
+                      child: _RadioMark(selected: selected),
                     ),
-                  ),
-                  padding: const EdgeInsets.all(2),
-                  child: ClipRRect(
-                    borderRadius: const BorderRadius.all(Radius.circular(8)),
-                    child: ExperimentPreview(
-                      mode: mode,
-                      animate: false,
-                      showLabels: false,
-                      showGrid: false,
+                    const SizedBox(width: AppSpace.md),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            mode.label,
+                            style: AppType.bodyStrong.copyWith(fontSize: 16),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            _blurb(mode),
+                            style: AppType.caption.copyWith(
+                              fontSize: 13,
+                              color: scheme.onSurfaceVariant,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
+                  ],
                 ),
-                const SizedBox(width: AppSpace.lg),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        mode.label,
-                        style: AppType.bodyStrong.copyWith(fontSize: 16),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        _blurb(mode),
-                        style: AppType.caption.copyWith(
-                          fontSize: 13,
-                          color: scheme.onSurfaceVariant,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: AppSpace.sm),
-                SizedBox(
-                  width: 24,
-                  child: AnimatedOpacity(
-                    duration: AppMotion.quick,
-                    opacity: selected ? 1 : 0,
-                    child: Icon(AppIcons.checkCircle, color: scheme.primary),
-                  ),
-                ),
-              ],
+              ),
             ),
           ),
         ),
@@ -399,7 +281,43 @@ class _ModeRow extends StatelessWidget {
   }
 }
 
-/// The primary action, pinned to the bottom, plus which backend measures it.
+class _RadioMark extends StatelessWidget {
+  const _RadioMark({required this.selected});
+
+  final bool selected;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return AnimatedContainer(
+      duration: AppMotion.quick,
+      width: 20,
+      height: 20,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        border: Border.all(
+          color: selected ? scheme.primary : scheme.outline,
+          width: 1.5,
+        ),
+      ),
+      child: AnimatedScale(
+        duration: AppMotion.quick,
+        scale: selected ? 1 : 0,
+        child: Container(
+          width: 10,
+          height: 10,
+          decoration: BoxDecoration(
+            color: scheme.primary,
+            shape: BoxShape.circle,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// The primary action, pinned to the bottom, plus which backend measures it.
 class _StartBar extends ConsumerWidget {
   const _StartBar({required this.mode});
 

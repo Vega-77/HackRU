@@ -306,64 +306,29 @@ class _Steps extends ConsumerWidget {
     final scale = calibration.pxPerM;
     final surfaces = this.surfaces;
     final hasSurface = surfaces != null && calibration.surface != null;
+    final total = surfaces == null ? 3 : 4;
     var number = 0;
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(
         AppSpace.lg,
-        AppSpace.md,
+        AppSpace.xl,
         AppSpace.lg,
         AppSpace.md,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(
-              AppSpace.xs,
-              AppSpace.xs,
-              AppSpace.xs,
-              AppSpace.lg,
-            ),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'CALIBRATION',
-                        style: AppType.label.copyWith(
-                          color: scheme.primary,
-                          fontSize: 12,
-                        ),
-                      ),
-                      const SizedBox(height: AppSpace.xs),
-                      Text(
-                        'Prepare the measurement',
-                        style: Theme.of(context).textTheme.titleLarge,
-                      ),
-                    ],
-                  ),
-                ),
-                Text(
-                  '${surfaces == null ? 3 : 4} steps',
-                  style: AppType.readoutSmall.copyWith(
-                    color: scheme.onSurfaceVariant,
-                  ),
-                ),
-              ],
-            ),
-          ),
           if (surfaces != null)
             _SurfaceStep(
               number: ++number,
+              total: total,
               finder: surfaces,
               frameSize: frameSize!,
             ),
           _Step(
             number: ++number,
+            total: total,
             title: 'Set the scale',
             body: hasSurface
                 ? 'Not needed while a surface is set. The surface measures '
@@ -383,41 +348,47 @@ class _Steps extends ConsumerWidget {
           ),
           _Step(
             number: ++number,
+            total: total,
             title: 'Mark the object',
+            // Keyboard controls are in the picture's screen reader label.
             body: calibration.selectionPending
-                ? 'Finding the boundary in this picture. Hold the object still until tracking starts.'
+                ? 'Finding the object in this picture. Hold it still.'
                 : calibration.selectionError ??
                       (calibration.target == null
-                          ? 'Tap the object to propose its boundary, or drag a box around it. '
-                                'With a keyboard, focus the picture and press Enter; '
-                                'arrows move the box and + or - resize it.'
+                          ? 'Tap the object in the picture, or drag a box '
+                                'around it.'
                           : calibration.selectionConfirmed
-                          ? 'Object region confirmed. Keep the object visible when starting.'
-                          : 'Does the box enclose the whole object? Confirm it, or draw a better box on this picture.'),
+                          ? 'Keep it in view when you start.'
+                          : 'Does the box fit the whole object? Confirm it, '
+                                'or draw a better one.'),
             done: calibration.selectionConfirmed,
             footer: calibration.target == null
                 ? null
                 : Wrap(
+                    spacing: AppSpace.sm,
+                    runSpacing: AppSpace.sm,
                     children: [
                       if (calibration.targetBbox != null &&
                           !calibration.selectionConfirmed)
-                        TextButton(
+                        OutlinedButton.icon(
                           onPressed: ref
                               .read(calibrationProvider.notifier)
                               .confirmSelection,
-                          child: const Text('Confirm object'),
+                          icon: const Icon(AppIcons.check, size: 18),
+                          label: const Text('Confirm object'),
                         ),
                       TextButton(
                         onPressed: ref
                             .read(calibrationProvider.notifier)
                             .clearTarget,
-                        child: const Text('Retry selection'),
+                        child: const Text('Select again'),
                       ),
                     ],
                   ),
           ),
           _Step(
             number: ++number,
+            total: total,
             title: 'Enter its mass',
             body: 'Forces and energy scale with mass. Weigh it if you can.',
             done: true,
@@ -439,11 +410,13 @@ class _Steps extends ConsumerWidget {
 class _SurfaceStep extends ConsumerStatefulWidget {
   const _SurfaceStep({
     required this.number,
+    required this.total,
     required this.finder,
     required this.frameSize,
   });
 
   final int number;
+  final int total;
   final SurfaceFinder finder;
   final FrameSize frameSize;
 
@@ -503,6 +476,7 @@ class _SurfaceStepState extends ConsumerState<_SurfaceStep> {
 
     return _Step(
       number: widget.number,
+      total: widget.total,
       title: 'Find the surface',
       body: wantsBoard
           ? 'Aim the middle of the picture at a board behind the experiment, '
@@ -525,6 +499,7 @@ class _SurfaceStepState extends ConsumerState<_SurfaceStep> {
 class _Step extends StatelessWidget {
   const _Step({
     required this.number,
+    required this.total,
     required this.title,
     required this.body,
     required this.done,
@@ -534,6 +509,7 @@ class _Step extends StatelessWidget {
   });
 
   final int number;
+  final int total;
   final String title;
   final String body;
   final bool done;
@@ -546,7 +522,7 @@ class _Step extends StatelessWidget {
     final scheme = Theme.of(context).colorScheme;
     return Semantics(
       container: true,
-      label: 'Step $number of 3${done ? ', done' : ''}',
+      label: 'Step $number of $total${done ? ', done' : ''}',
       child: IntrinsicHeight(
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,

@@ -3,11 +3,13 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/theme/app_icons.dart';
 import '../../../core/theme/tokens.dart';
 import '../../../models/experiment_mode.dart';
 import '../../../models/physics_state.dart';
 import '../../../state/experiment_settings.dart';
 import '../../../state/session_controller.dart';
+import '../../debug/copy_debug_log.dart';
 import 'energy_bars.dart';
 import 'physics_symbol.dart';
 import 'telemetry_chart.dart';
@@ -101,6 +103,20 @@ class _TelemetryPanelState extends ConsumerState<TelemetryPanel> {
         Text('Energy', style: Theme.of(context).textTheme.titleMedium),
         const SizedBox(height: AppSpace.md),
         EnergyBars(energy: latest?.tracked == true ? latest?.energy : null),
+        const SizedBox(height: AppSpace.xl),
+        // For when tracking goes wrong mid-experiment; out of the way of
+        // the physics, so it lives at the end.
+        Align(
+          alignment: Alignment.centerLeft,
+          child: TextButton.icon(
+            onPressed: () => copyDebugLog(context),
+            style: TextButton.styleFrom(
+              foregroundColor: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
+            icon: const Icon(AppIcons.copy, size: 18),
+            label: const Text('Copy debug log'),
+          ),
+        ),
       ],
     );
   }

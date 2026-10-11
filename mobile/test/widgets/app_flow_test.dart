@@ -16,6 +16,7 @@ import 'package:hands_on_physics/models/vec2.dart';
 import 'package:hands_on_physics/models/physics_state.dart';
 import 'package:hands_on_physics/services/network/acquisition_client.dart';
 import 'package:hands_on_physics/features/calibration/widgets/calibration_stage.dart';
+import 'package:hands_on_physics/features/experiment/widgets/telemetry_panel.dart';
 import 'package:hands_on_physics/state/calibration_controller.dart';
 import 'package:hands_on_physics/state/experiment_settings.dart';
 import 'package:hands_on_physics/state/session_controller.dart';
@@ -411,11 +412,11 @@ void main() {
     await tester.pump();
     expect(container.read(calibrationProvider).selectionConfirmed, isTrue);
     await tester.scrollUntilVisible(
-      find.text('Retry selection'),
+      find.text('Select again'),
       100,
       scrollable: find.byType(Scrollable).first,
     );
-    await tester.tap(find.text('Retry selection'));
+    await tester.tap(find.text('Select again'));
     await tester.pump();
     expect(container.read(calibrationProvider).selectionFrame, isNull);
     expect(container.read(calibrationProvider).selectionError, isNull);
@@ -435,7 +436,19 @@ void main() {
     final copied = mockClipboard(tester);
     await pumpApp(tester, at: Routes.experiment);
 
-    await tester.tap(find.byTooltip('Copy debug log'));
+    // At the end of the telemetry sheet, out of the physics' way.
+    final copy = find.text('Copy debug log');
+    await tester.scrollUntilVisible(
+      copy,
+      200,
+      scrollable: find
+          .descendant(
+            of: find.byType(TelemetryPanel),
+            matching: find.byType(Scrollable),
+          )
+          .first,
+    );
+    await tester.tap(copy);
     await tester.pump();
 
     expect(copied, hasLength(1));
