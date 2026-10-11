@@ -9,6 +9,8 @@ import '../../core/theme/tokens.dart';
 import '../../models/experiment_mode.dart';
 import '../../services/network/physics_socket.dart';
 import '../../services/network/recorded_analysis.dart';
+import '../../services/download/capture_download.dart';
+import '../../core/logging/debug_log.dart';
 import '../../state/experiment_settings.dart';
 import '../../state/session_controller.dart';
 import '../debug/copy_debug_log.dart';
@@ -446,6 +448,7 @@ class _RecordingBanner extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final state = ref.watch(sessionProvider);
     final controller = ref.read(sessionProvider.notifier);
+    final downloader = ref.watch(captureDownloaderProvider);
     final message = switch (state.recordingPhase) {
       RecordingPhase.idle => 'For fast falls, record 3 seconds locally, then analyze every saved frame. The dashed outline is a local estimate; charts use server measurements.',
       RecordingPhase.recording =>
@@ -463,6 +466,34 @@ class _RecordingBanner extends ConsumerWidget {
               if (state.recordingPhase == RecordingPhase.failed &&
                   controller.canRetryRecordedAnalysis)
                 ('Retry analysis', controller.retryRecordedAnalysis),
+              if (downloader != null && controller.canExportRecording)
+                (
+                  'Download capture',
+                  () {
+                    final messenger = ScaffoldMessenger.maybeOf(context);
+                    try {
+                      final file = controller.exportRecording();
+                      downloader(file);
+                      log.i('Capture download requested: ${file.filename}');
+                      messenger?.showSnackBar(
+                        const SnackBar(
+                          content: Text(
+                            'Download requested. Find the capture in your browser’s Downloads.',
+                          ),
+                        ),
+                      );
+                    } catch (error, stack) {
+                      log.e('Capture download failed', error, stack);
+                      messenger?.showSnackBar(
+                        const SnackBar(
+                          content: Text(
+                            'Could not download the capture. Try again.',
+                          ),
+                        ),
+                      );
+                    }
+                  },
+                ),
               ('Record 3 s', controller.recordFreeFall),
             ],
     );

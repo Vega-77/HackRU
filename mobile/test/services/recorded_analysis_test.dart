@@ -5,6 +5,7 @@ import 'dart:typed_data';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hands_on_physics/models/experiment_mode.dart';
 import 'package:hands_on_physics/models/session_config.dart';
+import 'package:hands_on_physics/models/physics_state.dart';
 import 'package:hands_on_physics/services/camera/frame_source.dart';
 import 'package:hands_on_physics/services/network/physics_socket.dart';
 import 'package:hands_on_physics/services/network/recorded_analysis.dart';
@@ -114,13 +115,16 @@ void main() {
       final saved = RecordedSequence([
         for (var i = 0; i < 8; i++) frame(3 + i / 30),
       ]);
+      final delivered = <PhysicsState>[];
       final results = await analyzer.analyze(
         url: 'ws://test',
         config: config,
         selection: frame(1),
         sequence: saved,
+        onObservation: delivered.add,
       );
       expect(results, hasLength(8));
+      expect(delivered, results);
       expect(
         channel.peak,
         1,
@@ -148,6 +152,32 @@ void main() {
       expect(saved.frames.length, greaterThanOrEqualTo(4));
       expect(saved.fps, closeTo(60, .01));
       expect(saved.maxGapMs, closeTo(1000 / 60, .01));
+    },
+  );
+  test(
+    'interrupted analysis retains the validated observations already returned',
+    () async {
+      final channel = ReplyChannel(const Duration(milliseconds: 1));
+      final analyzer = RecordedAnalyzer(
+        socketFactory: (url) => PhysicsSocket(url, connector: (_) => channel),
+      );
+      final delivered = <PhysicsState>[];
+      await expectLater(
+        analyzer.analyze(
+          url: 'ws://test',
+          config: config,
+          selection: frame(1),
+          sequence: RecordedSequence([frame(3), frame(3.04)]),
+          onObservation: (state) {
+            delivered.add(state);
+            analyzer.cancel();
+          },
+        ),
+        throwsStateError,
+      );
+      expect(delivered, hasLength(1));
+      expect(delivered.single.t, 3);
+      await channel.server.close();
     },
   );
   test(

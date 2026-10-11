@@ -56,7 +56,7 @@ Initial matching allocated a normalized patch for every candidate. Browser profi
 - Recorded charts/readouts show server observations after completion; historical states do not move the current live marker. Resume clears recorded charts and returns to live measurements. Lost observations/withheld derivatives break chart lines. Recorded charts label their final sample **end**, not **now**.
 - `FREE_FALL_MAX_SAMPLES` is now 24. The 0.35 s cutoff, four-sample/0.12 s minimum, one-pixel localization floor, and 2 m/s² acceleration uncertainty gate remain unchanged. Measured acceleration is not forced to 9.81.
 
-Recordings are memory-only: refresh/leaving discards them, and no raw-JPEG export UI exists. Serial analysis deliberately trades completion time for compatibility/reliability; a long recording may take tens of seconds under remote RTT. A batch endpoint is a possible later improvement, not an implemented feature.
+Recordings remain in page memory until downloaded: refresh/leaving discards them. The new **Download capture** action exports exact JPEGs, timestamps, frozen calibration and measurements (see Capture export below). Serial analysis deliberately trades completion time for compatibility/reliability; a long recording may take tens of seconds under remote RTT. A batch endpoint is a possible later improvement, not an implemented feature.
 
 ## Performance measurements
 
@@ -141,7 +141,7 @@ backend/.venv/bin/python -m http.server 8086 --bind 127.0.0.1 --directory mobile
 4. Fit a measured 0.5–1 m path fully inside view with margin, in the calibration plane. Move camera back/recalibrate if needed. Choose **Record 3 s**, hold about 0.5 s, release without a push, keep camera still. Wait for analysis and inspect position/velocity/acceleration charts. Repeat three drops.
 5. Compare only **free-flight** samples, excluding held/release/contact/impact/reacquisition. Y is upward, so downward motion has negative velocity/acceleration. Expect quadratic y(t), nearly linear v(t); compare measured acceleration with -9.81 using uncertainty. Valid numerical acceleration does not identify ideal free flight; a held ball can correctly measure near zero.
 6. Repeat after switching to proxy endpoints on ports 8850/8950/9100/9300. Reinitialize after endpoint changes. Server markers remain delayed. Local estimates should stay responsive while confident; saved capture FPS/gaps should not follow RTT, though analysis waits grow. Test retry after an analysis connection failure without recapturing.
-7. Save Copy Debug Log and a screen recording from calibration through absence and recorded results. Include commit, endpoint/delay, browser/phone/camera model, ruler length, drop height, lighting, selection method, capture FPS/max gap, and wrong-marker incidents. Raw JPEGs with timestamps/IDs remain needed for blur/identity tuning; no export UI is implemented.
+7. Choose **Download capture** after each analysis succeeds or fails, before recording again or leaving. Send the `.hop.json` file and Copy Debug Log, plus browser/phone/camera model, ruler length, drop height, lighting and wrong-marker incidents. A separate screen recording can help show calibration/interaction, but is not required to inspect the exported camera frames.
 
 A phone browser needs a trusted HTTPS frontend; ordinary LAN HTTP does not grant camera access, and phone localhost refers to the phone. No public tunnel/certificate was created. Use an existing trusted development setup, or approve deployment first and test Pages HTTPS against the approved backend. Native iOS LAN testing needs the computer's LAN IP, but was not tested here.
 
@@ -198,6 +198,56 @@ The moving marker can lag the ball because observations correspond to earlier ca
 3. Select/confirm the whole gray ball and wait for a newer-frame detection. Perform horizontal movement and removal/return first to document the local outline's recovery separately from the drop.
 4. Activate **Record 3 s inside the app**, hold briefly, then release without pushing. Wait for the saved-frame analysis to finish. Repeat three times. The external screen recording should cover the whole session, including calibration, the recording/analysis states and final results; it need not be three seconds long.
 5. Save the debug log after analysis. It must contain the recorded frame count, actual capture FPS and maximum gap. Inspect position and velocity curves during actual flight only, excluding held, release, contact and recovery portions. Missing acceleration is a valid outcome if the isolated flight is too short or noisy.
-6. Obtain/export the actual saved JPEGs and original capture timestamps before further identity/blur tuning; the current UI still does not export them. Screen-recording pixels include overlays, cropping and their own presentation timestamps and cannot substitute for exact sensor frames in a physics replay.
+6. Download the actual saved JPEGs and original capture timestamps with **Download capture** before further identity/blur tuning. Screen-recording pixels include overlays, cropping and their own presentation timestamps and cannot substitute for exact captured JPEGs in a physics replay.
 
-Priorities for the next implementation: reproduce local recovery rejection with logged anchor reasons and this scene; profile failed full-frame search without weakening identity checks; add saved-JPEG diagnostic export; then evaluate recorded physical flight and mixed pre-release fitting. The latest evidence does **not** justify replacing the tracker wholesale or claiming either the local estimate or recorded Free Fall is physically verified.
+Priorities for the next implementation: use the new saved-JPEG export to reproduce local recovery rejection with logged anchor reasons and this scene; profile failed full-frame search without weakening identity checks; then evaluate recorded physical flight and mixed pre-release fitting. The latest evidence does **not** justify replacing the tracker wholesale or claiming either the local estimate or recorded Free Fall is physically verified.
+
+## Capture export (October 11 follow-up)
+
+Implemented **Download capture** in the browser's Free Fall controls. The action appears when saved-frame analysis completes or fails; it retains partial returned observations on analysis failure. It uses a local Blob download, with no new server endpoint or upload. The original saved frames are left available for retry/download. Native file sharing is not implemented; the download control is hidden on native builds.
+
+Each `HandsOnPhysics-<UTC time>.hop.json` file contains format/version, UTC capture-start time, exact JPEG bytes as base64, original client-monotonic timestamps, ordered frame IDs, dimensions, encoding diagnostics, the original selection JPEG/region, frozen session configuration and ruler endpoints/length. Capture summary includes actual FPS and maximum gap. Analysis includes completion/error, parsed observations with positions, velocity, acceleration, forces, energy, tracking decisions, quality and stage timings. Missing observations/derivatives remain missing. This is a portable image sequence, not a MOV video or a fabricated raw-camera stream; the images are the actual JPEGs used for analysis.
+
+Find the file in the browser's configured Downloads location and attach it to the conversation. On iPhone/iPad Safari, check the Downloads button and Files app's configured Downloads folder. Download each trial before another recording, calibration change, cancellation, refresh or leaving; there is no recording library or recovery of already discarded captures. Previously logged trials cannot be reconstructed byte-for-byte from text logs.
+
+Extract and replay from the repository root (the output directory must be new):
+
+```sh
+backend/.venv/bin/python backend/extract_capture_bundle.py ~/Downloads/HandsOnPhysics-<time>.hop.json /tmp/hop-drop-1
+backend/.venv/bin/python backend/replay_tracking.py /tmp/hop-drop-1/manifest.json --out /tmp/hop-drop-1/replay.json
+```
+
+Replace the example filename with the downloaded filename, quoted if it contains spaces. Extraction writes `selection.jpg`, ordered `frame_0001.jpg` onward, `manifest.json`, `analysis.json` and `capture.json`. Replay initializes from the selection before tracking saved frames; it tests CV, while `analysis.json` preserves the original physics results. Label visible ball centers/diameters in manifest `truth` entries before interpreting recall/precision; unlabeled replay cannot establish accuracy. Do not use replay processing time as physical time.
+
+Before: no export UI; only text logs and in-memory captures. After: exact saved frames plus diagnostics can be downloaded after success/failure. No FPS, latency or physical-accuracy improvement is claimed for this export change. Base64 adds about one-third to JPEG storage size; existing capture limits remain 180 frames/8 MiB. Recorded debug logs now also include bbox, velocity, acceleration and tracking decisions.
+
+Files: `mobile/lib/services/network/capture_export.dart`, `mobile/lib/services/download/capture_download*.dart`, `mobile/lib/services/network/recorded_analysis.dart`, `mobile/lib/state/session_controller.dart`, `mobile/lib/features/experiment/experiment_screen.dart`, `backend/extract_capture_bundle.py`, focused service/widget/Python tests and this report. The existing Xcode edit remains excluded.
+
+UI decision: place the action beside existing recording controls so saved data can be retrieved without a separate screen. Reuse the existing button typography, contrast, focus treatment, accent and wrapping layout. No new visual motif or animation; existing laboratory style retained (ENERGY 1 / RHYTHM 1 / MOTION 1).
+
+Export verification:
+
+- Focused Flutter VM run: **27 passed** (export serialization, recorded scheduling and partial-observation callback, session regressions and recording controls). Additional error-state widget test brought focused coverage to **28 distinct passing cases**; the controls rerun passed all **11** cases at phone/desktop sizes.
+- Chrome: **1 passed**, executing the actual Blob/anchor helper and verifying filename, MIME type, exact UTF-8 content, attached click target and anchor cleanup. The test intercepts the click to inspect its bytes; it does not establish OS Downloads behavior on Safari/iPhone.
+- Python extraction/replay: **5 passed**, preserving exact JPEGs, IDs, irregular timestamps, calibration, partial observations; rejecting malformed base64/order/version before writes and refusing to overwrite a capture.
+- `flutter analyze`: **no issues found**. Release Web build and WASM dry run succeed. Existing missing CupertinoIcons font-family warning remains. Local frontend HTTP 200 and backend health OK. `git diff --check` passes. No additional performance claim or native/phone hardware verification.
+
+Reproduce the export checks:
+
+```sh
+backend/.venv/bin/python -m pytest backend/tests/test_extract_capture_bundle.py backend/tests/test_replay_tracking.py -q
+cd mobile
+flutter test test/services/capture_export_test.dart test/services/recorded_analysis_test.dart test/widgets/recording_controls_test.dart test/state/session_controller_test.dart
+flutter test --platform chrome test/services/capture_download_web_test.dart
+flutter analyze
+flutter build web --release --dart-define=BACKEND_URL=ws://127.0.0.1:8002/ws/frames --dart-define=TRACKING_DIAGNOSTICS=true
+```
+
+Antislop delivery gate for the changed recording controls:
+
+- Hard gate **PASS**: real download action and visible failure feedback; success/failure/busy/empty visibility and phone/desktop overflow checked by widget interactions; actual download helper exercised in Chrome, release app built.
+- Purpose gate **PASS**: action location and reuse of existing control styles justified above; no new decorative technique or asset.
+- Liveliness **PASS**: retained laboratory direction, declared 1/1/1 dials, existing camera focal point, structural spacing and copper control accent.
+- Craftsmanship **PASS**: concrete action label, wrapped controls, retry after download failure tested, original data preserved; no invented performance/accuracy claims. Phone/Safari download behavior remains a documented validation step after approved deployment.
+
+After deployment approval: deploy the reviewed commit through the existing process, reload Pages, verify the build and backend endpoint, make a new trial, download its bundle and extract it using the commands above. Compare frame count/FPS/timestamps against Copy Debug Log; inspect release/missing/reacquired JPEGs before diagnosing identity or computing free-flight acceleration. Do not push main just to test the browser download.

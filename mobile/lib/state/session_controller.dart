@@ -9,6 +9,7 @@ import '../models/calibration.dart';
 import '../models/camera_pose.dart';
 import '../models/experiment_mode.dart';
 import '../services/network/recorded_analysis.dart';
+import '../services/network/capture_export.dart';
 import '../models/physics_state.dart';
 import '../models/session_config.dart';
 import '../services/camera/frame_source_factory.dart';
@@ -144,6 +145,10 @@ class SessionController extends Notifier<SessionState> {
   RecordedSequence? _recordedSequence;
   EncodedFrame? _recordedSelection;
   SessionConfig? _recordedConfig;
+  DateTime? _recordedAt;
+  Map<String, dynamic> _recordedRuler = const {};
+  final List<PhysicsState> _recordedObservations = [];
+  String? _recordedAnalysisError;
   int _recordingEpoch = 0;
 
   /// The second collision object's picture, sent after [_selectionFrame]:
@@ -356,6 +361,14 @@ class SessionController extends Notifier<SessionState> {
     _recordedSelection = selection;
     _recordedConfig = _config();
     _recordedSequence = null;
+    _recordedAt = DateTime.now().toUtc();
+    _recordedRuler = {
+      'start': calibration.rulerStart?.toJson(),
+      'end': calibration.rulerEnd?.toJson(),
+      'length_m': calibration.rulerLengthM,
+    };
+    _recordedObservations.clear();
+    _recordedAnalysisError = null;
     state = state.copyWith(
       recordingPhase: RecordingPhase.recording,
       recordingProgress: 0,
@@ -406,6 +419,8 @@ class SessionController extends Notifier<SessionState> {
       return;
     }
     final epoch = _recordingEpoch;
+    _recordedObservations.clear();
+    _recordedAnalysisError = null;
     state = state.copyWith(
       recordingPhase: RecordingPhase.analyzing,
       recordingProgress: 0,
@@ -417,6 +432,11 @@ class SessionController extends Notifier<SessionState> {
         config: config,
         selection: selection,
         sequence: sequence,
+        onObservation: (observation) {
+          if (ref.mounted && epoch == _recordingEpoch) {
+            _recordedObservations.add(observation);
+          }
+        },
         progress: (p) {
           if (ref.mounted && epoch == _recordingEpoch) {
             state = state.copyWith(recordingProgress: p);
@@ -429,7 +449,10 @@ class SessionController extends Notifier<SessionState> {
         telemetry.add(observation);
         log.d(
           'Recorded frame ${observation.frameId}, t=${observation.t}, '
-          'pixel=${observation.pixel}, quality=${jsonEncode(observation.physicsQuality)}',
+          'pixel=${observation.pixel}, bbox=${observation.bbox?.toJson()}, '
+          'v=${observation.velocity}, a=${observation.acceleration}, '
+          'tracking=${jsonEncode(observation.trackingDebug)}, '
+          'quality=${jsonEncode(observation.physicsQuality)}',
         );
       }
       final located = states
@@ -451,6 +474,7 @@ class SessionController extends Notifier<SessionState> {
       );
     } catch (error) {
       if (ref.mounted && epoch == _recordingEpoch) {
+        _recordedAnalysisError = '$error';
         state = state.copyWith(
           recordingPhase: RecordingPhase.failed,
           recordingMessage: '$error. Saved frames remain available for retry.',
@@ -460,6 +484,28 @@ class SessionController extends Notifier<SessionState> {
   }
 
   bool get canRetryRecordedAnalysis => _recordedSequence != null;
+
+  bool get canExportRecording =>
+      !state.recordingBusy &&
+      _recordedSequence != null &&
+      _recordedSelection != null &&
+      _recordedConfig != null &&
+      _recordedAt != null;
+
+  CaptureExport exportRecording() {
+    if (!canExportRecording) {
+      throw StateError('No completed capture to download.');
+    }
+    return exportCapture(
+      sequence: _recordedSequence!,
+      selection: _recordedSelection!,
+      config: _recordedConfig!,
+      capturedAt: _recordedAt!,
+      ruler: _recordedRuler,
+      observations: _recordedObservations,
+      analysisError: _recordedAnalysisError,
+    );
+  }
 
   void cancelRecording() {
     _cancelRecording();
@@ -475,6 +521,10 @@ class SessionController extends Notifier<SessionState> {
     _recordedSequence = null;
     _recordedSelection = null;
     _recordedConfig = null;
+    _recordedAt = null;
+    _recordedRuler = const {};
+    _recordedObservations.clear();
+    _recordedAnalysisError = null;
     if (ref.mounted) {
       state = state.copyWith(recordingPhase: RecordingPhase.idle);
     }

@@ -81,6 +81,7 @@ class RecordedAnalyzer {
     required EncodedFrame selection,
     required RecordedSequence sequence,
     void Function(double)? progress,
+    void Function(PhysicsState)? onObservation,
   }) async {
     final socket = _factory(url);
     _socket = socket;
@@ -111,6 +112,7 @@ class RecordedAnalyzer {
             throw StateError('Backend did not preserve capture timestamps.');
           }
           states.add(state);
+          onObservation?.call(state);
         } else {
           throw StateError(
             message is ErrorMessage
