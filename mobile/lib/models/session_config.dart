@@ -37,6 +37,8 @@ class SessionConfig {
     this.pxPerM,
     this.targetPx,
     this.targetBbox,
+    this.secondTargetPx,
+    this.secondTargetBbox,
     this.debugTracking = false,
     this.initializationRequired = false,
     this.surface,
@@ -52,6 +54,11 @@ class SessionConfig {
   /// Where the user tapped the object, in frame pixels. Null means auto-detect.
   final Vec2? targetPx;
   final PixelRect? targetBbox;
+
+  /// The other object in a collision, marked like [targetPx]. The backend
+  /// follows it only in collision mode.
+  final Vec2? secondTargetPx;
+  final PixelRect? secondTargetBbox;
   final bool debugTracking;
   final bool initializationRequired;
 
@@ -73,6 +80,8 @@ class SessionConfig {
             'w': targetBbox!.w,
             'h': targetBbox!.h,
           },
+    'second_target_px': secondTargetPx?.toJson(),
+    'second_target_bbox': secondTargetBbox?.toJson(),
     'frame_size': frameSize.toJson(),
     'ar_plane': surface?.toJson(),
     if (debugTracking) 'debug_tracking': true,

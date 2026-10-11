@@ -1,0 +1,66 @@
+# Compiles the iOS app on a Mac, so Swift and Xcode project mistakes show
+# up without anyone needing the team's Mac. It signs nothing; each run keeps
+# an unsigned .ipa to sideload from Windows and a simulator build.
+name: iOS build
+
+on:
+  push:
+    branches: [Dev1, main]
+    paths: [mobile/ios/**, mobile/pubspec.*, .github/workflows/ios-build.yml]
+  pull_request:
+    branches: [main]
+    paths: [mobile/ios/**, mobile/pubspec.*, .github/workflows/ios-build.yml]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ios-build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-ios:
+    runs-on: macos-15
+    timeout-minutes: 40
+    defaults:
+      run:
+        working-directory: mobile
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: 3.47.7
+          channel: stable
+          cache: true
+
+      - run: xcodebuild -version
+      - run: flutter pub get
+
+      # A release device build, unsigned: compiles the Dart, the plugins and
+      # our Swift (ArSessionPlugin, ArVectorNode) against the iPhone SDK.
+      # Release, because a debug build won't open without a debugger.
+      - run: flutter build ios --release --no-codesign
+
+      # Sideloadly (Windows) signs this with a free Apple ID and installs
+      # it over USB. See mobile/README.md.
+      - name: Package the unsigned .ipa
+        run: |
+          mkdir -p dist/Payload
+          cp -R build/ios/iphoneos/Runner.app dist/Payload/
+          (cd dist && zip -qry HandsOnPhysics-unsigned.ipa Payload)
+
+      # For a simulator in the browser, like Appetize.io: no camera, so the
+      # app plays its test video.
+      - run: flutter build ios --simulator --debug
+      - name: Package the simulator app
+        run: (cd build/ios/iphonesimulator && zip -qry ../../../dist/HandsOnPhysics-simulator.zip Runner.app)
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: HandsOnPhysics-ios-${{ github.sha }}
+          path: |
+            mobile/dist/HandsOnPhysics-unsigned.ipa
+            mobile/dist/HandsOnPhysics-simulator.zip
+          retention-days: 14

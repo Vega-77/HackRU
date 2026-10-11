@@ -11,6 +11,15 @@ void main() {
     visibility: 1,
   );
 
+  test('movedTo moves the object and keeps its vectors', () {
+    final moved = target.movedTo(const Vec2(40, 50), 7);
+    expect(moved.pixel, const Vec2(40, 50));
+    expect(moved.markerRadius, 7);
+    expect(moved.velocity, target.velocity);
+    expect(moved.forces, target.forces);
+    expect(moved.visibility, 1);
+  });
+
   group('OverlayFrame.approach', () {
     test('appears in place on first sighting', () {
       final next = OverlayFrame.empty.approach(

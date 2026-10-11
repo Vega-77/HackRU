@@ -58,6 +58,17 @@ class OverlayFrame {
     );
   }
 
+  /// This frame with the object at [to], keeping its vectors.
+  OverlayFrame movedTo(Vec2 to, double radius) => OverlayFrame(
+    pixel: to,
+    markerRadius: radius,
+    velocity: velocity,
+    acceleration: acceleration,
+    forces: forces,
+    visibility: visibility,
+    axes: axes,
+  );
+
   /// Moves this frame towards [target].
   ///
   /// [vectorT] and [positionT] are the fraction of the remaining distance

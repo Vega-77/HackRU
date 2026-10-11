@@ -1,6 +1,7 @@
 import 'dart:collection';
 import 'dart:math' as math;
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter/widgets.dart';
 
@@ -19,6 +20,10 @@ import 'vector_overlay_painter.dart';
 ///
 /// Animation stops by itself once the arrows have caught up, and is
 /// skipped entirely when the system asks for reduced motion.
+///
+/// With a [liveBox], the marker sits on that box instead of easing
+/// towards the backend's position, since it is where the object is on the
+/// newest camera frame.
 class VectorOverlay extends StatefulWidget {
   const VectorOverlay({
     super.key,
@@ -32,6 +37,7 @@ class VectorOverlay extends StatefulWidget {
     this.showLabels = true,
     this.haloColor = AppColors.graphiteDeep,
     this.markerColor = AppColors.vellum,
+    this.liveBox,
   });
 
   final PhysicsState? state;
@@ -50,6 +56,10 @@ class VectorOverlay extends StatefulWidget {
   final Color haloColor;
   final Color markerColor;
 
+  /// The object's box on the newest camera frame, frame pixels, from
+  /// on-device tracking in the AR camera.
+  final ValueListenable<PixelRect?>? liveBox;
+
   @override
   State<VectorOverlay> createState() => _VectorOverlayState();
 }
@@ -64,6 +74,10 @@ class _VectorOverlayState extends State<VectorOverlay>
   final _trailPoints = ListQueue<Vec2>();
 
   late final Ticker _ticker = createTicker(_onTick);
+
+  /// Where the newest state puts things, and the same moved onto the live
+  /// box when there is one.
+  OverlayFrame _stateTarget = OverlayFrame.empty;
   OverlayFrame _target = OverlayFrame.empty;
   Duration _lastTick = Duration.zero;
   Duration _sinceTrailDot = Duration.zero;
@@ -73,18 +87,53 @@ class _VectorOverlayState extends State<VectorOverlay>
   @override
   void initState() {
     super.initState();
-    _target = OverlayFrame.fromState(widget.state);
+    widget.liveBox?.addListener(_onLiveBox);
+    _stateTarget = OverlayFrame.fromState(widget.state);
+    _target = _onLive(_stateTarget);
     _frame.value = _target;
   }
 
   @override
   void didUpdateWidget(VectorOverlay old) {
     super.didUpdateWidget(old);
+    if (!identical(widget.liveBox, old.liveBox)) {
+      old.liveBox?.removeListener(_onLiveBox);
+      widget.liveBox?.addListener(_onLiveBox);
+      _onLiveBox();
+    }
     if (!identical(widget.state, old.state)) _retarget();
   }
 
+  /// [frame] moved onto the live box, if there is one and [frame] has the
+  /// object at all.
+  OverlayFrame _onLive(OverlayFrame frame) {
+    final box = widget.liveBox?.value;
+    if (box == null || frame.pixel == null) return frame;
+    return frame.movedTo(box.centre, math.max(box.w, box.h) / 2);
+  }
+
+  void _onLiveBox() {
+    _target = _onLive(_stateTarget);
+    final live = widget.liveBox?.value == null ? null : _target.pixel;
+    final shown = _frame.value;
+    // No easing onto the box: it is already where the object is. Losing it
+    // eases back to the backend's position.
+    if (live != null && shown.pixel != null) {
+      _frame.value = shown.movedTo(live, _target.markerRadius);
+    }
+    if (_reduceMotion) {
+      if (live == null) _frame.value = _target;
+      return;
+    }
+    if (!_ticker.isActive) {
+      _lastTick = Duration.zero;
+      _ticker.start();
+    }
+  }
+
   void _retarget() {
-    _target = OverlayFrame.fromState(widget.state);
+    _stateTarget = OverlayFrame.fromState(widget.state);
+    _target = _onLive(_stateTarget);
     if (_target.pixel == null) _clearTrail();
 
     if (_reduceMotion) {
@@ -119,7 +168,8 @@ class _VectorOverlayState extends State<VectorOverlay>
       _addTrailPoint();
     }
 
-    if (next.settledOn(_target)) {
+    // A followed object keeps moving, and the trail with it.
+    if (next.settledOn(_target) && widget.liveBox?.value == null) {
       _frame.value = _target;
       _ticker.stop();
     }
@@ -154,6 +204,7 @@ class _VectorOverlayState extends State<VectorOverlay>
 
   @override
   void dispose() {
+    widget.liveBox?.removeListener(_onLiveBox);
     _ticker.dispose();
     _frame.dispose();
     _trail.dispose();

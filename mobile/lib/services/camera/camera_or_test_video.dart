@@ -1,8 +1,11 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 
 import '../../core/config/app_config.dart';
 import '../../core/logging/debug_log.dart';
+import '../../models/ar_vectors.dart';
 import '../../models/camera_pose.dart';
+import '../../models/physics_state.dart';
 import '../../models/session_config.dart';
 import '../../models/vec2.dart';
 import 'frame_source.dart';
@@ -15,9 +18,9 @@ import 'test_video_frame_source.dart';
 /// Only a missing camera switches to the test video. Any other failure,
 /// like camera access being turned off, is passed on so the user can fix it.
 ///
-/// Surface finding is passed through when the camera supports it (ARKit),
-/// so wrapping never hides it from setup.
-class CameraOrTestVideo implements FrameSource, SurfaceFinder {
+/// Surface finding and 3D arrows are passed through when the camera
+/// supports them (ARKit), so wrapping never hides them.
+class CameraOrTestVideo implements FrameSource, SurfaceFinder, ArVectorDisplay {
   CameraOrTestVideo(this._camera, {TestVideoFrameSource? testVideo})
     : _testVideo = testVideo ?? TestVideoFrameSource();
 
@@ -70,4 +73,25 @@ class CameraOrTestVideo implements FrameSource, SurfaceFinder {
     final SurfaceFinder f => f.findSurface(framePixel),
     _ => null,
   };
+
+  @override
+  bool get canShowArVectors => switch (_active) {
+    final ArVectorDisplay d => d.canShowArVectors,
+    _ => false,
+  };
+
+  @override
+  Future<void> showArVectors(ArVectorScene? scene) async {
+    if (_active case final ArVectorDisplay d) await d.showArVectors(scene);
+  }
+
+  /// The test video never follows anything, so the camera's box is right
+  /// either way: it stays null while the camera is idle.
+  @override
+  ValueListenable<PixelRect?> get followedBox => switch (_camera) {
+    final ArVectorDisplay d => d.followedBox,
+    _ => _noBox,
+  };
+
+  static final _noBox = ValueNotifier<PixelRect?>(null);
 }

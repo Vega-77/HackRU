@@ -52,6 +52,27 @@ toolbar (iPhone 12/13/14 is 390 x 844).
 5. The first time, trust the developer on the phone: Settings > General >
    VPN & Device Management.
 
+### On an iPhone from Windows (no Mac)
+
+GitHub builds the app on a Mac for every change to `mobile/ios` on Dev1
+(the "iOS build" workflow). To build the latest code, open Actions > iOS
+build > Run workflow and pick Dev1.
+
+1. Open the finished run and download the `HandsOnPhysics-ios-...`
+   artifact. Unzip it to get `HandsOnPhysics-unsigned.ipa`.
+2. Install Apple Devices (or iTunes) from the Microsoft Store, so Windows
+   can see the phone, and install Sideloadly from sideloadly.io.
+3. Plug in the iPhone and tap Trust on it. In Sideloadly, pick the `.ipa`,
+   enter your Apple ID, and press Start.
+4. On the iPhone, turn on Settings > Privacy & Security > Developer Mode,
+   then trust your Apple ID under Settings > General > VPN & Device
+   Management.
+
+With a free Apple ID the app stops opening after 7 days. Install it again
+to renew it. The same artifact has `HandsOnPhysics-simulator.zip`, which
+runs in a browser simulator like Appetize.io: no camera or ARKit there, so
+the app plays its test video.
+
 ### Against the backend
 
 The backend is hosted on Render (`../render.yaml`), and the app streams to
@@ -186,7 +207,7 @@ app from the bottom up.
 
 | Folder | What lives there |
 |---|---|
-| `lib/models/` | Plain Dart types that mirror `docs/protocol.md`: `PhysicsState`, `SessionConfig`, `Calibration`, `Vec2`. No Flutter. |
+| `lib/models/` | Plain Dart types that mirror `docs/protocol.md`: `PhysicsState`, `SessionConfig`, `Calibration`, `Vec2`, `Vec3`, and the `ArVectorScene` sent to the native AR view. No Flutter. |
 | `lib/services/camera/` | `FrameSource`: start the camera, grab a JPEG frame, show a preview. One version for iOS (`native_`), one for Chrome (`web_`), and a drawn test video (`test_video_`) for devices with no camera. |
 | `lib/services/network/` | `PhysicsSocket`: the WebSocket client, with reconnect and flow control. |
 | `lib/state/` | Riverpod controllers: experiment settings, calibration, the running session, and the rolling telemetry buffer for charts. |
@@ -206,6 +227,43 @@ app from the bottom up.
 4. `ExperimentStage` maps the backend's frame pixels to screen pixels
    (`CoordinateMapper`), eases the arrows towards the new values
    (`OverlayFrame`), and paints them (`VectorOverlayPainter`).
+
+### 3D arrows on an iPhone
+
+With ARKit and a picked surface, the backend also sends `position_3d`,
+`velocity_3d`, `acceleration_3d` and `forces_3d` in ARKit world metres.
+Then the arrows are drawn in 3D instead of 2D:
+
+1. `ArVectorLayer` turns each reply into an `ArVectorScene`
+   (`ArVectorSceneBuilder`) and sends it over the `setVectors` channel
+   method.
+2. `ios/Runner/ArVectorNode.swift` draws each arrow as SceneKit nodes in
+   the camera preview, anchored at the object. SceneKit redraws them from
+   the live camera pose every screen refresh, so they stay on the object
+   while the phone moves, and they glide between replies.
+3. An invisible sphere the size of the ball (from its bounding box) sits
+   at the anchor and fills only the depth buffer, so the real ball hides
+   the parts of the arrows inside or behind it. Hands don't hide arrows:
+   ARKit people occlusion adds work on every frame, and the build that
+   had it lost the ball more often.
+4. Between replies, `ios/Runner/ArObjectFollower.swift` tracks the ball
+   on every camera frame with Vision's object tracker. Each reply's box
+   (with the timestamp of the frame it describes) starts the tracker, or
+   restarts it when the two disagree. The anchor and the sphere then sit
+   where the ball is on the newest frame, not where the backend saw it a
+   few frames ago, so the arrows stay centred on it while it moves. If the
+   tracker loses the ball, the arrows glide back to the backend's position
+   until the next reply.
+5. The 2D overlay keeps the marker and trail, and stops drawing arrows.
+   The marker follows the same on-device box (`ArVectorDisplay.followedBox`).
+
+Lengths use the 2D proportions: every frame the native side scales the
+arrows by the object's distance, so they look as long on screen as the 2D
+overlay's, near or far. Shaft thickness is
+`ArVectorSceneBuilder.radiusPerWidthPx`.
+
+On Chrome, devices without ARKit, without a surface, or if the native side
+fails, the 2D arrows are used as before.
 
 ## Design rules
 

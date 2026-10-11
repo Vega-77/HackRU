@@ -269,3 +269,37 @@ def fast_red_roll() -> Clip:
 def all_clips() -> list[Clip]:
     return [ramp_roll(), pendulum(), toss(), grey_box_slide(), occluded_roll(), distractor_roll(),
             fast_red_roll()]
+
+
+def collision() -> tuple[Clip, Clip]:
+    """A red ball rolls into a still blue one, which rolls on as the red one stops, as in
+    an elastic collision of equal masses. One clip per ball: the same frames, each with
+    its own ground truth and selection box."""
+    r = 11
+    speed, start, rest = 120.0, 40.0, 200.0
+    hit = (rest - 2 * r - start) / speed
+
+    def red_pos(t):
+        return (start + speed * min(t, hit), 120.0)
+
+    def blue_pos(t):
+        return (rest + speed * max(0.0, t - hit), 120.0)
+
+    def red(t):
+        return _ball_sprite(r, speed * min(t, hit) / r, ((40, 40, 200), (230, 230, 230)))
+
+    def blue(canvas, t):
+        spr, alpha = _ball_sprite(r, speed * max(0.0, t - hit) / r, ((200, 120, 30), (30, 30, 30)))
+        _paste(canvas, spr, alpha, blue_pos(t))
+
+    first = _clip("collision", 28, 29, red_pos, red, r, extra=blue)
+    truth = []
+    shakes = np.random.default_rng(29 + 1)  # the same shake _clip drew, frame by frame
+    for i in range(len(first.frames)):
+        shake = shakes.normal(0, 0.8, 2) if i else (0.0, 0.0)
+        cx, cy = blue_pos(i / FPS + 0.3 / FPS)
+        truth.append((cx + shake[0], cy + shake[1]))
+    x, y = blue_pos(0.0)
+    box = {"x": x - r - 2, "y": y - r - 2, "w": 2 * (r + 2), "h": 2 * (r + 2)}
+    second = Clip("collision_partner", first.frames, truth, 2 * r, box, first.timestamps)
+    return first, second

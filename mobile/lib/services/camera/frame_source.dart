@@ -1,7 +1,10 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 
 import '../../core/config/app_config.dart';
+import '../../models/ar_vectors.dart';
 import '../../models/camera_pose.dart';
+import '../../models/physics_state.dart';
 import '../../models/session_config.dart';
 import '../../models/vec2.dart';
 
@@ -13,7 +16,8 @@ import '../../models/vec2.dart';
 /// Implementations:
 /// * `WebFrameSource`: browser getUserMedia, used for development in Chrome.
 /// * `ArKitFrameSource`: an ARKit session on iOS, which also reports the
-///   camera pose with every frame ([SurfaceFinder]).
+///   camera pose with every frame ([SurfaceFinder]) and draws arrows in
+///   3D ([ArVectorDisplay]).
 /// * `NativeFrameSource`: the `camera` plugin on iOS, used when the device
 ///   has no ARKit world tracking.
 /// * `TestVideoFrameSource`: a drawn ball, for devices with no camera.
@@ -54,6 +58,23 @@ abstract interface class SurfaceFinder {
   /// The surface seen at [framePixel] (frame pixels), or null if ARKit has
   /// not found one there yet.
   Future<ArSurface?> findSurface(Vec2 framePixel);
+}
+
+/// A frame source whose preview can draw arrows anchored in the real
+/// world (ARKit). The 2D overlay steps aside while it does.
+abstract interface class ArVectorDisplay {
+  /// False until [FrameSource.start] completes, and on devices without
+  /// ARKit world tracking.
+  bool get canShowArVectors;
+
+  /// Draws [scene], replacing the last one, or fades the arrows out when
+  /// [scene] is null.
+  Future<void> showArVectors(ArVectorScene? scene);
+
+  /// The object's box on the newest camera frame, frame pixels, while the
+  /// preview follows it on device between backend replies. Null when it
+  /// isn't following.
+  ValueListenable<PixelRect?> get followedBox;
 }
 
 class CameraUnavailableException implements Exception {
