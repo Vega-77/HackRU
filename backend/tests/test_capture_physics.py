@@ -49,6 +49,29 @@ def test_window_excludes_held_ball_once_sufficient_fall_is_observed():
     assert state['acceleration']['y'] == pytest.approx(-9.81, abs=1e-6)
 
 
+def test_30fps_drop_with_pixel_jitter_still_measures_gravity():
+    # A 1 m drop at 220 px/m, tracked at 30 fps with 2 px of jitter. A
+    # seven-sample window spans 0.2 s, and the uncertainty gate then withheld
+    # acceleration on most of the fall.
+    rng = np.random.default_rng(3)
+    session = PhysicsSession()
+    noise = 2 / 220
+    measured = []
+    for index in range(30):
+        t = index / 30
+        fall = max(0.0, t - .3)
+        y = 1 - 4.905 * fall**2 + rng.normal(0, noise)
+        state = session.process_frame(
+            {**observation(t, y), 'calibration': {'method': 'manual', 'settings': {'px_per_m': 220}},
+             'objects': [{'id': 1, 'target': True, 'score': 1.0, 'pixel': {'x': 100, 'y': (2 - y) * 220},
+                          'position': {'x': .5 + rng.normal(0, noise), 'y': y}}]},
+            {'mode': 'free_fall'})
+        if fall >= .35 and y > 0:
+            measured.append(state.get('acceleration', {}).get('y'))
+    assert measured and all(a is not None for a in measured)
+    assert np.median(measured) == pytest.approx(-9.81, abs=2)
+
+
 def test_sparse_noisy_and_missing_observations_withhold_acceleration():
     session = PhysicsSession()
     for t in [0, .194, .39, .59]:  # Log's 5 FPS sequence, too few samples per time window.
