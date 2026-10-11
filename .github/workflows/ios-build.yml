@@ -1,6 +1,6 @@
 # Compiles the iOS app on a Mac, so Swift and Xcode project mistakes show
-# up without anyone needing the team's Mac or iPhone. It doesn't sign or
-# install anything, and it can't run ARKit: that still needs a real phone.
+# up without anyone needing the team's Mac. It signs nothing; each run keeps
+# an unsigned .ipa to sideload from Windows and a simulator build.
 name: iOS build
 
 on:
@@ -38,6 +38,29 @@ jobs:
       - run: xcodebuild -version
       - run: flutter pub get
 
-      # A device build, unsigned: compiles the Dart, the plugins and our
-      # Swift (ArSessionPlugin, ArVectorNode) against the iPhone SDK.
-      - run: flutter build ios --debug --no-codesign
+      # A release device build, unsigned: compiles the Dart, the plugins and
+      # our Swift (ArSessionPlugin, ArVectorNode) against the iPhone SDK.
+      # Release, because a debug build won't open without a debugger.
+      - run: flutter build ios --release --no-codesign
+
+      # Sideloadly (Windows) signs this with a free Apple ID and installs
+      # it over USB. See mobile/README.md.
+      - name: Package the unsigned .ipa
+        run: |
+          mkdir -p dist/Payload
+          cp -R build/ios/iphoneos/Runner.app dist/Payload/
+          (cd dist && zip -qry HandsOnPhysics-unsigned.ipa Payload)
+
+      # For a simulator in the browser, like Appetize.io: no camera, so the
+      # app plays its test video.
+      - run: flutter build ios --simulator --debug
+      - name: Package the simulator app
+        run: (cd build/ios/iphonesimulator && zip -qry ../../../dist/HandsOnPhysics-simulator.zip Runner.app)
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: HandsOnPhysics-ios-${{ github.sha }}
+          path: |
+            mobile/dist/HandsOnPhysics-unsigned.ipa
+            mobile/dist/HandsOnPhysics-simulator.zip
+          retention-days: 14

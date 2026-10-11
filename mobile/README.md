@@ -52,6 +52,27 @@ toolbar (iPhone 12/13/14 is 390 x 844).
 5. The first time, trust the developer on the phone: Settings > General >
    VPN & Device Management.
 
+### On an iPhone from Windows (no Mac)
+
+GitHub builds the app on a Mac for every change to `mobile/ios` on Dev1
+(the "iOS build" workflow). To build the latest code, open Actions > iOS
+build > Run workflow and pick Dev1.
+
+1. Open the finished run and download the `HandsOnPhysics-ios-...`
+   artifact. Unzip it to get `HandsOnPhysics-unsigned.ipa`.
+2. Install Apple Devices (or iTunes) from the Microsoft Store, so Windows
+   can see the phone, and install Sideloadly from sideloadly.io.
+3. Plug in the iPhone and tap Trust on it. In Sideloadly, pick the `.ipa`,
+   enter your Apple ID, and press Start.
+4. On the iPhone, turn on Settings > Privacy & Security > Developer Mode,
+   then trust your Apple ID under Settings > General > VPN & Device
+   Management.
+
+With a free Apple ID the app stops opening after 7 days. Install it again
+to renew it. The same artifact has `HandsOnPhysics-simulator.zip`, which
+runs in a browser simulator like Appetize.io: no camera or ARKit there, so
+the app plays its test video.
+
 ### Against the backend
 
 The backend is hosted on Render (`../render.yaml`), and the app streams to
