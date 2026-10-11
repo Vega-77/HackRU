@@ -62,6 +62,19 @@ def camera(board: np.ndarray, t: float, rng: np.random.Generator) -> np.ndarray:
     return np.clip(view.astype(np.float32) + noise, 0, 255).astype(np.uint8)
 
 
+def square_camera(board: np.ndarray, t: float, rng: np.random.Generator) -> np.ndarray:
+    """The board straight on, as the app's ruler scale assumes: no tilt, no wobble."""
+    h, w = board.shape[:2]
+    s = min(1180 / w, 680 / h)
+    x0, y0 = (OUT_SIZE[0] - w * s) / 2, (OUT_SIZE[1] - h * s) / 2
+    src = np.float32([[0, 0], [w, 0], [w, h], [0, h]])
+    dst = np.float32([[x0, y0], [x0 + w * s, y0], [x0 + w * s, y0 + h * s], [x0, y0 + h * s]])
+    M = cv2.getPerspectiveTransform(src, dst)
+    view = cv2.warpPerspective(board, M, OUT_SIZE, flags=cv2.INTER_AREA, borderValue=(70, 75, 80))
+    noise = rng.normal(0, 4, view.shape)
+    return np.clip(view.astype(np.float32) + noise, 0, 255).astype(np.uint8)
+
+
 def circle(img, X, Y, r_m, color):
     cx, cy = board_px(X, Y, img.shape[0])
     cv2.circle(img, (round(cx), round(cy)), round(r_m * PX_PER_M), color, -1, cv2.LINE_AA)
@@ -138,7 +151,7 @@ def carts_frames():
         x2 = min(x2, BOARD_W - w / 2)
 
 
-def render(name: str, frames, out_dir: Path) -> None:
+def render(name: str, frames, out_dir: Path, view=camera) -> None:
     rng = np.random.default_rng(0)
     board = base_board()
     video = cv2.VideoWriter(str(out_dir / f"{name}.mp4"), cv2.VideoWriter_fourcc(*"mp4v"), FPS, OUT_SIZE)
@@ -148,7 +161,7 @@ def render(name: str, frames, out_dir: Path) -> None:
         for k, (t, objects, draw) in enumerate(frames):
             img = board.copy()
             draw(img)
-            video.write(camera(img, t, rng))
+            video.write(view(img, t, rng))
             for obj, color, X, Y in objects:
                 writer.writerow([k, f"{t:.4f}", obj, color, f"{X:.5f}", f"{Y:.5f}"])
     video.release()
@@ -160,6 +173,9 @@ def main() -> None:
     render("ramp", ramp_frames(), out)
     render("pendulum", pendulum_frames(), out)
     render("carts", carts_frames(), out)
+    # Filmed square on, for trying the pendulum with the app's ruler scale: the tilted
+    # clip above needs ArUco calibration to keep its swing circular.
+    render("pendulum_square", pendulum_frames(), out, view=square_camera)
 
 
 if __name__ == "__main__":

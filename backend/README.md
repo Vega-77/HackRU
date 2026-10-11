@@ -52,6 +52,17 @@ python -m pip install -r requirements.txt
 uvicorn app:app --host 0.0.0.0 --port 8000 --ws-max-size 1048576
 ```
 
+For the app on a phone on the same Wi-Fi, `python serve_lan.py` starts the
+same server and prints the `ws://` address to enter in the app's Settings,
+with what to check if the phone can't connect. A frame's round trip on
+Wi-Fi is about 20-40 ms, against 100-300 ms to the hosted free-tier server.
+
+The web app is an https page, so it can only reach `wss://` addresses.
+`python serve_lan.py --tunnel` also starts a free Cloudflare quick tunnel
+and prints its `wss://` address, which works from any network (about 35 ms
+a frame). It needs cloudflared (`winget install Cloudflare.cloudflared`),
+and the address changes every time it starts.
+
 Then, in another terminal, stream frames to it the way the app will:
 
 ```bash

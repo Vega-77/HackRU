@@ -102,14 +102,17 @@ WebSocket session.
 
 ### Flow control
 
-The client keeps **at most 2 frames in flight**: it sends a new frame only when
-fewer than 2 are awaiting a reply. The server keeps only the newest frame and
-drops older ones while busy, so a reply to frame N tells the client that every
-frame up to N is settled. A frame with no reply after 1 s is forgotten.
+The client starts with **2 frames in flight**, then keeps enough in flight to
+cover one measured round trip at 30 fps: 1 + RTT x 30 / 1000 frames, at most
+32. It sends a new frame only when fewer than that are awaiting a reply. The
+server keeps only the newest frame and drops older ones while busy, so a reply
+to frame N tells the client that every frame up to N is settled, and more
+frames in flight do not add lag. A frame with no reply after 1 s, or three
+round trips if that is longer, is forgotten.
 
 So the server must reply to **every frame it processes**, even when nothing is
-tracked (`"tracked": false`). Otherwise the client sends at most 2 frames per
-second.
+tracked (`"tracked": false`). Otherwise only the timeout frees a frame, and the
+stream drops to a few frames per second.
 
 ## Server to client
 
@@ -231,6 +234,7 @@ Replaces `frame` once the kinematics stage is in. This is what the app draws.
 | `forces` | list; known names: `gravity`, `normal`, `friction`, `tension`, `gravity_parallel`, `gravity_perpendicular`, `net`, plus `normal_2` (a second surface pushing, such as a wall) and `normal_contact` (another tracked object pushing). Unknown names are drawn in a neutral colour. Normal forces only appear while the object touches something, and carry `point` (where, plane metres) and, when the surface the object sits on is the plane itself (a table seen from above), `z`: newtons out of the plane, towards the camera. `gravity` and `gravity_perpendicular` also carry `z` when the plane is not a side-on board: gravity is always straight down in the world, so on a level or tilted plane most of it points into the plane |
 | `contacts` | what the target is touching this frame: `[{"name", "surface", "source", "point"}]`; `source` is `edge`, `path`, `ramp_angle`, `tap`, `ar_surface`, `ar_plane` or `object`. Missing in pendulum mode |
 | `screen_axes` | as in `frame` objects; the app draws vectors along them when present |
+| `pivot_pixel` | pendulum mode, once the pivot is known: where it is in client frame pixels. The app draws the string from the bob to it and lays `tension` along that line |
 | `position_3d`, `velocity_3d`, `acceleration_3d`, `forces_3d` | with an `ar_plane` only: the same vectors in ARKit world space, for a renderer that anchors arrows in 3D |
 | `collision_objects[].forces` | collision mode: the normal forces on each object, as in `forces` |
 | `energy` | joules; any key may be omitted |

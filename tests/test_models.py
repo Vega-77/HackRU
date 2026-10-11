@@ -77,6 +77,16 @@ class PhysicsModelTests(unittest.TestCase):
         self.assertAlmostEqual(result["energy"]["potential"], 0.0)
         self.assertAlmostEqual(result["extras"]["theta_deg"], 0.0)
 
+    def test_slack_pendulum_string_never_pushes(self) -> None:
+        # Bob level with the pivot and nearly still: the string can't pull it.
+        result = motion_model(
+            "pendulum", Vector2D(0.0, 0.5), Vector2D(0.05, 0.0),
+            None, 0.1, {"pendulum_pivot_m": {"x": 0.0, "y": 0.0}},
+        )
+        forces = {item["name"]: item for item in result["forces"]}
+
+        self.assertEqual((forces["tension"]["x"], forces["tension"]["y"]), (0.0, 0.0))
+
     def test_free_fall_gravity_and_measured_net_are_separate(self) -> None:
         result = motion_model(
             "free_fall", Vector2D(0.0, 2.0), Vector2D(0.0, -3.0),

@@ -63,8 +63,11 @@ final class ArObjectFollower {
   private var reference = simd_float3.zero
   private var radiusFactor: Float = 1
 
-  /// Two frames can be awaiting a reply, and one more can be taken before
-  /// the oldest reply reaches the native side.
+  /// More frames can await a reply on a slow connection (the window grows
+  /// with the round trip), but on Wi-Fi a reply is back within a frame or
+  /// two, so three cover it.
+  /// Keeping more of ARKit's buffers risks it stopping delivering frames.
+  /// A reply for an older frame starts the tracker on the next live frame.
   private static let keepSent = 3
   private static let historySeconds: TimeInterval = 1
   /// Below this Vision is guessing.

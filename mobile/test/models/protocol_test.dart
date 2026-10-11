@@ -456,6 +456,15 @@ void main() {
     });
   });
 
+  test('a pendulum state parses its pivot pixel', () {
+    final state = (ServerMessage.parse('''
+          {"type": "state", "frame_id": 3, "timestamp": 0.3, "tracked": true,
+           "pixel": {"x": 10, "y": 20}, "pivot_pixel": {"x": 12.5, "y": -4}}
+        ''') as StateMessage).state;
+    expect(state.pivotPixel, const Vec2(12.5, -4));
+    expect(state.toJson()['pivot_pixel'], {'x': 12.5, 'y': -4.0});
+  });
+
   group('3D vectors', () {
     test('a state message parses the ARKit world fields', () {
       final state = (ServerMessage.parse('''

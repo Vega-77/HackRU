@@ -131,7 +131,9 @@ def motion_model(
             radial_out = Vector2D(dx / length, dy / length)
             tangent = Vector2D(-radial_out.y, radial_out.x)
             tangential_speed = velocity.x * tangent.x + velocity.y * tangent.y
-            tension = mass_kg * (tangential_speed**2 / length + GRAVITY_MPS2 * cos(theta))
+            # A string can only pull. Above the pivot's level a slow bob would
+            # need a push, which means the string has gone slack: no tension.
+            tension = max(0.0, mass_kg * (tangential_speed**2 / length + GRAVITY_MPS2 * cos(theta)))
             forces.append(_force("tension", -radial_out.x * tension, -radial_out.y * tension))
             restoring = -mass_kg * GRAVITY_MPS2 * sin(theta)
             forces.append(_force("gravity_parallel", tangent.x * restoring, tangent.y * restoring))

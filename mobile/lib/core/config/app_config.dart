@@ -18,6 +18,12 @@ abstract final class AppConfig {
   static const double jpegQuality = 0.7;
   static const int initialFramesInFlight = 2;
   static const int maxFramesInFlight = 32;
+
+  /// The camera runs faster than frames are sent. At 60 fps no exposure is
+  /// longer than 1/60 s, so a fast object smears less, and each frame sent
+  /// is at most 17 ms old. Cameras that can't do 60 use their fastest rate.
+  static const int captureFps = 60;
+
   static const Duration frameTimeout = Duration(seconds: 1);
   static const Duration observationExpiry = Duration(seconds: 1);
   static const Duration reconnectDelay = Duration(seconds: 2);
