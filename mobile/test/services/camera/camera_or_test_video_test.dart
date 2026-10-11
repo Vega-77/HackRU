@@ -2,6 +2,7 @@ import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hands_on_physics/models/ar_vectors.dart';
 import 'package:hands_on_physics/models/camera_pose.dart';
+import 'package:hands_on_physics/models/physics_state.dart';
 import 'package:hands_on_physics/models/session_config.dart';
 import 'package:hands_on_physics/models/vec2.dart';
 import 'package:hands_on_physics/models/vec3.dart';
@@ -50,6 +51,9 @@ class _ArCamera implements FrameSource, SurfaceFinder, ArVectorDisplay {
 
   @override
   Future<void> showArVectors(ArVectorScene? scene) async => shown.add(scene);
+
+  @override
+  final followedBox = ValueNotifier<PixelRect?>(null);
 }
 
 void main() {

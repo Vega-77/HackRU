@@ -1,9 +1,11 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 
 import '../../core/config/app_config.dart';
 import '../../core/logging/debug_log.dart';
 import '../../models/ar_vectors.dart';
 import '../../models/camera_pose.dart';
+import '../../models/physics_state.dart';
 import '../../models/session_config.dart';
 import '../../models/vec2.dart';
 import 'frame_source.dart';
@@ -82,4 +84,14 @@ class CameraOrTestVideo implements FrameSource, SurfaceFinder, ArVectorDisplay {
   Future<void> showArVectors(ArVectorScene? scene) async {
     if (_active case final ArVectorDisplay d) await d.showArVectors(scene);
   }
+
+  /// The test video never follows anything, so the camera's box is right
+  /// either way: it stays null while the camera is idle.
+  @override
+  ValueListenable<PixelRect?> get followedBox => switch (_camera) {
+    final ArVectorDisplay d => d.followedBox,
+    _ => _noBox,
+  };
+
+  static final _noBox = ValueNotifier<PixelRect?>(null);
 }

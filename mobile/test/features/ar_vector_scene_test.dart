@@ -3,6 +3,7 @@ import 'package:hands_on_physics/core/theme/tokens.dart';
 import 'package:hands_on_physics/features/experiment/widgets/ar_vector_scene.dart';
 import 'package:hands_on_physics/features/experiment/widgets/vector_overlay_painter.dart';
 import 'package:hands_on_physics/models/physics_state.dart';
+import 'package:hands_on_physics/models/session_config.dart';
 import 'package:hands_on_physics/models/vec3.dart';
 
 PhysicsState _state({
@@ -80,6 +81,27 @@ void main() {
     expect(
       scene.objectRadiusPx,
       closeTo(20 * ArVectorSceneBuilder.boxRadiusFactor, 1e-9),
+    );
+  });
+
+  test('carries the box and its frame so the native view can follow', () {
+    final scene = ArVectorSceneBuilder.build(
+      _state(bbox: const PixelRect(100, 80, 40, 50)),
+      massKg: mass,
+    )!;
+    expect(scene.capturedAt, 1);
+    final map = scene.toMap(frameSize: const FrameSize(200, 400));
+    expect(map['box'], [0.5, 0.2, 0.2, 0.125]);
+    expect(map['captured_at'], 1);
+    expect(map['box_radius_factor'], ArVectorSceneBuilder.boxRadiusFactor);
+    // Nothing to normalize against without the frame size.
+    expect(scene.toMap(), isNot(contains('box')));
+    expect(
+      ArVectorSceneBuilder.build(
+        _state(),
+        massKg: mass,
+      )!.toMap(frameSize: const FrameSize(200, 400)),
+      isNot(contains('box')),
     );
   });
 

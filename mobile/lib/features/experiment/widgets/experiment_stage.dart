@@ -58,6 +58,8 @@ class ExperimentStage extends ConsumerWidget {
             // The camera preview always fills its box this way.
             fit: BoxFit.cover,
             layers: arDisplay == null ? layers : OverlayLayers.none,
+            // On the ball between replies, with the 3D arrows.
+            liveBox: arDisplay?.followedBox,
           ),
           if (arDisplay != null)
             ArVectorLayer(

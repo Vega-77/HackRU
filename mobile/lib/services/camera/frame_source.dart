@@ -1,8 +1,10 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 
 import '../../core/config/app_config.dart';
 import '../../models/ar_vectors.dart';
 import '../../models/camera_pose.dart';
+import '../../models/physics_state.dart';
 import '../../models/session_config.dart';
 import '../../models/vec2.dart';
 
@@ -68,6 +70,11 @@ abstract interface class ArVectorDisplay {
   /// Draws [scene], replacing the last one, or fades the arrows out when
   /// [scene] is null.
   Future<void> showArVectors(ArVectorScene? scene);
+
+  /// The object's box on the newest camera frame, frame pixels, while the
+  /// preview follows it on device between backend replies. Null when it
+  /// isn't following.
+  ValueListenable<PixelRect?> get followedBox;
 }
 
 class CameraUnavailableException implements Exception {

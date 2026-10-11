@@ -1,5 +1,3 @@
-import 'dart:math' as math;
-
 import 'package:flutter/painting.dart' show Color;
 
 import '../../../core/theme/tokens.dart';
@@ -17,8 +15,9 @@ import 'vector_overlay_painter.dart';
 /// long as the 2D overlay's arrows whether the object is near or far.
 /// Forces share one scale, so a free-body diagram still adds up.
 ///
-/// The object's size goes along too, so the real ball hides the parts of
-/// the arrows inside or behind it.
+/// The object's box goes along too, so the real ball hides the parts of
+/// the arrows inside or behind it, and so the native view can follow the
+/// ball on every camera frame between replies.
 abstract final class ArVectorSceneBuilder {
   /// World length of one reference pixel, before the native distance
   /// scaling. ArVectorNode.swift assumes this value.
@@ -118,16 +117,15 @@ abstract final class ArVectorSceneBuilder {
       );
     }
 
-    final box = state.bbox;
     return ArVectorScene(
       origin: origin,
       arrows: arrows,
       haloArgb: AppColors.graphiteDeep.toARGB32(),
       easeSeconds: reduceMotion ? 0 : easeSeconds,
       showLabels: showLabels,
-      objectRadiusPx: box == null
-          ? 0
-          : math.min(box.w, box.h) / 2 * boxRadiusFactor,
+      box: state.bbox,
+      capturedAt: state.t,
+      boxRadiusFactor: boxRadiusFactor,
     );
   }
 }

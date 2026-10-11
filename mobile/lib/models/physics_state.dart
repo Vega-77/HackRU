@@ -268,6 +268,8 @@ class PixelRect {
   final double w;
   final double h;
 
+  Vec2 get centre => Vec2(x + w / 2, y + h / 2);
+
   static PixelRect? tryParse(Object? json) {
     if (json is! Map) return null;
     final values = [json['x'], json['y'], json['w'], json['h']];

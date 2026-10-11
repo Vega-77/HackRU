@@ -2,6 +2,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hands_on_physics/models/ar_vectors.dart';
+import 'package:hands_on_physics/models/physics_state.dart';
 import 'package:hands_on_physics/models/session_config.dart';
 import 'package:hands_on_physics/models/vec2.dart';
 import 'package:hands_on_physics/models/vec3.dart';
@@ -211,13 +212,92 @@ void main() {
           origin: scene.origin,
           arrows: scene.arrows,
           haloArgb: scene.haloArgb,
-          objectRadiusPx: 25,
+          box: const PixelRect(100, 100, 50, 50),
         ),
       );
       final args =
           calls.singleWhere((c) => c.method == 'setVectors').arguments as Map;
       // 25 px at 1 m in front of a 250 px focal length is 10 cm.
       expect(args['occluder_radius'], closeTo(0.1, 1e-9));
+    });
+
+    ArVectorScene boxed(PixelRect box) => ArVectorScene(
+      origin: scene.origin,
+      arrows: scene.arrows,
+      haloArgb: scene.haloArgb,
+      box: box,
+      capturedAt: 1,
+      boxRadiusFactor: 0.9,
+    );
+
+    Future<void> fromNative(String method, Object? args) =>
+        messenger.handlePlatformMessage(
+          channel.name,
+          const StandardMethodCodec().encodeMethodCall(
+            MethodCall(method, args),
+          ),
+          (_) {},
+        );
+
+    test('sends the box on its frame for on-device tracking', () async {
+      final source = await started();
+      await source.showArVectors(boxed(const PixelRect(32, 42.7, 64, 85.4)));
+      final args =
+          calls.singleWhere((c) => c.method == 'setVectors').arguments as Map;
+      final box = (args['box'] as List).cast<double>();
+      for (final (i, v) in [0.1, 0.1, 0.2, 0.2].indexed) {
+        expect(box[i], closeTo(v, 1e-9));
+      }
+      expect(args['captured_at'], 1);
+      expect(args['box_radius_factor'], 0.9);
+
+      // Nothing to follow without a box.
+      await source.showArVectors(scene);
+      expect(
+        calls.where((c) => c.method == 'setVectors').last.arguments,
+        isNot(contains('box')),
+      );
+    });
+
+    test('reports where the native view follows the object', () async {
+      final source = await started();
+      final box = source.followedBox;
+      final follow = {
+        'box': [0.5, 0.5, 0.1, 0.1],
+        'timestamp': 2.0,
+        'confidence': 0.9,
+        'restarted': true,
+      };
+      // Not while the arrows are hidden: a late call would bring it back.
+      await fromNative('objectFollowed', follow);
+      expect(box.value, isNull);
+
+      await source.showArVectors(boxed(const PixelRect(150, 200, 30, 40)));
+      await fromNative('objectFollowed', follow);
+      expect(box.value!.x, 160);
+      expect(box.value!.y, closeTo(213.5, 1e-9));
+      expect(box.value!.w, 32);
+      expect(box.value!.h, closeTo(42.7, 1e-9));
+
+      await fromNative('objectLost', {'reason': 'confidence fell to 0.20'});
+      expect(box.value, isNull);
+
+      await fromNative('objectFollowed', follow);
+      expect(box.value, isNotNull);
+      await source.showArVectors(null);
+      expect(box.value, isNull);
+    });
+
+    test('stops following when the session stops', () async {
+      final source = await started();
+      await source.showArVectors(boxed(const PixelRect(150, 200, 30, 40)));
+      await fromNative('objectFollowed', {
+        'box': [0.5, 0.5, 0.1, 0.1],
+        'timestamp': 2.0,
+      });
+      expect(source.followedBox.value, isNotNull);
+      await source.stop();
+      expect(source.followedBox.value, isNull);
     });
 
     test('a native failure falls back to the 2D arrows', () async {

@@ -1,3 +1,7 @@
+import 'dart:math' as math;
+
+import 'physics_state.dart';
+import 'session_config.dart';
 import 'vec3.dart';
 
 /// One arrow to draw in the AR scene, in ARKit world space.
@@ -54,6 +58,11 @@ class ArArrow {
 /// The native view keeps drawing it at the screen's refresh rate from
 /// ARKit's live camera pose, so arrows stay put on the object while the
 /// phone moves, between the backend's replies.
+///
+/// With a [box], the native view also tracks the object on every camera
+/// frame (ArObjectFollower.swift), starting from [box] on the frame taken
+/// at [capturedAt], and roots the arrows where it is on screen right now
+/// instead of where the backend saw it a few frames ago.
 class ArVectorScene {
   const ArVectorScene({
     required this.origin,
@@ -61,7 +70,9 @@ class ArVectorScene {
     required this.haloArgb,
     this.easeSeconds = 0,
     this.showLabels = true,
-    this.objectRadiusPx = 0,
+    this.box,
+    this.capturedAt,
+    this.boxRadiusFactor = 1,
   });
 
   /// The object's centre, ARKit world metres.
@@ -78,19 +89,50 @@ class ArVectorScene {
   final double easeSeconds;
   final bool showLabels;
 
+  /// The object's bounding box in the frame the backend measured, pixels.
+  final PixelRect? box;
+
+  /// When that frame was taken, the camera's own clock (the reply's
+  /// echoed timestamp).
+  final double? capturedAt;
+
+  /// The share of the box's smaller half-side taken as the object's radius.
+  final double boxRadiusFactor;
+
   /// The object's radius in the frame, pixels; 0 when unknown. The native
   /// view hides the parts of the arrows the real object would cover.
-  final double objectRadiusPx;
+  double get objectRadiusPx {
+    final box = this.box;
+    return box == null ? 0 : math.min(box.w, box.h) / 2 * boxRadiusFactor;
+  }
 
   /// The `setVectors` arguments on the `handson/arkit` channel.
   /// [occluderRadiusM] is [objectRadiusPx] in world metres at [origin];
-  /// 0 draws the arrows over the object.
-  Map<String, Object> toMap({double occluderRadiusM = 0}) => {
-    'origin': origin.toList(),
-    'ease_s': easeSeconds,
-    'labels': showLabels,
-    'halo': haloArgb,
-    'occluder_radius': occluderRadiusM,
-    'arrows': [for (final a in arrows) a.toMap()],
-  };
+  /// 0 draws the arrows over the object. [frameSize] normalizes [box] for
+  /// on-device tracking, which is left off without it.
+  Map<String, Object> toMap({
+    double occluderRadiusM = 0,
+    FrameSize? frameSize,
+  }) {
+    final box = this.box;
+    final capturedAt = this.capturedAt;
+    return {
+      'origin': origin.toList(),
+      'ease_s': easeSeconds,
+      'labels': showLabels,
+      'halo': haloArgb,
+      'occluder_radius': occluderRadiusM,
+      'arrows': [for (final a in arrows) a.toMap()],
+      if (box != null && capturedAt != null && frameSize != null) ...{
+        'box': [
+          box.x / frameSize.width,
+          box.y / frameSize.height,
+          box.w / frameSize.width,
+          box.h / frameSize.height,
+        ],
+        'captured_at': capturedAt,
+        'box_radius_factor': boxRadiusFactor,
+      },
+    };
+  }
 }

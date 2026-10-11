@@ -214,7 +214,16 @@ Then the arrows are drawn in 3D instead of 2D:
    the parts of the arrows inside or behind it. Hands don't hide arrows:
    ARKit people occlusion adds work on every frame, and the build that
    had it lost the ball more often.
-4. The 2D overlay keeps the marker and trail, and stops drawing arrows.
+4. Between replies, `ios/Runner/ArObjectFollower.swift` tracks the ball
+   on every camera frame with Vision's object tracker. Each reply's box
+   (with the timestamp of the frame it describes) starts the tracker, or
+   restarts it when the two disagree. The anchor and the sphere then sit
+   where the ball is on the newest frame, not where the backend saw it a
+   few frames ago, so the arrows stay centred on it while it moves. If the
+   tracker loses the ball, the arrows glide back to the backend's position
+   until the next reply.
+5. The 2D overlay keeps the marker and trail, and stops drawing arrows.
+   The marker follows the same on-device box (`ArVectorDisplay.followedBox`).
 
 Lengths use the 2D proportions: every frame the native side scales the
 arrows by the object's distance, so they look as long on screen as the 2D

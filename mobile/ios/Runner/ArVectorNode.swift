@@ -7,8 +7,13 @@ import UIKit
 /// Channel `handson/arkit`:
 /// * `setVectors {origin: [3], ease_s, labels, halo (ARGB), occluder_radius,
 ///   arrows: [{id, direction: [3], length, radius, color (ARGB), symbol,
-///   subscript, dashed}]}`
+///   subscript, dashed}], box?: [x, y, w, h], captured_at?,
+///   box_radius_factor?}`
 /// * `hideVectors`
+///
+/// With a `box`, ArObjectFollower tracks the object on every camera frame
+/// and `follow` puts the arrows and the occluder where it is, instead of
+/// easing them towards `origin`.
 ///
 /// Positions are ARKit world metres, so SceneKit redraws the arrows from the
 /// live camera pose every screen refresh and they stay on the object while
@@ -31,6 +36,13 @@ final class ArVectorLayer {
   private let occluder = SCNNode(geometry: SCNSphere(radius: 1))
   private var arrows: [String: ArrowNode] = [:]
   private let labels = LabelImages()
+  /// While true, on-device tracking places the anchor and the occluder, and
+  /// `update` only changes the arrows.
+  private var following = false
+  /// The newest backend position and radius, to glide back to after
+  /// following stops.
+  private var backendOrigin: simd_float3?
+  private var backendRadius: Float = 0
 
   /// Dart sends 1 mm per pixel of the 2D overlay's 390 pt reference phone.
   private static let metresPerReferencePx: Float = 0.001
@@ -65,23 +77,27 @@ final class ArVectorLayer {
     let occluderRadius = Float(number(args["occluder_radius"]) ?? 0)
     let specs = (args["arrows"] as? [[String: Any]] ?? []).compactMap(ArrowSpec.init)
     let ids = Set(specs.map(\.id))
+    backendOrigin = origin
+    backendRadius = occluderRadius
 
     // Hidden arrows jump to the new object instead of gliding across the room.
     // A hidden occluder takes its size at once instead of shrinking from 1 m.
-    let snapOccluder = root.opacity == 0 || occluder.isHidden
-    SCNTransaction.begin()
-    SCNTransaction.disableActions = true
-    if root.opacity == 0 {
-      anchor.simdPosition = origin
-    }
-    if snapOccluder {
-      occluder.simdPosition = origin
-      if occluderRadius > 0 {
-        occluder.simdScale = simd_float3(repeating: occluderRadius)
+    if !following {
+      let snapOccluder = root.opacity == 0 || occluder.isHidden
+      SCNTransaction.begin()
+      SCNTransaction.disableActions = true
+      if root.opacity == 0 {
+        anchor.simdPosition = origin
       }
+      if snapOccluder {
+        occluder.simdPosition = origin
+        if occluderRadius > 0 {
+          occluder.simdScale = simd_float3(repeating: occluderRadius)
+        }
+      }
+      occluder.isHidden = occluderRadius <= 0
+      SCNTransaction.commit()
     }
-    occluder.isHidden = occluderRadius <= 0
-    SCNTransaction.commit()
 
     for (id, node) in arrows where !ids.contains(id) {
       node.removeFromParentNode()
@@ -102,14 +118,53 @@ final class ArVectorLayer {
     SCNTransaction.begin()
     SCNTransaction.animationDuration = ease
     root.opacity = 1
-    anchor.simdPosition = origin
-    occluder.simdPosition = origin
-    if occluderRadius > 0 {
-      occluder.simdScale = simd_float3(repeating: occluderRadius)
+    if !following {
+      anchor.simdPosition = origin
+      occluder.simdPosition = origin
+      if occluderRadius > 0 {
+        occluder.simdScale = simd_float3(repeating: occluderRadius)
+      }
     }
     for spec in specs {
       arrows[spec.id]?.apply(spec, label: showLabels ? labels.image(for: spec, halo: halo) : nil)
     }
+    SCNTransaction.commit()
+  }
+
+  /// Puts the arrows and the occluder on the object where on-device
+  /// tracking sees it on the newest camera frame. No easing: that is
+  /// already where the ball is.
+  func follow(point: simd_float3, radius: Float) {
+    SCNTransaction.begin()
+    SCNTransaction.disableActions = true
+    if !following {
+      // Drop a glide towards the backend's position that is still running.
+      anchor.removeAllAnimations()
+      occluder.removeAllAnimations()
+    }
+    anchor.simdPosition = point
+    occluder.simdPosition = point
+    if radius > 0 {
+      occluder.simdScale = simd_float3(repeating: radius)
+    }
+    occluder.isHidden = radius <= 0
+    SCNTransaction.commit()
+    following = true
+  }
+
+  /// Hands the arrows back to the backend's position, gliding there.
+  func unfollow() {
+    guard following else { return }
+    following = false
+    guard let origin = backendOrigin else { return }
+    SCNTransaction.begin()
+    SCNTransaction.animationDuration = 0.1
+    anchor.simdPosition = origin
+    occluder.simdPosition = origin
+    if backendRadius > 0 {
+      occluder.simdScale = simd_float3(repeating: backendRadius)
+    }
+    occluder.isHidden = backendRadius <= 0
     SCNTransaction.commit()
   }
 
@@ -340,11 +395,11 @@ final class LabelImages {
   }
 }
 
-private func number(_ value: Any?) -> Double? {
+func number(_ value: Any?) -> Double? {
   (value as? NSNumber)?.doubleValue
 }
 
-private func vector3(_ value: Any?) -> simd_float3? {
+func vector3(_ value: Any?) -> simd_float3? {
   guard let list = value as? [Any], list.count == 3 else { return nil }
   let values = list.compactMap(number)
   guard values.count == 3 else { return nil }

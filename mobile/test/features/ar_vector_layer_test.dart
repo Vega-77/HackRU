@@ -15,6 +15,9 @@ class _Display implements ArVectorDisplay {
 
   @override
   Future<void> showArVectors(ArVectorScene? scene) async => shown.add(scene);
+
+  @override
+  final followedBox = ValueNotifier<PixelRect?>(null);
 }
 
 PhysicsState _state(int frame, {bool tracked = true}) => PhysicsState(
