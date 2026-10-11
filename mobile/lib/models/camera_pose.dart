@@ -1,3 +1,5 @@
+import 'vec3.dart';
+
 /// The camera that took one frame, from ARKit on iOS. Lets the backend turn
 /// a pixel into a 3D ray (docs/protocol.md, "ARKit pose").
 class CameraPose {
@@ -29,6 +31,26 @@ class CameraPose {
   /// 4x4 as 16 numbers, row-major. Camera axes are x right, y up, z towards the viewer;
   /// world axes are ARKit's, in metres with +y up against gravity.
   final List<double> cameraToWorld;
+
+  /// Where the camera was, ARKit world metres.
+  Vec3 get position =>
+      Vec3(cameraToWorld[3], cameraToWorld[7], cameraToWorld[11]);
+
+  /// How far in front of the camera [point] is, along its view axis.
+  /// Negative behind it.
+  double depthOf(Vec3 point) {
+    final m = cameraToWorld;
+    final d = point - position;
+    // The camera looks down its own -z axis, the rotation's third column.
+    return -(d.x * m[2] + d.y * m[6] + d.z * m[10]);
+  }
+
+  /// World metres that [px] frame pixels span at [point], across the view.
+  /// 0 when the point is behind the camera.
+  double metresAcross(double px, Vec3 point) {
+    final depth = depthOf(point);
+    return depth > 0 && fx > 0 ? px * depth / fx : 0;
+  }
 
   Map<String, dynamic> toJson() => {
     'intrinsics': {'fx': fx, 'fy': fy, 'cx': cx, 'cy': cy},

@@ -13,6 +13,14 @@ import UIKit
 /// * `capture {width, quality}` -> {jpeg, width, height, timestamp,
 ///   intrinsics: [fx, fy, cx, cy], camera_to_world: [16, row-major]} or nil
 /// * `raycast {x, y, width}` -> {point: [3], normal: [3], vertical} or nil
+/// * `setVectors {...}` and `hideVectors`: 3D arrows, see `ArVectorLayer`
+///
+/// And calls back:
+/// * `objectFollowed {box: [x, y, w, h], timestamp, confidence, restarted}`
+///   on every camera frame while ArObjectFollower tracks the object. The box
+///   is normalized to the upright frame, top-left origin.
+/// * `objectLost {reason}` when it gives up; the arrows go back to the
+///   backend's position until the next `setVectors` restarts it.
 ///
 /// Frames, intrinsics and pose all describe the image as the user sees it
 /// (upright for the current interface orientation), scaled to `width`.
@@ -20,18 +28,35 @@ import UIKit
 /// ARKit's, in metres with +y up against gravity.
 ///
 /// Platform view `handson/arkit_view` shows the same session's camera feed.
-final class ArSessionPlugin: NSObject, FlutterPlugin {
+final class ArSessionPlugin: NSObject, FlutterPlugin, ARSessionDelegate {
   static func register(with registrar: FlutterPluginRegistrar) {
     let channel = FlutterMethodChannel(name: "handson/arkit", binaryMessenger: registrar.messenger())
-    let instance = ArSessionPlugin()
+    let instance = ArSessionPlugin(channel: channel)
     registrar.addMethodCallDelegate(instance, channel: channel)
-    registrar.register(ArPreviewFactory(session: instance.session), withId: "handson/arkit_view")
+    registrar.register(
+      ArPreviewFactory(session: instance.session, vectors: instance.vectors), withId: "handson/arkit_view")
   }
 
   let session = ARSession()
+  let vectors = ArVectorLayer()
+  private let follower = ArObjectFollower()
+  private let channel: FlutterMethodChannel
   private let ciContext = CIContext()
   private let encodeQueue = DispatchQueue(label: "handson.arkit.encode", qos: .userInitiated)
   private var running = false
+  private var frameWidth = 320
+  /// Live frames go to the follower while the arrows show and the newest
+  /// reply had a box.
+  private var following = false
+
+  init(channel: FlutterMethodChannel) {
+    self.channel = channel
+    super.init()
+    // Delivered on the main queue.
+    session.delegate = self
+    follower.onFix = { [weak self] fix in self?.followed(fix) }
+    follower.onLost = { [weak self] reason in self?.lost(reason) }
+  }
 
   func handle(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
     let args = call.arguments as? [String: Any] ?? [:]
@@ -46,6 +71,8 @@ final class ArSessionPlugin: NSObject, FlutterPlugin {
       // during setup is still valid when the experiment starts.
       session.pause()
       running = false
+      stopFollowing(forgetFrames: true)
+      vectors.hide(animated: false)
       result(nil)
     case "capture":
       capture(width: width, quality: args["quality"] as? Double ?? 0.7, result: result)
@@ -55,6 +82,14 @@ final class ArSessionPlugin: NSObject, FlutterPlugin {
         return
       }
       result(raycast(x: x, y: y, width: width))
+    case "setVectors":
+      vectors.update(args)
+      follow(args)
+      result(nil)
+    case "hideVectors":
+      stopFollowing()
+      vectors.hide()
+      result(nil)
     default:
       result(FlutterMethodNotImplemented)
     }
@@ -88,10 +123,13 @@ final class ArSessionPlugin: NSObject, FlutterPlugin {
   private func run(width: Int, result: FlutterResult) {
     let config = ARWorldTrackingConfiguration()
     config.planeDetection = [.horizontal, .vertical]
+    // No people occlusion for now: it adds work on every frame, and the
+    // build that had it got replies at about a third of the usual rate.
     if !running {
       session.run(config)
       running = true
     }
+    frameWidth = width
     let sensor = config.videoFormat.imageResolution
     let size = OrientedCamera.outputSize(sensor: sensor, orientation: interfaceOrientation, width: width)
     result(["width": Int(size.width), "height": Int(size.height)])
@@ -117,6 +155,7 @@ final class ArSessionPlugin: NSObject, FlutterPlugin {
     let camera = OrientedCamera(camera: frame.camera, orientation: interfaceOrientation, width: width)
     let pixelBuffer = frame.capturedImage
     let timestamp = frame.timestamp
+    follower.remember(pixelBuffer, camera: camera, timestamp: timestamp)
     encodeQueue.async { [ciContext] in
       var image = CIImage(cvPixelBuffer: pixelBuffer).oriented(camera.imageOrientation)
       image = image.transformed(by: CGAffineTransform(translationX: -image.extent.minX, y: -image.extent.minY))
@@ -142,6 +181,59 @@ final class ArSessionPlugin: NSObject, FlutterPlugin {
         ])
       }
     }
+  }
+
+  // MARK: - Following
+
+  /// Checks the reply's box against on-device tracking, starting it when
+  /// needed. A reply without a box leaves the arrows on its position.
+  private func follow(_ args: [String: Any]) {
+    let box = (args["box"] as? [Any] ?? []).compactMap(number)
+    guard box.count == 4, let capturedAt = number(args["captured_at"]),
+      let origin = vector3(args["origin"])
+    else {
+      stopFollowing()
+      return
+    }
+    following = true
+    follower.check(
+      box: CGRect(x: box[0], y: box[1], width: box[2], height: box[3]),
+      capturedAt: capturedAt,
+      origin: origin,
+      radiusFactor: Float(number(args["box_radius_factor"]) ?? 1))
+  }
+
+  private func stopFollowing(forgetFrames: Bool = false) {
+    following = false
+    follower.stop(forgetFrames: forgetFrames)
+    vectors.unfollow()
+  }
+
+  func session(_ session: ARSession, didUpdate frame: ARFrame) {
+    guard following else { return }
+    if case .notAvailable = frame.camera.trackingState { return }
+    let camera = OrientedCamera(camera: frame.camera, orientation: interfaceOrientation, width: frameWidth)
+    // Only the image and the camera: holding on to ARFrames stalls ARKit.
+    follower.offer(frame.capturedImage, camera: camera, timestamp: frame.timestamp)
+  }
+
+  private func followed(_ fix: ArObjectFollower.Fix) {
+    guard following else { return }
+    vectors.follow(point: fix.point, radius: fix.radius)
+    channel.invokeMethod(
+      "objectFollowed",
+      arguments: [
+        "box": [fix.box.minX, fix.box.minY, fix.box.width, fix.box.height].map { Double($0) },
+        "timestamp": fix.timestamp,
+        "confidence": Double(fix.confidence),
+        "restarted": fix.restarted,
+      ])
+  }
+
+  private func lost(_ reason: String) {
+    guard following else { return }
+    vectors.unfollow()
+    channel.invokeMethod("objectLost", arguments: ["reason": reason])
   }
 
   // MARK: - Surfaces
@@ -235,30 +327,42 @@ struct OrientedCamera {
 
 final class ArPreviewFactory: NSObject, FlutterPlatformViewFactory {
   private let session: ARSession
+  private let vectors: ArVectorLayer
 
-  init(session: ARSession) {
+  init(session: ARSession, vectors: ArVectorLayer) {
     self.session = session
+    self.vectors = vectors
   }
 
   func create(withFrame frame: CGRect, viewIdentifier viewId: Int64, arguments args: Any?) -> FlutterPlatformView {
-    ArPreview(frame: frame, session: session)
+    ArPreview(frame: frame, session: session, vectors: vectors)
   }
 }
 
 /// The live camera feed. ARSCNView fills its bounds like BoxFit.cover, which
 /// is what the Flutter overlay assumes when it maps frame pixels to screen.
-final class ArPreview: NSObject, FlutterPlatformView {
+/// The same view draws the 3D arrows, from the session's live camera pose.
+final class ArPreview: NSObject, FlutterPlatformView, ARSCNViewDelegate {
   private let sceneView: ARSCNView
+  private let vectors: ArVectorLayer
 
-  init(frame: CGRect, session: ARSession) {
+  init(frame: CGRect, session: ARSession, vectors: ArVectorLayer) {
     sceneView = ARSCNView(frame: frame)
+    self.vectors = vectors
     sceneView.session = session
     sceneView.scene = SCNScene()
     sceneView.automaticallyUpdatesLighting = false
+    sceneView.antialiasingMode = .multisampling4X
+    vectors.attach(to: sceneView.scene)
     super.init()
+    sceneView.delegate = self
   }
 
   func view() -> UIView {
     sceneView
+  }
+
+  func renderer(_ renderer: SCNSceneRenderer, updateAtTime time: TimeInterval) {
+    vectors.keepScreenSize(camera: renderer.pointOfView)
   }
 }
