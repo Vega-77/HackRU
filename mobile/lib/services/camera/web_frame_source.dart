@@ -156,8 +156,13 @@ class WebFrameSource implements FrameSource {
       canvas = web.HTMLCanvasElement()
         ..width = size.width
         ..height = size.height;
-      (canvas.getContext('2d') as web.CanvasRenderingContext2D)
-          .drawImage(_canvas, 0, 0, size.width, size.height);
+      (canvas.getContext('2d') as web.CanvasRenderingContext2D).drawImage(
+        _canvas,
+        0,
+        0,
+        size.width,
+        size.height,
+      );
     }
 
     // toDataURL is synchronous and fast at 320 px wide.
@@ -180,8 +185,13 @@ class WebFrameSource implements FrameSource {
         _canvas
           ..width = size.width
           ..height = size.height;
-        (_canvas.getContext('2d') as web.CanvasRenderingContext2D)
-            .drawImage(_captureVideo, 0, 0, size.width, size.height);
+        (_canvas.getContext('2d') as web.CanvasRenderingContext2D).drawImage(
+          _captureVideo,
+          0,
+          0,
+          size.width,
+          size.height,
+        );
         // Copy pixels in the callback for this exact presentation timestamp.
         // Encoding and network scheduling must not change motion time.
         _frameTime = metadata.mediaTime;
