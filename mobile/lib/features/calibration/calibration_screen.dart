@@ -126,7 +126,11 @@ class _CalibrationScreenState extends ConsumerState<CalibrationScreen> {
         backgroundColor: AppColors.instrumentAccentDark,
         foregroundColor: AppColors.graphiteDeep,
       ),
-      onPressed: ref.watch(calibrationProvider).selectionConfirmed
+      // A collision needs both objects, so the physics has a pair to compare.
+      onPressed:
+          (mode == ExperimentMode.collision
+              ? ref.watch(calibrationProvider).pairConfirmed
+              : ref.watch(calibrationProvider).selectionConfirmed)
           ? _startExperiment
           : null,
       child: const Text('Start experiment'),
@@ -388,7 +392,10 @@ class _Steps extends ConsumerWidget {
     final scale = calibration.pxPerM;
     final surfaces = this.surfaces;
     final hasSurface = surfaces != null && calibration.surface != null;
-    final total = surfaces == null ? 3 : 4;
+    final collision =
+        ref.watch(experimentSettingsProvider.select((s) => s.mode)) ==
+        ExperimentMode.collision;
+    final total = (surfaces == null ? 3 : 4) + (collision ? 1 : 0);
     var number = 0;
 
     return Padding(
@@ -426,7 +433,7 @@ class _Steps extends ConsumerWidget {
                     ),
                     const SizedBox(width: 12),
                     Text(
-                      '${surfaces == null ? 3 : 4} steps',
+                      '$total steps',
                       style: AppType.readoutSmall.copyWith(
                         color: scheme.onSurfaceVariant,
                       ),
@@ -484,7 +491,7 @@ class _Steps extends ConsumerWidget {
           _Step(
             number: ++number,
             total: total,
-            title: 'Mark the object',
+            title: collision ? 'Mark the first object' : 'Mark the object',
             // Keyboard controls are in the picture's screen reader label.
             body: calibration.selectionPending
                 ? 'Finding the object in this picture. Hold it still.'
@@ -492,7 +499,9 @@ class _Steps extends ConsumerWidget {
                       (calibration.target == null
                           ? 'Tap the object to propose its boundary, or drag a box around it.'
                           : calibration.selectionConfirmed
-                          ? 'Keep it in view when you start.'
+                          ? collision
+                                ? 'Now mark the object it will hit.'
+                                : 'Keep it in view when you start.'
                           : 'Does the box fit the whole object? Confirm it, '
                                 'or draw a better one.'),
             done: calibration.selectionConfirmed,
@@ -547,6 +556,7 @@ class _Steps extends ConsumerWidget {
               ],
             ),
           ),
+          if (collision) _SecondObjectStep(number: ++number, total: total),
           _Step(
             number: ++number,
             total: total,
@@ -561,6 +571,77 @@ class _Steps extends ConsumerWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// Marks the other object in a collision the same way as the first. It
+/// opens once the first object is confirmed, so a tap is never ambiguous.
+class _SecondObjectStep extends ConsumerWidget {
+  const _SecondObjectStep({required this.number, required this.total});
+
+  final int number;
+  final int total;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final calibration = ref.watch(calibrationProvider);
+    final controller = ref.read(calibrationProvider.notifier);
+    final second = calibration.second;
+    final scheme = Theme.of(context).colorScheme;
+    final String body;
+    if (!calibration.selectionConfirmed) {
+      body = 'Confirm the first object, then tap the second one.';
+    } else if (second?.pending ?? false) {
+      body = 'Finding the object in this picture. Hold it still.';
+    } else if (calibration.secondError case final error?) {
+      body = error;
+    } else if (second == null) {
+      body = 'Tap the other object, or drag a box around it.';
+    } else if (second.confirmed) {
+      body = 'Keep both objects in view when you start.';
+    } else {
+      body = 'Does the box fit the whole object? Confirm it, or draw a better one.';
+    }
+    return _Step(
+      number: number,
+      total: total,
+      title: 'Mark the second object',
+      body: body,
+      done: second?.confirmed ?? false,
+      footer: second == null
+          ? null
+          : Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (second.box case final box?) ...[
+                  Text(
+                    '${box.w.toStringAsFixed(1)} × ${box.h.toStringAsFixed(1)} px · held selection picture',
+                    style: AppType.readoutSmall.copyWith(
+                      color: scheme.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+                Wrap(
+                  spacing: AppSpace.sm,
+                  runSpacing: AppSpace.sm,
+                  children: [
+                    if (second.box != null &&
+                        !second.pending &&
+                        !second.confirmed)
+                      OutlinedButton.icon(
+                        onPressed: controller.confirmSelection,
+                        icon: const Icon(AppIcons.check, size: 18),
+                        label: const Text('Confirm object'),
+                      ),
+                    TextButton(
+                      onPressed: controller.clearSecond,
+                      child: const Text('Select again'),
+                    ),
+                  ],
+                ),
+              ],
+            ),
     );
   }
 }

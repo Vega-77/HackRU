@@ -3,12 +3,43 @@ import 'physics_state.dart';
 import 'session_config.dart';
 import 'vec2.dart';
 
+/// The other object in a collision, marked the same way as the first: a tap
+/// that the backend proposes a box for, or a drawn box, then confirmed.
+class ObjectSelection {
+  const ObjectSelection({
+    required this.point,
+    required this.frame,
+    this.box,
+    this.pending = false,
+    this.confirmed = false,
+  });
+
+  final Vec2 point;
+
+  /// The picture the object was marked in. [point] and [box] are in it.
+  final EncodedFrame frame;
+
+  /// Null while the backend is still finding the object's boundary.
+  final PixelRect? box;
+  final bool pending;
+  final bool confirmed;
+
+  ObjectSelection copyWith({bool? pending, bool? confirmed}) => ObjectSelection(
+    point: point,
+    frame: frame,
+    box: box,
+    pending: pending ?? this.pending,
+    confirmed: confirmed ?? this.confirmed,
+  );
+}
+
 /// The result of the calibration screen, all in frame pixels.
 ///
 /// The user drags a line over a ruler of known length ([rulerLengthM]), which
 /// gives the pixel-to-metre scale, and taps the object to track. On iOS the
 /// user can instead pick the AR [surface] the object moves on, which gives
-/// real 3D positions and keeps working while the phone moves.
+/// real 3D positions and keeps working while the phone moves. A collision
+/// also marks the [second] object.
 class Calibration {
   const Calibration({
     this.rulerStart,
@@ -21,6 +52,8 @@ class Calibration {
     this.selectionConfirmed = false,
     this.selectionError,
     this.surface,
+    this.second,
+    this.secondError,
   });
 
   final Vec2? rulerStart;
@@ -33,6 +66,11 @@ class Calibration {
   final bool selectionConfirmed;
   final String? selectionError;
   final ArSurface? surface;
+  final ObjectSelection? second;
+  final String? secondError;
+
+  /// Whether both collision objects are marked and confirmed.
+  bool get pairConfirmed => selectionConfirmed && (second?.confirmed ?? false);
 
   /// Frame pixels per metre, or null until both ruler ends are placed.
   double? get pxPerM {
@@ -70,8 +108,28 @@ class Calibration {
     selectionConfirmed: selectionConfirmed ?? this.selectionConfirmed,
     selectionError: selectionError ?? this.selectionError,
     surface: surface ?? this.surface,
+    second: second,
+    secondError: secondError,
   );
 
+  /// Replaces the second object, or clears it with a null [selection].
+  Calibration withSecond(ObjectSelection? selection, {String? error}) =>
+      Calibration(
+        rulerStart: rulerStart,
+        rulerEnd: rulerEnd,
+        rulerLengthM: rulerLengthM,
+        target: target,
+        targetBbox: targetBbox,
+        selectionFrame: selectionFrame,
+        selectionPending: selectionPending,
+        selectionConfirmed: selectionConfirmed,
+        selectionError: selectionError,
+        surface: surface,
+        second: selection,
+        secondError: error,
+      );
+
+  /// Clears both objects: the second is marked after the first.
   Calibration clearTarget() => Calibration(
     rulerStart: rulerStart,
     rulerEnd: rulerEnd,
@@ -89,5 +147,7 @@ class Calibration {
     selectionPending: selectionPending,
     selectionConfirmed: selectionConfirmed,
     selectionError: selectionError,
+    second: second,
+    secondError: secondError,
   );
 }

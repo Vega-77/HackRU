@@ -6,6 +6,7 @@ import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hands_on_physics/core/logging/debug_log.dart';
+import 'package:hands_on_physics/models/experiment_mode.dart';
 import 'package:hands_on_physics/models/session_config.dart';
 import 'package:hands_on_physics/models/physics_state.dart';
 import 'package:hands_on_physics/models/vec2.dart';
@@ -128,6 +129,71 @@ void main() {
       await session().stop();
     },
   );
+
+  test('in a collision initializes both objects before live frames', () async {
+    final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+    addTearDown(() => server.close(force: true));
+    final configs = <Map<String, dynamic>>[];
+    final initialized = <String>[];
+    var liveFrames = 0;
+    server.transform(WebSocketTransformer()).listen((ws) {
+      Map<String, dynamic>? meta;
+      ws.listen((message) {
+        if (message is String) {
+          final data = jsonDecode(message) as Map<String, dynamic>;
+          if (data['type'] == 'config') configs.add(data);
+          meta = data;
+        } else if (meta?['type'] == 'initialize') {
+          initialized.add('${meta!['target'] ?? 'first'}');
+          ws.add(
+            jsonEncode({
+              'type': 'initialization',
+              'frame_id': meta!['frame_id'],
+              'status': 'initialized',
+              'reason': 'initialized',
+            }),
+          );
+          meta = null;
+        } else {
+          liveFrames++;
+        }
+      });
+    });
+    EncodedFrame picture(int byte, double t) => EncodedFrame(
+      jpeg: Uint8List.fromList([byte]),
+      size: const FrameSize(320, 240),
+      captureTime: t,
+    );
+    container
+        .read(experimentSettingsProvider.notifier)
+        .setMode(ExperimentMode.collision);
+    container.read(calibrationProvider.notifier)
+      ..selectObject(
+        const Vec2(40, 120),
+        const PixelRect(27, 107, 26, 26),
+        picture(1, 1),
+      )
+      ..confirmSelection()
+      ..selectObject(
+        const Vec2(200, 120),
+        const PixelRect(187, 107, 26, 26),
+        picture(2, 2),
+      )
+      ..confirmSelection();
+    camera.liveFrame = picture(3, 3);
+    container
+        .read(experimentSettingsProvider.notifier)
+        .setBackendUrl('ws://127.0.0.1:${server.port}/ws/frames');
+    await session().start();
+    for (var i = 0; i < 100 && liveFrames == 0; i++) {
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+    }
+    expect(initialized, ['first', 'second']);
+    expect(liveFrames, greaterThan(0));
+    expect(configs.last['second_target_px'], {'x': 200.0, 'y': 120.0});
+    expect(configs.last['second_target_bbox']['x'], 187.0);
+    await session().stop();
+  });
 
   test(
     'leaves the camera on for calibration when the experiment ends',

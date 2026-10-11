@@ -20,7 +20,8 @@ import 'selection_region_painter.dart';
 /// The picture with the calibration marks on it:
 ///
 /// * a ruler line with two draggable ends, which you lay over a real ruler;
-/// * a target ring where you tapped the object to track.
+/// * a target ring where you tapped the object to track, and in a
+///   collision a second one for the other object.
 ///
 /// While you drag an end, a loupe above your finger shows the end magnified,
 /// so you can place it on a millimetre mark. The line snaps level or upright
@@ -76,8 +77,12 @@ class _CalibrationStageState extends ConsumerState<CalibrationStage> {
 
   /// The picture to hold when no gesture is in progress: the selection's,
   /// while it waits for the user to confirm it, else none (live camera).
-  static EncodedFrame? _heldFrame(Calibration c) =>
-      c.target == null || c.selectionConfirmed ? null : c.selectionFrame;
+  static EncodedFrame? _heldFrame(Calibration c) {
+    if (c.second case final second? when !second.confirmed) {
+      return second.frame;
+    }
+    return c.target == null || c.selectionConfirmed ? null : c.selectionFrame;
+  }
 
   KeyEventResult _onKey(
     KeyEvent event,
@@ -105,7 +110,9 @@ class _CalibrationStageState extends ConsumerState<CalibrationStage> {
       });
       return KeyEventResult.handled;
     }
-    final box = c.targetBbox, frame = c.selectionFrame;
+    final second = ref.read(calibrationProvider.notifier).choosingSecond;
+    final box = second ? c.second?.box : c.targetBbox;
+    final frame = second ? c.second?.frame : c.selectionFrame;
     if (box == null || frame == null) return KeyEventResult.ignored;
     var x = box.x, y = box.y, w = box.w, h = box.h;
     if (key == LogicalKeyboardKey.arrowLeft) {
@@ -168,11 +175,14 @@ class _CalibrationStageState extends ConsumerState<CalibrationStage> {
   Widget build(BuildContext context) {
     final calibration = ref.watch(calibrationProvider);
     ref.listen(calibrationProvider, (previous, next) {
-      if (previous?.target != null && next.target == null) {
+      if ((previous?.target != null && next.target == null) ||
+          (previous?.second != null && next.second == null)) {
         _selectionEpoch++;
         setState(() => _previewFrame = null);
-      } else if (next.selectionConfirmed &&
-          !(previous?.selectionConfirmed ?? false)) {
+      } else if ((next.selectionConfirmed &&
+              !(previous?.selectionConfirmed ?? false)) ||
+          ((next.second?.confirmed ?? false) &&
+              !(previous?.second?.confirmed ?? false))) {
         // Confirmed: back to the live camera, to check the object is in
         // view before starting.
         setState(() => _previewFrame = null);
@@ -247,6 +257,11 @@ class _CalibrationStageState extends ConsumerState<CalibrationStage> {
                       active: _dragging,
                       snapped: _snapped,
                       confirmed: calibration.selectionConfirmed,
+                      second: screen(calibration.second?.point),
+                      secondBox: calibration.second?.box == null
+                          ? null
+                          : mapper.rectToScreen(calibration.second!.box!),
+                      secondConfirmed: calibration.second?.confirmed ?? false,
                     ),
                   ),
                   if (active != null) _loupe(active, view),
@@ -471,6 +486,7 @@ class _CalibrationStageState extends ConsumerState<CalibrationStage> {
         'Ruler line set to ${_lengthLabel(c.rulerLengthM)}, '
             '${scale.round()} pixels per metre.',
       c.target == null ? 'No object marked.' : 'Object marked.',
+      if (c.second != null) 'Second object marked.',
       'Enter selects a box. Arrow keys move it. Plus and minus resize it.',
     ].join(' ');
   }
@@ -488,6 +504,9 @@ class _MarksPainter extends CustomPainter {
     required this.active,
     required this.snapped,
     required this.confirmed,
+    this.second,
+    this.secondBox,
+    this.secondConfirmed = false,
   });
 
   final Offset? start;
@@ -498,6 +517,9 @@ class _MarksPainter extends CustomPainter {
   final _End? active;
   final bool snapped;
   final bool confirmed;
+  final Offset? second;
+  final Rect? secondBox;
+  final bool secondConfirmed;
 
   static const _ink = AppColors.vellum;
   static const _halo = Color(0x99000000);
@@ -509,6 +531,13 @@ class _MarksPainter extends CustomPainter {
       SelectionRegionPainter(
         box: targetBox!,
         confirmed: confirmed,
+      ).paint(canvas, size);
+    }
+    if (second != null && secondBox == null) _paintTarget(canvas, second!);
+    if (secondBox != null) {
+      SelectionRegionPainter(
+        box: secondBox!,
+        confirmed: secondConfirmed,
       ).paint(canvas, size);
     }
     if (start != null && end != null) _paintRuler(canvas, size, start!, end!);
@@ -642,5 +671,8 @@ class _MarksPainter extends CustomPainter {
       old.label != label ||
       old.active != active ||
       old.snapped != snapped ||
-      old.confirmed != confirmed;
+      old.confirmed != confirmed ||
+      old.second != second ||
+      old.secondBox != secondBox ||
+      old.secondConfirmed != secondConfirmed;
 }

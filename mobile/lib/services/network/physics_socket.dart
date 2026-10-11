@@ -128,7 +128,12 @@ class PhysicsSocket {
     return true;
   }
 
-  Future<InitializationMessage> initialize(EncodedFrame frame) async {
+  /// Sends the picture a selection was made in, so the backend can learn
+  /// the object from it. [second] is for the other object in a collision.
+  Future<InitializationMessage> initialize(
+    EncodedFrame frame, {
+    bool second = false,
+  }) async {
     if (!canSendFrame) {
       throw StateError('The connection is not ready for initialization');
     }
@@ -146,6 +151,7 @@ class PhysicsSocket {
         ).toJson(),
         'type': 'initialize',
         'selection_id': '$id',
+        if (second) 'target': 'second',
       }),
     );
     _channel!.sink.add(frame.jpeg);

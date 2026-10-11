@@ -4,11 +4,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:image/image.dart' as img;
 import 'package:hands_on_physics/features/calibration/widgets/calibration_stage.dart';
+import 'package:hands_on_physics/models/experiment_mode.dart';
 import 'package:hands_on_physics/models/physics_state.dart';
 import 'package:hands_on_physics/models/session_config.dart';
 import 'package:hands_on_physics/models/vec2.dart';
 import 'package:hands_on_physics/services/camera/frame_source.dart';
 import 'package:hands_on_physics/state/calibration_controller.dart';
+import 'package:hands_on_physics/state/experiment_settings.dart';
 import 'package:hands_on_physics/state/session_controller.dart';
 
 class _Camera implements FrameSource {
@@ -209,4 +211,56 @@ void main() {
       expect(container.read(calibrationProvider).targetBbox!.w, before.w + 2);
     },
   );
+
+  testWidgets('in a collision a second box marks the other object', (
+    tester,
+  ) async {
+    final container = await _pumpStage(
+      tester,
+      _Camera(),
+      before: (c) => c
+          .read(experimentSettingsProvider.notifier)
+          .setMode(ExperimentMode.collision),
+    );
+    final controller = container.read(calibrationProvider.notifier);
+    await _drag(tester, const Offset(20, 40), const Offset(80, 100));
+    controller.confirmSelection();
+    await tester.pumpAndSettle();
+    final first = container.read(calibrationProvider).targetBbox;
+    expect(controller.choosingSecond, isTrue);
+
+    await _drag(tester, const Offset(200, 40), const Offset(260, 100));
+    var c = container.read(calibrationProvider);
+    expect(c.targetBbox, first, reason: 'the first object stays marked');
+    expect(c.second?.box?.x, greaterThan(first!.x + first.w));
+    expect(c.pairConfirmed, isFalse);
+    expect(find.byType(Image), findsOneWidget, reason: 'held to confirm');
+
+    controller.confirmSelection();
+    await tester.pumpAndSettle();
+    c = container.read(calibrationProvider);
+    expect(c.pairConfirmed, isTrue);
+    expect(find.byType(Image), findsNothing);
+
+    controller.clearSecond();
+    c = container.read(calibrationProvider);
+    expect(c.second, isNull);
+    expect(c.selectionConfirmed, isTrue);
+    controller.clearTarget();
+    expect(container.read(calibrationProvider).target, isNull);
+  });
+
+  testWidgets('outside a collision a new box replaces the object', (
+    tester,
+  ) async {
+    final container = await _pumpStage(tester, _Camera());
+    final controller = container.read(calibrationProvider.notifier);
+    await _drag(tester, const Offset(20, 40), const Offset(80, 100));
+    controller.confirmSelection();
+    await tester.pumpAndSettle();
+    await _drag(tester, const Offset(200, 40), const Offset(260, 100));
+    final c = container.read(calibrationProvider);
+    expect(c.second, isNull);
+    expect(c.targetBbox!.x, greaterThan(150));
+  });
 }

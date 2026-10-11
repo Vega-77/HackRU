@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../models/experiment_mode.dart';
 import '../../../state/experiment_settings.dart';
 import '../../../state/session_controller.dart';
 import 'vector_overlay.dart';
@@ -9,7 +10,8 @@ import 'vector_overlay_painter.dart';
 /// The picture with the arrows on it: the camera feed with the
 /// [VectorOverlay] on top.
 ///
-/// Both layers use the same [BoxFit], so frame pixels from the backend land
+/// In a collision, the other selected object gets its own marker and
+/// velocity arrow. Both layers use the same [BoxFit], so frame pixels from the backend land
 /// exactly on the object the user sees.
 class ExperimentStage extends ConsumerWidget {
   const ExperimentStage({super.key});
@@ -39,6 +41,19 @@ class ExperimentStage extends ConsumerWidget {
               forces: settings.showForces,
             ),
           ),
+          if (settings.mode == ExperimentMode.collision)
+            VectorOverlay(
+              state: session.latest?.partner,
+              frameSize:
+                  session.frameSize ?? SessionController.fallbackFrameSize,
+              massKg: settings.massKg,
+              fit: BoxFit.cover,
+              layers: OverlayLayers(
+                velocity: settings.showVelocity,
+                acceleration: false,
+                forces: false,
+              ),
+            ),
         ],
       ),
     );

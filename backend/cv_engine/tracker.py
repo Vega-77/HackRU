@@ -50,9 +50,11 @@ class CentroidTracker:
         self.tracks: dict[int, Track] = {}
         self._next_id = 1
 
-    def forget_manual(self) -> None:
-        """Drop the selected object's track, when the user selects something else."""
-        self.tracks = {i: t for i, t in self.tracks.items() if t.source != "manual"}
+    def forget_manual(self, label: str | None = None) -> None:
+        """Drop the selected object's track (only the one with `label`, when given), when the
+        user selects something else."""
+        self.tracks = {i: t for i, t in self.tracks.items()
+                       if t.source != "manual" or (label is not None and t.label != label)}
 
     def update(self, detections: list[Detection]) -> list[Track]:
         """Feed one frame's detections; returns the confirmed tracks seen this frame."""
