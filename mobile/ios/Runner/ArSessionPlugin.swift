@@ -85,16 +85,55 @@ final class ArSessionPlugin: NSObject, FlutterPlugin {
     }
   }
 
+  /// Cleared when the session starts. ARKit sets the camera's format as it starts, which
+  /// can reset the exposure limit, so the first frame sets it again.
+  private var exposureLimited = false
+
   private func run(width: Int, result: FlutterResult) {
     let config = ARWorldTrackingConfiguration()
     config.planeDetection = [.horizontal, .vertical]
+    config.videoFormat = Self.fastestVideoFormat
     if !running {
       session.run(config)
       running = true
+      // Try now, so the preview and the selection picture already get the shorter
+      // exposure; the first frame tries again in case starting reset it.
+      limitExposure()
+      exposureLimited = false
     }
     let sensor = config.videoFormat.imageResolution
     let size = OrientedCamera.outputSize(sensor: sensor, orientation: interfaceOrientation, width: width)
     result(["width": Int(size.width), "height": Int(size.height)])
+  }
+
+  /// The first format with the highest frame rate (ARKit lists its recommended format
+  /// first). At 60 fps no exposure can be longer than 1/60 s, so a moving ball smears less.
+  private static var fastestVideoFormat: ARConfiguration.VideoFormat {
+    let formats = ARWorldTrackingConfiguration.supportedVideoFormats
+    let fastest = formats.map(\.framesPerSecond).max() ?? 0
+    return formats.first { $0.framesPerSecond == fastest } ?? ARWorldTrackingConfiguration().videoFormat
+  }
+
+  /// The longest exposure auto exposure may pick. A ball smears across the picture for the
+  /// whole exposure, and indoors a phone picks 1/30 s, a smear longer than a fast ball. 1/120 s
+  /// is also one whole flicker cycle of 60 Hz mains lighting, so lamps don't pulse or band.
+  private static let maxExposure = CMTime(value: 1, timescale: 120)
+
+  /// Caps the exposure on iOS 16 and later. Elsewhere 60 fps alone keeps it under 1/60 s.
+  private func limitExposure() {
+    guard #available(iOS 16.0, *) else { return }
+    guard let device = ARWorldTrackingConfiguration.configurableCaptureDeviceForPrimaryCamera else { return }
+    guard device.exposureMode == .continuousAutoExposure || device.exposureMode == .autoExpose else { return }
+    let format = device.activeFormat
+    // Outside the format's range the setter raises an exception.
+    let cap = CMTimeMaximum(format.minExposureDuration, CMTimeMinimum(Self.maxExposure, format.maxExposureDuration))
+    do {
+      try device.lockForConfiguration()
+      device.activeMaxExposureDuration = cap
+      device.unlockForConfiguration()
+    } catch {
+      NSLog("HandsOn: could not limit the camera exposure: %@", "\(error)")
+    }
   }
 
   private var interfaceOrientation: UIInterfaceOrientation {
@@ -108,6 +147,10 @@ final class ArSessionPlugin: NSObject, FlutterPlugin {
     guard running, let frame = session.currentFrame else {
       result(nil)
       return
+    }
+    if !exposureLimited {
+      exposureLimited = true
+      limitExposure()
     }
     // Skip frames ARKit can't place in the world: their pose would be wrong.
     if case .notAvailable = frame.camera.trackingState {

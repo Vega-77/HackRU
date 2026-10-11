@@ -16,7 +16,16 @@ abstract final class AppConfig {
   static const int targetFps = 30;
   static const int frameWidth = 320;
   static const double jpegQuality = 0.7;
-  static const int maxFramesInFlight = 2;
+
+  /// Enough to keep [targetFps] going over a round trip of up to about
+  /// 130 ms. The backend keeps only the newest frame, so more in flight
+  /// does not add lag.
+  static const int maxFramesInFlight = 4;
+
+  /// The camera runs faster than frames are sent. At 60 fps no exposure is
+  /// longer than 1/60 s, so a fast object smears less, and each frame sent
+  /// is at most 17 ms old. Cameras that can't do 60 use their fastest rate.
+  static const int captureFps = 60;
   static const Duration frameTimeout = Duration(seconds: 1);
   static const Duration reconnectDelay = Duration(seconds: 2);
 

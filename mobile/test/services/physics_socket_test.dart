@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:hands_on_physics/core/config/app_config.dart';
 import 'package:hands_on_physics/core/logging/debug_log.dart';
 import 'package:hands_on_physics/models/experiment_mode.dart';
 import 'package:hands_on_physics/models/physics_state.dart';
@@ -147,11 +148,21 @@ void main() {
     expect(jsonDecode(channel.sink.sent.first as String)['type'], 'config');
   });
 
-  test('allows at most two frames in flight', () {
-    expect(socket.sendFrame(frame), isTrue);
-    expect(socket.sendFrame(frame), isTrue);
+  test('allows at most maxFramesInFlight frames in flight', () {
+    for (var i = 0; i < AppConfig.maxFramesInFlight; i++) {
+      expect(socket.sendFrame(frame), isTrue);
+    }
     expect(socket.sendFrame(frame), isFalse);
-    expect(socket.framesInFlight, 2);
+    expect(socket.framesInFlight, AppConfig.maxFramesInFlight);
+  });
+
+  test('keeps a 30 fps stream going over a slow connection', () {
+    // A hosted backend answers in 100 ms or more; at 30 fps that is three
+    // or four frames sent before the first reply.
+    expect(
+      AppConfig.maxFramesInFlight * 1000 / AppConfig.targetFps,
+      greaterThanOrEqualTo(130),
+    );
   });
 
   test('each frame is a metadata text followed by the JPEG bytes', () {

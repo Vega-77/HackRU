@@ -163,7 +163,7 @@ Future<_Run> _streamBall(String url, {required bool handshake}) async {
         captureTimes.add(t);
         await Future<void>.delayed(_frameInterval);
       } else {
-        // Two frames already in flight: wait for an answer.
+        // The most frames allowed are in flight: wait for an answer.
         await Future<void>.delayed(const Duration(milliseconds: 5));
       }
     }

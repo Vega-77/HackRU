@@ -77,7 +77,8 @@ class NativeFrameSource implements FrameSource {
       back,
       ResolutionPreset.medium,
       enableAudio: false,
-      fps: 30,
+      // The plugin picks the closest rate the camera supports.
+      fps: AppConfig.captureFps,
       imageFormatGroup: ImageFormatGroup.bgra8888,
     );
 
