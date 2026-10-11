@@ -62,7 +62,9 @@ class ForceStyle {
   static ForceStyle of(String name) => switch (name) {
     'net' => const ForceStyle('F', 'net', AppColors.forceNet),
     'gravity' => const ForceStyle('F', 'g', AppColors.forceComponent),
-    'normal' => const ForceStyle('F', 'N', AppColors.forceComponent),
+    'normal' ||
+    'normal_2' ||
+    'normal_contact' => const ForceStyle('F', 'N', AppColors.forceComponent),
     'friction' => const ForceStyle('F', 'f', AppColors.forceComponent),
     'tension' => const ForceStyle('T', '', AppColors.forceComponent),
     'gravity_parallel' => const ForceStyle(
@@ -186,10 +188,11 @@ class VectorOverlayPainter extends CustomPainter {
         final length = lengths[name]!;
         if (!scale.visible(length)) continue;
         final style = ForceStyle.of(name);
+        final vector = f.forces[name]!;
         final tip = _arrow(
           canvas,
-          origin,
-          f.forces[name]!,
+          _forceStart(name, vector, origin, f, mapper.scale, u),
+          vector,
           length,
           style.color.withValues(alpha: f.visibility),
           unit: u,
@@ -200,6 +203,19 @@ class VectorOverlayPainter extends CustomPainter {
         // Tiny components would only add clutter around the marker.
         if (showLabels && length > 18 * u) {
           labels.add(style.symbol, style.subscript, style.color, tip, origin);
+        }
+      }
+      final support = scale.forces({'support': Vec2(f.support, 0)});
+      if (scale.visible(support['support']!)) {
+        final at = _paintOutOfScreen(
+          canvas,
+          origin,
+          f.markerRadius * mapper.scale,
+          f.visibility,
+          u,
+        );
+        if (showLabels) {
+          labels.add('F', 'N', AppColors.forceComponent, at, origin);
         }
       }
     }
@@ -242,6 +258,56 @@ class VectorOverlayPainter extends CustomPainter {
 
     labels.paint(canvas, size, f.visibility);
     canvas.restore();
+  }
+
+  /// Where a force's arrow starts. A push from a surface or another object
+  /// starts where they touch, on the object's edge opposite the arrow, as in
+  /// a free-body diagram. Everything else starts at the centre.
+  static Offset _forceStart(
+    String name,
+    Vec2 world,
+    Offset origin,
+    OverlayFrame f,
+    double viewScale,
+    double u,
+  ) {
+    if (!name.startsWith('normal')) return origin;
+    final d = CoordinateMapper.screenDirection(world, f.axes);
+    return origin - d * math.max(f.markerRadius * viewScale, 9 * u);
+  }
+
+  /// The textbook symbol for a vector pointing out of the page (a dot in a
+  /// circle), beside the marker. Returns its centre, for the label.
+  Offset _paintOutOfScreen(
+    Canvas canvas,
+    Offset c,
+    double radius,
+    double alpha,
+    double u,
+  ) {
+    final r = math.max(radius + 4 * u, 9 * u);
+    final at = c + Offset(r, -r) * 0.9;
+    final size = 7 * u.clamp(0.8, 1.1);
+    final color = AppColors.forceComponent.withValues(alpha: alpha);
+    canvas
+      ..drawCircle(
+        at,
+        size + 1.5,
+        Paint()
+          ..color = haloColor.withValues(alpha: 0.55 * alpha)
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 4,
+      )
+      ..drawCircle(
+        at,
+        size,
+        Paint()
+          ..color = color
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 2,
+      )
+      ..drawCircle(at, size * 0.32, Paint()..color = color);
+    return at;
   }
 
   /// Paint order for forces: lower is drawn first (further back).

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from math import hypot, isfinite
 
+from .contact import Body, ContactTracker, Surface, gravity_in_plane, plane_support, ramp_surface
 from .kinematics import KinematicsEngine, KinematicsResult, Vector2D
 from .models import GRAVITY_MPS2, collision_metrics, motion_model
 
@@ -26,6 +27,7 @@ class PhysicsSession:
         self._calibration: tuple | None = None
         self._pre_collision: tuple | None = None
         self._last_collision: dict | None = None
+        self.contacts = ContactTracker()
 
     def reset(self) -> None:
         self.engines.clear()
@@ -33,6 +35,7 @@ class PhysicsSession:
         self._last_seen.clear()
         self._pre_collision = None
         self._last_collision = None
+        self.contacts.reset()
 
     def process_frame(self, frame: dict, settings: dict | None = None) -> dict:
         """Return a ``type: state`` reply with CV fields preserved.
@@ -50,7 +53,7 @@ class PhysicsSession:
         configuration = (
             mode, mass, repr(settings.get("pendulum_pivot_m")),
             settings.get("ramp_angle_deg"), settings.get("sliding_body"),
-            repr(settings.get("collision_masses_kg")),
+            repr(settings.get("collision_masses_kg")), settings.get("view"),
         )
         if self._configuration is not None and configuration != self._configuration:
             self.reset()
@@ -78,6 +81,7 @@ class PhysicsSession:
         for gone_id in [i for i, seen in self._last_seen.items() if timestamp - seen > FORGET_AFTER_S]:
             self.engines.pop(gone_id, None)
             self.initial_energy.pop(gone_id, None)
+            self.contacts.forget(gone_id)
             del self._last_seen[gone_id]
         target = next((o for o in frame.get("objects", []) if o.get("target")), None)
         if target is None:
@@ -120,9 +124,14 @@ class PhysicsSession:
         if target_result.acceleration_valid:
             state["acceleration"] = _vec(target_result.acceleration_mps2)
 
+        contact_forces = self._contact_forces(frame, results, mode, mass, settings, calibration.get("plane"))
+        if contact_forces is not None:
+            state["contacts"] = [_contact_summary(f) for f in contact_forces.get(int(target["id"]), [])]
+
         if target_result.velocity_valid:
             target_id = int(target["id"])
             model_settings = dict(settings)
+            model_settings["normal_from_contacts"] = contact_forces is not None
             if mode == "ramp" and model_settings.get("ramp_angle_deg") is None:
                 model_settings["ramp_angle_deg"] = self.engines[target_id].trajectory_angle_deg()
             if mode == "pendulum" and model_settings.get("pendulum_pivot_m") is None:
@@ -150,6 +159,8 @@ class PhysicsSession:
                     + model["energy"].get("potential", 0.0)
                 )
 
+        if contact_forces is not None:
+            state["forces"] = state["forces"] + [_plain_force(f) for f in contact_forces.get(int(target["id"]), [])]
         _add_world_vectors(state, calibration.get("plane"))
 
         if mode == "collision":
@@ -158,6 +169,7 @@ class PhysicsSession:
                     "id": obj["id"],
                     "position": obj["position"],
                     "velocity": _vec(results[int(obj["id"])].velocity_mps),
+                    "forces": [_plain_force(f) for f in (contact_forces or {}).get(int(obj["id"]), [])],
                 }
                 for obj in frame.get("objects", [])
                 if obj.get("position") is not None
@@ -169,6 +181,52 @@ class PhysicsSession:
                 state["extras"].update(collision)
 
         return state
+
+    def _contact_forces(
+        self, frame: dict, results: dict[int, KinematicsResult], mode: str | None, mass: float,
+        settings: dict, plane: dict | None,
+    ) -> dict[int, list[dict]] | None:
+        """Normal forces on every tracked object from the surfaces and objects it rests
+        against (see contact.py), or None where contact doesn't apply (a pendulum hangs)."""
+        if mode == "pendulum":
+            return None
+        gravity = gravity_in_plane(plane, settings.get("view"))
+        masses = settings.get("collision_masses_kg") if mode == "collision" else None
+        ids = sorted(results)
+        shared = [s for s in (Surface.from_dict(d) for d in frame.get("surfaces", [])) if s is not None]
+        support = plane_support(gravity)
+        if support is not None:
+            shared.append(support)
+        bodies, surfaces = [], {}
+        for obj in frame.get("objects", []):
+            object_id = int(obj["id"])
+            result = results.get(object_id)
+            if result is None:
+                continue
+            # Collision masses go to the objects in ID order, as in _update_collision.
+            rank = ids.index(object_id)
+            body_mass = float(masses[rank]) if masses and len(masses) == 2 and rank < 2 else mass
+            body = Body(
+                object_id, body_mass, result.position_m,
+                result.velocity_mps if result.velocity_valid else None,
+                result.acceleration_mps2 if result.acceleration_valid else None,
+                obj.get("width_m"), obj.get("height_m"),
+            )
+            bodies.append(body)
+            own = [s for s in (Surface.from_dict(d) for d in obj.get("surfaces", [])) if s is not None]
+            if mode == "ramp" and obj.get("target"):
+                angle = settings.get("ramp_angle_deg")
+                if angle is None:
+                    angle = self.engines[object_id].trajectory_angle_deg()
+                if angle is not None:
+                    own.append(ramp_surface(body, float(angle)))
+            surfaces[object_id] = shared + own
+            self.contacts.learn_path(body, self.engines[object_id].recent_positions(), gravity)
+        # Only objects the user cares about push on each other: the target, and in a
+        # collision the other selected object. Background blobs would add phantom contacts.
+        if mode != "collision":
+            bodies = [b for b in bodies if any(o.get("target") and int(o["id"]) == b.id for o in frame.get("objects", []))]
+        return self.contacts.update(bodies, surfaces, gravity)
 
     def _update_collision(
         self, objects: list[dict], results: dict[int, KinematicsResult], mass: float, settings: dict
@@ -209,6 +267,21 @@ class PhysicsSession:
         return self._last_collision
 
 
+def _plain_force(force: dict) -> dict:
+    """A contact force as the protocol's force entry: the out-of-plane part (z) only
+    when there is one, and where on the object it acts (point, plane metres)."""
+    out = {"name": force["name"], "x": force["x"], "y": force["y"]}
+    if abs(force["z"]) > 1e-9:
+        out["z"] = force["z"]
+    if "point" in force:
+        out["point"] = force["point"]
+    return out
+
+
+def _contact_summary(force: dict) -> dict:
+    return {k: force[k] for k in ("name", "surface", "source", "point") if k in force}
+
+
 def _vec(vector: Vector2D) -> dict:
     return {"x": vector.x, "y": vector.y}
 
@@ -221,9 +294,12 @@ def _add_world_vectors(state: dict, plane: dict | None) -> None:
     if not plane or "x_axis" not in plane or "y_axis" not in plane:
         return
     ex, ey = plane["x_axis"], plane["y_axis"]
+    ez = plane.get("normal", [0.0, 0.0, 0.0])
 
     def lift(v: dict) -> dict:
-        return {axis: round(v["x"] * ex[i] + v["y"] * ey[i], 6) for i, axis in enumerate("xyz")}
+        # z is out of the plane: only a support force (a table pushing up) has one.
+        z = v.get("z", 0.0)
+        return {axis: round(v["x"] * ex[i] + v["y"] * ey[i] + z * ez[i], 6) for i, axis in enumerate("xyz")}
 
     for key in ("velocity", "acceleration"):
         if state.get(key) is not None:

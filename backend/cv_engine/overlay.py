@@ -21,6 +21,10 @@ LABEL_COLORS = {
     "purple": (220, 80, 200),
 }
 PLANE_COLOR = (255, 255, 0)
+SURFACE_COLOR = (0, 200, 255)
+NORMAL_COLOR = (0, 215, 255)
+# Debug arrows: a force equal to the object's weight is drawn this long on the plane.
+WEIGHT_ARROW_M = 0.08
 FONT = cv2.FONT_HERSHEY_SIMPLEX
 
 
@@ -118,8 +122,53 @@ def draw_overlay(img: np.ndarray, result: dict, trail_map: dict[int, deque] | No
             label += f"  ({o['position']['x']:.3f}, {o['position']['y']:.3f}) m"
         _text_box(out, label, (x, max(14, y - 6)), color)
 
+    draw_contacts(out, result)
     _hud(out, result)
     return out
+
+
+def draw_contacts(img: np.ndarray, result: dict) -> None:
+    """The surfaces found next to the target (thin lines) and the normal forces on it,
+    starting where it touches, as in a free-body diagram."""
+    calibration = result.get("calibration", {})
+    if "world_to_image" not in calibration:
+        return
+    H = np.array(calibration["world_to_image"], np.float64)
+    space = calibration.get("space", "px")
+    size = (img.shape[1], img.shape[0])
+
+    def project(pts):
+        p = cv2.perspectiveTransform(np.asarray(pts, np.float64).reshape(-1, 1, 2), H).reshape(-1, 2)
+        return [_to_px(q, space, size) for q in p]
+
+    surfaces = list(result.get("surfaces", []))
+    for o in result.get("objects", []):
+        surfaces += o.get("surfaces", [])
+    for surface in surfaces:
+        (px, py, _), (nx, ny, _) = surface["point"], surface["normal"]
+        if abs(nx) + abs(ny) < 1e-6:
+            continue
+        tx, ty = -ny, nx
+        a, b = project([[px - 0.15 * tx, py - 0.15 * ty], [px + 0.15 * tx, py + 0.15 * ty]])
+        cv2.line(img, a, b, SURFACE_COLOR, 1, cv2.LINE_AA)
+
+    forces = [f for f in result.get("forces", []) if f["name"].startswith("normal")]
+    weight = next((abs(f["y"]) for f in result.get("forces", []) if f["name"] == "gravity"), None)
+    for f in forces:
+        scale = WEIGHT_ARROW_M / (weight or max(abs(f["x"]) + abs(f["y"]), 1e-6))
+        if "point" in f and abs(f["x"]) + abs(f["y"]) > 1e-6:
+            start = (f["point"]["x"], f["point"]["y"])
+            a, b = project([start, [start[0] + f["x"] * scale, start[1] + f["y"] * scale]])
+            cv2.arrowedLine(img, a, b, (0, 0, 0), 5, cv2.LINE_AA, tipLength=0.25)
+            cv2.arrowedLine(img, a, b, NORMAL_COLOR, 3, cv2.LINE_AA, tipLength=0.25)
+            cv2.putText(img, f"N {np.hypot(f['x'], f['y']):.2f} N", (b[0] + 6, b[1]), FONT, 0.5,
+                        NORMAL_COLOR, 1, cv2.LINE_AA)
+        elif f.get("z") and result.get("pixel"):
+            c = (int(round(result["pixel"]["x"])), int(round(result["pixel"]["y"])))
+            cv2.circle(img, c, 9, NORMAL_COLOR, 2, cv2.LINE_AA)
+            cv2.circle(img, c, 3, NORMAL_COLOR, -1, cv2.LINE_AA)
+            cv2.putText(img, f"N {f['z']:.2f} N (out of the plane)", (c[0] + 12, c[1] - 12), FONT, 0.5,
+                        NORMAL_COLOR, 1, cv2.LINE_AA)
 
 
 def _text_box(img, text, org, color, scale=0.5) -> None:
