@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from collections import deque
 from dataclasses import asdict, dataclass
-from math import atan, degrees, hypot, isfinite
+from math import atan, degrees, hypot, isfinite, sqrt
 from typing import Deque, Optional
 
 
@@ -47,6 +47,9 @@ class KinematicsResult:
     tracking_valid: bool
     sample_count: int
     reason: Optional[str] = None
+    span_s: float = 0.0
+    position_residual_m: float = 0.0
+    acceleration_std_mps2: Optional[float] = None
 
     def to_dict(self) -> dict:
         """Return a JSON-serializable representation."""
@@ -73,6 +76,11 @@ class KinematicsEngine:
         confidence_threshold: float = 0.5,
         invert_y: bool = True,
         max_gap_seconds: Optional[float] = 0.5,
+        max_window_seconds: Optional[float] = None,
+        min_acceleration_samples: int = 3,
+        min_acceleration_span: float = 0.0,
+        position_noise_m: float = 0.0,
+        max_acceleration_std: Optional[float] = None,
     ) -> None:
         if window_size < 3:
             raise ValueError("window_size must be at least 3")
@@ -85,6 +93,11 @@ class KinematicsEngine:
         self.confidence_threshold = confidence_threshold
         self.invert_y = invert_y
         self.max_gap_seconds = max_gap_seconds
+        self.max_window_seconds = max_window_seconds
+        self.min_acceleration_samples = min_acceleration_samples
+        self.min_acceleration_span = min_acceleration_span
+        self.position_noise_m = position_noise_m
+        self.max_acceleration_std = max_acceleration_std
         self._samples: Deque[_PositionSample] = deque(maxlen=window_size)
 
     def reset(self) -> None:
@@ -200,22 +213,32 @@ class KinematicsEngine:
                 self.reset()
 
         self._samples.append(_PositionSample(timestamp, position.x, position.y))
+        if self.max_window_seconds is not None:
+            while timestamp - self._samples[0].timestamp > self.max_window_seconds:
+                self._samples.popleft()
 
         velocity = Vector2D(0.0, 0.0)
         acceleration = Vector2D(0.0, 0.0)
         velocity_valid = len(self._samples) >= 2
-        acceleration_valid = len(self._samples) >= 3
+        span = timestamp - self._samples[0].timestamp
+        acceleration_valid = (len(self._samples) >= self.min_acceleration_samples
+                              and span >= self.min_acceleration_span)
+        residual = 0.0
+        acceleration_std = None
+        reason = None
 
         if velocity_valid:
-            velocity = Vector2D(
-                self._estimate_axis("x")[0],
-                self._estimate_axis("y")[0],
-            )
-        if acceleration_valid:
-            acceleration = Vector2D(
-                self._estimate_axis("x")[1],
-                self._estimate_axis("y")[1],
-            )
+            x_fit, y_fit = self._estimate_axis("x"), self._estimate_axis("y")
+            velocity = Vector2D(x_fit[0], y_fit[0])
+            acceleration = Vector2D(x_fit[1], y_fit[1])
+            residual = hypot(x_fit[2], y_fit[2])
+            if len(self._samples) >= 3:
+                acceleration_std = hypot(x_fit[3], y_fit[3])
+        if not acceleration_valid:
+            reason = "insufficient_time_span" if span < self.min_acceleration_span else "insufficient_samples"
+        elif self.max_acceleration_std is not None and acceleration_std > self.max_acceleration_std:
+            acceleration_valid = False
+            reason = "acceleration_uncertain"
 
         return KinematicsResult(
             timestamp=timestamp,
@@ -227,6 +250,10 @@ class KinematicsEngine:
             acceleration_valid=acceleration_valid,
             tracking_valid=True,
             sample_count=len(self._samples),
+            reason=reason,
+            span_s=span,
+            position_residual_m=residual,
+            acceleration_std_mps2=acceleration_std,
         )
 
     def mark_tracking_lost(self, timestamp: float = 0.0) -> KinematicsResult:
@@ -239,8 +266,13 @@ class KinematicsEngine:
             timestamp, Vector2D(0.0, 0.0), "tracking_lost"
         )
 
-    def _estimate_axis(self, axis: str) -> tuple[float, float]:
-        """Return velocity and acceleration at the latest sample."""
+    def _estimate_axis(self, axis: str) -> tuple[float, float, float, float]:
+        """Latest derivatives, residual RMS and acceleration standard error.
+
+        Normalize time before fitting so clustered capture times do not make
+        the normal equations singular solely because their units are seconds.
+        The noise floor represents pixel localization error, not gravity.
+        """
 
         latest_time = self._samples[-1].timestamp
         times = [sample.timestamp - latest_time for sample in self._samples]
@@ -248,11 +280,23 @@ class KinematicsEngine:
 
         if len(self._samples) == 2:
             elapsed = times[1] - times[0]
-            return (values[1] - values[0]) / elapsed, 0.0
+            return (values[1] - values[0]) / elapsed, 0.0, 0.0, 0.0
 
-        constant, linear, quadratic = _quadratic_least_squares(times, values)
-        del constant
-        return linear, 2.0 * quadratic
+        span = -times[0]
+        normalized = [t / span for t in times]
+        constant, linear, quadratic = _quadratic_least_squares(normalized, values)
+        squared_error = sum((v - constant - linear * t - quadratic * t * t) ** 2
+                            for t, v in zip(normalized, values))
+        count = len(values)
+        variance = max(self.position_noise_m ** 2, squared_error / max(1, count - 3))
+        sums = [sum(t ** power for t in normalized) for power in range(5)]
+        covariance_column = _solve_3x3([
+            [sums[0], sums[1], sums[2], 0.0],
+            [sums[1], sums[2], sums[3], 0.0],
+            [sums[2], sums[3], sums[4], 1.0],
+        ])
+        std = 2 * sqrt(max(0.0, variance * covariance_column[2])) / span ** 2
+        return linear / span, 2 * quadratic / span ** 2, sqrt(squared_error / count), std
 
     def _invalid_result(
         self, timestamp: float, position: Vector2D, reason: str

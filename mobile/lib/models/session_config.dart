@@ -98,6 +98,7 @@ class EncodedFrame {
     required this.size,
     required this.captureTime,
     this.pose,
+    this.ageAtEncodingMs = 0,
   });
 
   final Uint8List jpeg;
@@ -105,6 +106,10 @@ class EncodedFrame {
 
   /// Seconds on the phone's monotonic clock.
   final double captureTime;
+
+  /// Time already spent waiting for capture/encoding on the client. When
+  /// exposure time is unavailable, this starts at frame availability.
+  final double ageAtEncodingMs;
 
   /// The camera that took this frame, when ARKit is running.
   final CameraPose? pose;

@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:math' as math;
 
 import 'package:web_socket_channel/web_socket_channel.dart';
 
@@ -23,7 +24,8 @@ enum ConnectionStatus {
 /// * Reconnects automatically and re-sends the last config.
 /// * Each frame goes out as two messages: a [FrameMetadata] text, then the
 ///   JPEG bytes.
-/// * Flow control: at most [AppConfig.maxFramesInFlight] frames awaiting a
+/// * Flow control: a bounded window covering one measured round trip, at
+///   most [AppConfig.maxFramesInFlight] frames awaiting a
 ///   reply. The backend only processes the newest frame it has, so a reply
 ///   to frame N also settles every older frame. A frame with no reply after
 ///   [AppConfig.frameTimeout] is forgotten, so the stream can never stall.
@@ -54,6 +56,11 @@ class PhysicsSocket {
 
   /// frame_id → time it was sent, for frames still awaiting a reply.
   final Map<int, Duration> _inFlight = {};
+  final Map<int, double> _captureAges = {};
+  double? _lastCaptureTime;
+  int _lastDeliveredId = -1;
+  int _lastStateId = -1;
+  double? _lastStateTime;
 
   ConnectionStatus _currentStatus = ConnectionStatus.idle;
   ConnectionStatus get status => _currentStatus;
@@ -70,6 +77,17 @@ class PhysicsSocket {
   /// for a frame already settled (the backend sends two messages a frame).
   double? get lastRttMs => _lastRttMs;
   double? _lastRttMs;
+  double? get lastObservationAgeMs => _lastObservationAgeMs;
+  double? _lastObservationAgeMs;
+
+  /// Enough credits for the capture cadence during one RTT. Two credits
+  /// alone cap a 600 ms connection at 3.3 FPS even when CV is fast.
+  int get frameWindow => _latencyMs == null
+      ? AppConfig.initialFramesInFlight
+      : (1 + (_latencyMs! * AppConfig.targetFps / 1000).ceil()).clamp(
+          AppConfig.initialFramesInFlight,
+          AppConfig.maxFramesInFlight,
+        );
 
   /// The id of the newest frame sent, or null before the first.
   int? get lastFrameId => _nextFrameId == 0 ? null : _nextFrameId - 1;
@@ -86,7 +104,7 @@ class PhysicsSocket {
   bool get canSendFrame =>
       _currentStatus == ConnectionStatus.live &&
       _initialization == null &&
-      framesInFlight < AppConfig.maxFramesInFlight;
+      framesInFlight < frameWindow;
 
   /// Opens the connection and keeps it open until [disconnect].
   void connect() {
@@ -114,8 +132,14 @@ class PhysicsSocket {
   /// says the backend is still busy.
   bool sendFrame(EncodedFrame frame) {
     if (!canSendFrame) return false;
+    if (!frame.captureTime.isFinite ||
+        (_lastCaptureTime != null && frame.captureTime <= _lastCaptureTime!)) {
+      return false;
+    }
+    _lastCaptureTime = frame.captureTime;
     final frameId = _nextFrameId++;
     _inFlight[frameId] = _clock();
+    _captureAges[frameId] = frame.ageAtEncodingMs;
     final sink = _channel!.sink;
     sink.add(
       FrameMetadata(
@@ -217,6 +241,10 @@ class PhysicsSocket {
       (_) {
         if (_channel != channel) return;
         _inFlight.clear();
+        _captureAges.clear();
+        _lastCaptureTime = null;
+        _lastDeliveredId = _lastStateId = -1;
+        _lastStateTime = null;
         log.i('Connected in ${_opening.elapsedMilliseconds} ms');
         _setStatus(ConnectionStatus.live);
         final config = _lastConfig;
@@ -253,31 +281,56 @@ class PhysicsSocket {
     }
     final frameId = message.frameId;
     if (frameId != null) _recordReply(frameId);
+    if (message is StateMessage || message is FrameAckMessage) {
+      if (frameId != null && frameId < _lastDeliveredId) return;
+      if (message is StateMessage) {
+        final s = message.state;
+        if (s.frameId <= _lastStateId ||
+            !s.t.isFinite ||
+            (_lastStateTime != null && s.t <= _lastStateTime!)) {
+          return;
+        }
+        _lastStateId = s.frameId;
+        _lastStateTime = s.t;
+      }
+      if (frameId != null) _lastDeliveredId = frameId;
+    }
     _messages.add(message);
   }
 
   void _recordReply(int frameId) {
     final sentAt = _inFlight[frameId];
+    final captureAge = _captureAges[frameId] ?? 0;
     // Older frames were dropped by the backend in favour of this one.
     _inFlight.removeWhere((id, _) => id <= frameId);
+    _captureAges.removeWhere((id, _) => id <= frameId);
     _lastRttMs = null;
+    _lastObservationAgeMs = null;
     if (sentAt == null) return;
     final rttMs = (_clock() - sentAt).inMicroseconds / 1000;
     _lastRttMs = rttMs;
+    _lastObservationAgeMs = rttMs + captureAge;
     // Exponential moving average so the latency chip doesn't flicker.
     _latencyMs = _latencyMs == null ? rttMs : _latencyMs! * 0.8 + rttMs * 0.2;
   }
 
   void _expireStaleFrames() {
     final now = _clock();
+    final timeout = Duration(
+      milliseconds: math.max(
+        AppConfig.frameTimeout.inMilliseconds,
+        ((_latencyMs ?? 0) * 3).ceil(),
+      ),
+    );
     final stale = [
       for (final MapEntry(key: id, value: sentAt) in _inFlight.entries)
-        if (now - sentAt > AppConfig.frameTimeout) id,
+        if (now - sentAt > timeout) id,
     ];
     if (stale.isEmpty) return;
     stale.forEach(_inFlight.remove);
+    stale.forEach(_captureAges.remove);
     log.w(
-      'No reply within ${AppConfig.frameTimeout.inMilliseconds} ms for '
+      'No reply within ${timeout.inMilliseconds} ms for '
       'frame${stale.length == 1 ? '' : 's'} ${stale.join(', ')}, '
       'forgotten so frames keep flowing',
     );
@@ -326,6 +379,7 @@ class PhysicsSocket {
     _channel?.sink.close();
     _channel = null;
     _inFlight.clear();
+    _captureAges.clear();
   }
 
   void _setStatus(ConnectionStatus next) {

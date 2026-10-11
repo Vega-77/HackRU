@@ -16,7 +16,8 @@ abstract final class AppConfig {
   static const int targetFps = 30;
   static const int frameWidth = 320;
   static const double jpegQuality = 0.7;
-  static const int maxFramesInFlight = 2;
+  static const int initialFramesInFlight = 2;
+  static const int maxFramesInFlight = 32;
   static const Duration frameTimeout = Duration(seconds: 1);
   static const Duration reconnectDelay = Duration(seconds: 2);
 

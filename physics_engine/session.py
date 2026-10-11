@@ -89,6 +89,10 @@ class PhysicsSession:
         state["position"] = target.get("position")
         state["position_3d"] = target.get("position_3d")
         state["screen_axes"] = target.get("screen_axes")
+        if frame.get("timestamp_source") == "server_receive":
+            self.reset()
+            state["physics_quality"] = {"reason": "capture_timestamp_missing"}
+            return state
 
         results: dict[int, KinematicsResult] = {}
         for obj in frame.get("objects", []):
@@ -100,9 +104,21 @@ class PhysicsSession:
                     self.initial_energy.pop(object_id, None)
                 continue
             object_id = int(obj["id"])
-            engine = self.engines.setdefault(
-                object_id, KinematicsEngine(window_size=self.window_size, confidence_threshold=0.6)
-            )
+            if object_id not in self.engines:
+                # A seven-frame history can cover seconds on a slow connection,
+                # blending a held ball with its entire fall. Bound physical time.
+                axes = obj.get("screen_axes") or {}
+                scales = [hypot(v["x"], v["y"]) for v in axes.values() if isinstance(v, dict)]
+                scale = min(scales) if scales else calibration.get("settings", {}).get("px_per_m")
+                self.engines[object_id] = KinematicsEngine(
+                    window_size=self.window_size, confidence_threshold=0.6,
+                    max_window_seconds=0.35 if mode == "free_fall" else None,
+                    min_acceleration_samples=4 if mode == "free_fall" else 3,
+                    min_acceleration_span=0.12 if mode == "free_fall" else 0.0,
+                    position_noise_m=1.0 / scale if scale and scale > 0 else 0.0,
+                    max_acceleration_std=2.0 if mode == "free_fall" else None,
+                )
+            engine = self.engines[object_id]
             result = engine.add_world_sample(
                 timestamp, float(position["x"]), float(position["y"]),
                 confidence=float(obj.get("score", 1.0)),
@@ -112,7 +128,18 @@ class PhysicsSession:
 
         target_result = results.get(int(target["id"]))
         if target_result is None:
+            state["physics_quality"] = {"reason": "tracking_unreliable"}
             return state
+
+        state["physics_quality"] = {
+            "reason": target_result.reason,
+            "samples": target_result.sample_count,
+            "span_s": target_result.span_s,
+            "position_residual_m": target_result.position_residual_m,
+            "acceleration_std_mps2": target_result.acceleration_std_mps2,
+            "velocity_valid": target_result.velocity_valid,
+            "acceleration_valid": target_result.acceleration_valid,
+        }
 
         if target_result.velocity_valid:
             state["velocity"] = _vec(target_result.velocity_mps)
