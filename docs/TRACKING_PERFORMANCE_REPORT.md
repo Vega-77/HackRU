@@ -147,10 +147,57 @@ A phone browser needs a trusted HTTPS frontend; ordinary LAN HTTP does not grant
 
 ## Remaining limitations and recommendations
 
-- No physical gray-ball, low-end phone, Safari, real network, or Render CPU profile is verified. Main-thread matching competes with CanvasKit/encoding. Use the new diagnostics before adding a Worker/WASM dependency.
+- The physical gray-ball test reviewed below shows unresolved live tracking failures. Physical success of saved-frame analysis, low-end phone performance, Safari, real network, and Render CPU performance remain unverified. Main-thread matching competes with CanvasKit/encoding. Use the new diagnostics before adding a Worker/WASM dependency.
 - Camera hints do not guarantee 60 FPS or short exposure. Availability timestamps substitute when capture metadata is absent. Sensor delay/jitter, rolling shutter, perspective, blur bias, calibration error, and systematic localization error remain outside current fit uncertainty.
 - Missing acceleration is correct when sampling/precision is insufficient. More images do not make an incorrect identity valid. Preserve rejection/uncertainty gates during further work.
 - Serial recorded analysis can be slow. A bounded batch upload/analysis endpoint could remove per-frame RTT later using identical timestamps/tracker/physics; it is proposed, not implemented.
 - Profile Render with actual camera logs before changing hosting. Consider a closer region if transport residual dominates, reserved CPU/always-on if processing/wake-up dominates. No plan/region recommendation is justified from these laptop measurements alone. Existing main's LAN backend tooling provides a useful nearby comparison.
 
 Anti-Slop scope: existing Kinetic Laboratory tokens/layout retained. R-17/R-36 PASS: metrics identify their harnesses and limits. R-26/R-27 PASS: start/cancel/retry and recording states exercised. R-03 PASS for changed controls: phone/desktop tests caught and fixed overflow. R-35 PASS for executable checks: build, full Flutter, browser camera/matching, and backend integration ran. Browser click-through limitations are explicit; no comprehensive visual audit or physical success claimed.
+
+## Physical-camera follow-up: ball_freefall4
+
+Reviewed October 11 after local commit `ebe7b4f`. Evidence:
+
+- `diagnostics/logs/ball_freefall4.txt`: 2,224 lines; release web build, Free Fall, backend `ws://127.0.0.1:8002/ws/frames`, 320×180 analysis frames.
+- `diagnostics/logs/Screen Recording 2026-10-11 at 3.43.34 PM.mov`: directly decoded with OpenCV. 1,553 screen-recording frames; last decoded presentation timestamp 30.600 s. Inspected full-screen samples and a closer sequence around both drops. Temporary review images are in `/tmp/hop-freefall4/`; they are not committed fixtures or raw camera images.
+
+The external screen recording is correctly longer than three seconds. It shows calibration, live tracking, two drops, and tracking-unavailable states. **Record 3 s was not activated**: the button stays available and the log contains no saved capture/analysis session. This verifies a physical failure of the live path, not success or failure of the separate recorded-analysis path. No source-code correction, test rerun, or build was performed during this evidence review.
+
+### Measured live pipeline
+
+Values below come from this physical-camera log, not a synthetic benchmark. There are 383 returned state/timing records over a 35.371 s capture-timestamp span, approximately 10.80 returned states/s. Of these, 210 report tracking and 173 report `appearance_rejected`. The 210/383 fraction is **not tracking accuracy**: absent-ball frames are included and rejecting those can be correct. No identity-switch rate can be established from these counts alone.
+
+| Quantity | Median ms | p95 ms |
+| --- | ---: | ---: |
+| Capture-to-observation age | 122.80 | 284.39 |
+| Backend CV/physics processing | 65.40 | 200.17 |
+| Backend queue wait | 13.70 | 86.66 |
+| Transport/response residual | 3.30 | 16.39 |
+| Tracking stage | 63.48 | 198.43 |
+| Physics stage | 0.27 | 0.63 |
+| JPEG encoding, 758 sends | 3.10 | 8.91 |
+| Capture age at send, 758 sends | 25.70 | 44.17 |
+
+Medians of components do not sum to the median total. The residual includes frontend handling and scheduling; it is not pure network ping. This localhost evidence identifies **tracking computation, particularly failed full-frame recovery, as the dominant backend cost**. It does not measure Render or establish the deployed connection's transport delay. Successful detections have median processing 34.9 ms and observation age 82.0 ms; rejected detections have median processing 126.6 ms and age 190.0 ms. Queueing further delays recovery. Example: frame 83 spends 163.856 ms in tracking; frame 85 adds 98.7 ms queue wait. At the second drop, frame 381 spends 224.537 ms in tracking (`ball_freefall4.txt` lines 402–410 and 1402–1405).
+
+### Confirmed failures and limits
+
+1. **Acquisition succeeds; fast-motion tracking remains inadequate.** Initialization is acknowledged at log line 50, and a subsequent frame confirms the selected ball. The two visible releases then produce only a short series of falling observations before loss. Frame 318 is lost after frame 317; frame 381 is lost after frame 380. Neither a null selection box nor an initialization overwrite explains this test.
+2. **The browser-local estimate stops recovering.** The cumulative `local_matches` counter reaches 65 by session second 7 and stays there through second 35 despite subsequent server detections. The recording also shows the dashed local outline disappear. `LocalVisualTracker.anchor` (`mobile/lib/services/camera/local_visual_tracker.dart:40`) rejects a new reference patch below 0.90 correlation to its immutable initial patch; `lose()` preserves that reference. `WebFrameSource.validateLocalEstimate` (`mobile/lib/services/camera/web_frame_source.dart:371`) withholds the estimate on a failed anchor. The visible rotation, changed background and changing object size are consistent with this limitation. The exact rejection cause is **not logged**, so permanent reference rejection is a supported hypothesis, not a proven per-frame diagnosis. Do not lower identity thresholds or replace the reference blindly.
+3. **The live derivative window includes held motion before release.** Before the first drop, frames 310–314 show nearly stationary observations. Frames 315–317 then have capture timestamps 69.773, 69.807, and 69.877 s, and vertical pixel positions 60.5, 75.5, and 123.5. Those three clearly falling observations span only 0.104 s. Frame 317 nevertheless reports seven fit samples spanning 0.3307 s and acceleration −6.276 m/s²: its fit includes pre-release positions. `PhysicsSession` configures a 0.35 s window and a four-sample/0.12 s minimum (`physics_engine/session.py:126`). A numerically accepted mixed held/falling fit is not a measurement of ideal free flight. The second drop similarly ends at frame 380 with −3.281 m/s². Do not force either estimate toward gravity; isolated flight samples and adequate sampling are required.
+4. **Absolute scale was not established.** Ruler endpoints remain the exact defaults (96,63) to (224,63), with 0.3 m entered and 426.6667 px/m. The visible calibration screen has no physical ruler corresponding to these endpoints. This is adequate for testing pixel tracking but cannot verify SI velocity or acceleration. Camera angle, perspective and the ball's depth changes add further uncertainty.
+5. **The theory summary does not identify free flight.** The recording shows a historical theory comparison while current speed/acceleration are unavailable. `fallingAcceleration` (`mobile/lib/state/theory_check.dart:125`) averages samples with downward velocity below −0.1 m/s and a reported acceleration. It does not distinguish release from downward hand motion and does not require current tracking. Therefore the displayed run comparison, including the visible 3.84 m/s², is not independent evidence of gravity accuracy. This interpretation needs to be made explicit before treating it as an experiment result.
+
+The moving marker can lag the ball because observations correspond to earlier camera frames. A marker visibly displaced from the current ball is not by itself proof of a wrong-object identity switch. Raw images bound to the reported timestamps are still needed to evaluate such candidates confidently.
+
+### Next physical test and focused engineering steps
+
+1. Keep using `http://127.0.0.1:8086/` and confirm backend port 8002. Fix the camera and use bright diffuse light and a contrasting plain background.
+2. Put a measured ruler in the same plane as the drop. Align both calibration endpoints with an actual measured segment and enter its length; do not leave the default line as a physical calibration. Keep the full drop inside the camera view with margin.
+3. Select/confirm the whole gray ball and wait for a newer-frame detection. Perform horizontal movement and removal/return first to document the local outline's recovery separately from the drop.
+4. Activate **Record 3 s inside the app**, hold briefly, then release without pushing. Wait for the saved-frame analysis to finish. Repeat three times. The external screen recording should cover the whole session, including calibration, the recording/analysis states and final results; it need not be three seconds long.
+5. Save the debug log after analysis. It must contain the recorded frame count, actual capture FPS and maximum gap. Inspect position and velocity curves during actual flight only, excluding held, release, contact and recovery portions. Missing acceleration is a valid outcome if the isolated flight is too short or noisy.
+6. Obtain/export the actual saved JPEGs and original capture timestamps before further identity/blur tuning; the current UI still does not export them. Screen-recording pixels include overlays, cropping and their own presentation timestamps and cannot substitute for exact sensor frames in a physics replay.
+
+Priorities for the next implementation: reproduce local recovery rejection with logged anchor reasons and this scene; profile failed full-frame search without weakening identity checks; add saved-JPEG diagnostic export; then evaluate recorded physical flight and mixed pre-release fitting. The latest evidence does **not** justify replacing the tracker wholesale or claiming either the local estimate or recorded Free Fall is physically verified.
