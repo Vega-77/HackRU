@@ -50,6 +50,7 @@ REFERENCE_FPS = 15.0  # the search margin is sized for frames this far apart
 UNKNOWN_SPEED = 400.0  # px/s at 320 px wide: how fast an object of unknown speed may go
 MAX_GAP_S = 0.34  # about 3 fps: the slowest stream the search margin still widens for
 RECENT_FIX_S = 0.5  # a recovery this soon after the last fix still tells the speed
+WEAK_DROP = 0.15  # a match this far below the recent ones is checked against the whole frame
 
 
 def weighted_scores(search, references, weights):
@@ -122,6 +123,7 @@ class ManualTracker:
         self._image: np.ndarray | None = None  # this frame in the matched channel
         self._scene_lightness = 0.0
         self._lightness_shift = 0.0
+        self._recent_score: float | None = None  # typical confidence of recent matches
 
     # Selection
 
@@ -251,6 +253,28 @@ class ManualTracker:
         if self.missed == 0 and bounds[2] - bounds[0] >= 8 and bounds[3] - bounds[1] >= 8:
             best = self._search(frame, bounds, (px, py), reach, global_search=False)
         recovered = best is None
+        has_color = self.color_model is not None
+        if best is not None and self._recent_score is not None:
+            score = best.confidence(has_color)
+            if score < self._recent_score - WEAK_DROP:
+                # Much weaker than the recent matches. After a sudden turn the object can be
+                # outside the search, and the background it just left can still match a
+                # little; tracking would stay there. With no reach, every match across the
+                # frame must pass the strict checks on its own, and only a clearly better
+                # one close enough to have been reached replaces it.
+                debug = self.debug
+                other = self._search(frame, (0, 0, fw, fh), (px, py), 0.0, global_search=True)
+                if (other is not None and other.confidence(has_color) >= score + 0.1
+                        and math.hypot(other.cx - self._center[0], other.cy - self._center[1])
+                        <= 2 * reach + max(w, h)):
+                    best, recovered = other, True
+                    self.debug["weak_local"] = round(score, 3)
+                else:
+                    self.debug = debug
+            else:
+                self._recent_score = 0.8 * self._recent_score + 0.2 * score
+        elif best is not None:
+            self._recent_score = best.confidence(has_color)
         if best is None:
             best = self._search(frame, (0, 0, fw, fh), (px, py), reach, global_search=True)
         if best is None:
@@ -258,7 +282,7 @@ class ManualTracker:
             self.debug["missed"] = self.missed
             return None
 
-        confidence = best.confidence(self.color_model is not None)
+        confidence = best.confidence(has_color)
         self._update(frame, best, dt, recovered)
         self.missed = 0
         self.debug.update(reason="detected", bbox=list(self.bbox), score=round(confidence, 3))
@@ -436,8 +460,13 @@ class ManualTracker:
         cx, cy = best.cx, best.cy
         if dt > 0 and not recovered:
             vx, vy = (cx - self._center[0]) / dt, (cy - self._center[1]) / dt
-            # Follow changes in speed quickly (a falling ball), but not frame-to-frame jitter.
-            self._velocity = (0.4 * self._velocity[0] + 0.6 * vx, 0.4 * self._velocity[1] + 0.6 * vy)
+            if vx * self._velocity[0] + vy * self._velocity[1] < 0:
+                # It turned back (a bounce). A blend with the old direction would aim the
+                # next search behind it, where the background it just left can match.
+                self._velocity = (vx, vy)
+            else:
+                # Follow changes in speed quickly (a falling ball), but not frame-to-frame jitter.
+                self._velocity = (0.4 * self._velocity[0] + 0.6 * vx, 0.4 * self._velocity[1] + 0.6 * vy)
             self._velocity_known = True
         elif 0 < dt <= RECENT_FIX_S:
             # Found again by the whole-frame search soon after the last fix: usually it simply
