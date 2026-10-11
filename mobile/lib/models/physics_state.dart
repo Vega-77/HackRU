@@ -194,24 +194,42 @@ class ScreenAxes {
 enum ForceKind { net, component }
 
 class ForceVector {
-  const ForceVector(this.name, this.vector);
+  const ForceVector(this.name, this.vector, {this.z = 0});
 
   /// One of `gravity`, `normal`, `friction`, `tension`, `gravity_parallel`,
-  /// `gravity_perpendicular`, `net`, or a name we don't know yet.
+  /// `gravity_perpendicular`, `net`, a contact force (`normal_2`,
+  /// `normal_contact`), or a name we don't know yet.
   final String name;
 
   /// Newtons, world space.
   final Vec2 vector;
 
+  /// Newtons out of the plane, towards the camera. Only a surface the object
+  /// sits on (a table seen from above) pushes this way.
+  final double z;
+
   ForceKind get kind => name == 'net' ? ForceKind.net : ForceKind.component;
+
+  /// A push from something the object rests against.
+  bool get isNormal => name.startsWith('normal');
 
   static ForceVector? tryParse(Object? json) {
     if (json is! Map || json['name'] is! String) return null;
     final vector = Vec2.tryParse(json);
-    return vector == null ? null : ForceVector(json['name'] as String, vector);
+    if (vector == null) return null;
+    final z = json['z'];
+    return ForceVector(
+      json['name'] as String,
+      vector,
+      z: z is num && z.isFinite ? z.toDouble() : 0,
+    );
   }
 
-  Map<String, dynamic> toJson() => {'name': name, ...vector.toJson()};
+  Map<String, dynamic> toJson() => {
+    'name': name,
+    ...vector.toJson(),
+    if (z != 0) 'z': z,
+  };
 }
 
 /// A [ForceVector] in ARKit world space, from `forces_3d`.

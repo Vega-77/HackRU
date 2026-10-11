@@ -75,6 +75,12 @@ class CameraOrTestVideo implements FrameSource, SurfaceFinder, ArVectorDisplay {
   };
 
   @override
+  Future<List<ArSurface>> allSurfaces() async => switch (_active) {
+    final SurfaceFinder f => f.allSurfaces(),
+    _ => const [],
+  };
+
+  @override
   bool get canShowArVectors => switch (_active) {
     final ArVectorDisplay d => d.canShowArVectors,
     _ => false,

@@ -91,6 +91,9 @@ class _FakeArCamera extends _FakeCamera implements SurfaceFinder {
   bool get canFindSurfaces => running;
 
   @override
+  Future<List<ArSurface>> allSurfaces() async => const [];
+
+  @override
   Future<ArSurface?> findSurface(Vec2 framePixel) async {
     searches.add(framePixel);
     return const ArSurface(

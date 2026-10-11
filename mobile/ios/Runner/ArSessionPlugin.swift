@@ -13,6 +13,8 @@ import UIKit
 /// * `capture {width, quality}` -> {jpeg, width, height, timestamp,
 ///   intrinsics: [fx, fy, cx, cy], camera_to_world: [16, row-major]} or nil
 /// * `raycast {x, y, width}` -> {point: [3], normal: [3], vertical} or nil
+/// * `surfaces` -> [{id, point: [3], normal: [3], vertical}]: every plane
+///   ARKit has mapped so far, for the backend's normal forces
 /// * `setVectors {...}` and `hideVectors`: 3D arrows, see `ArVectorLayer`
 ///
 /// And calls back:
@@ -82,6 +84,8 @@ final class ArSessionPlugin: NSObject, FlutterPlugin, ARSessionDelegate {
         return
       }
       result(raycast(x: x, y: y, width: width))
+    case "surfaces":
+      result(surfaces())
     case "setVectors":
       vectors.update(args)
       follow(args)
@@ -280,6 +284,24 @@ final class ArSessionPlugin: NSObject, FlutterPlugin, ARSessionDelegate {
   }
 
   // MARK: - Surfaces
+
+  /// The planes ARKit has found (tables, floors, walls), each as its centre
+  /// and normal in world space. A plane anchor's y axis is its normal.
+  private func surfaces() -> [[String: Any]] {
+    guard running, let frame = session.currentFrame else { return [] }
+    return frame.anchors.compactMap { anchor -> [String: Any]? in
+      guard let plane = anchor as? ARPlaneAnchor else { return nil }
+      let t = plane.transform
+      let normal = simd_normalize(simd_make_float3(t.columns.1))
+      let point = simd_make_float3(t * simd_float4(plane.center, 1))
+      return [
+        "id": plane.identifier.uuidString,
+        "point": [Double(point.x), Double(point.y), Double(point.z)],
+        "normal": [Double(normal.x), Double(normal.y), Double(normal.z)],
+        "vertical": plane.alignment == .vertical,
+      ]
+    }
+  }
 
   /// The surface under frame pixel (x, y), from the camera's current pose.
   private func raycast(x: Double, y: Double, width: Int) -> [String: Any]? {
