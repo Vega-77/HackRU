@@ -13,7 +13,7 @@ abstract final class AppConfig {
   );
 
   // Frame streaming, see docs/protocol.md.
-  static const int targetFps = 15;
+  static const int targetFps = 30;
   static const int frameWidth = 320;
   static const double jpegQuality = 0.7;
   static const int maxFramesInFlight = 2;

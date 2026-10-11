@@ -73,8 +73,10 @@ experiment, settings, error handling, log copying and landscape layout.
 
 ## Limits
 
-There are no real bottle/ball recordings in the supplied diagnostic package.
-Method comparison and the real gray-ball test steps are in `tap-acquisition-verification.md`.
+The acquisition report predates the subsequently supplied gray-ball screen recording.
+The follow-up evidence, tracking correction and physical-camera test steps are in
+[`foreground-tracking-verification.md`](foreground-tracking-verification.md).
+The earlier acquisition method comparison is in `tap-acquisition-verification.md`.
 Replay and synthetic regressions verify the reproduced mechanisms, not tracking
 recall under arbitrary clutter, lighting, rotation or indistinguishable objects.
 The replay tool reports processing throughput; it cannot measure live network
