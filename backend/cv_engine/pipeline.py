@@ -156,6 +156,8 @@ class TrackingPipeline:
             self._manual.reset()
             self.tracker.forget_manual()
             self._pending_selection = t is not None
+            if t is None and self.motion:
+                self.motion.reset()  # its background stopped learning while a tap was followed
         self.session = session
         plane_before = self.spatial.ar_plane
         self.spatial.set_ar_plane(session.get("ar_plane"))
@@ -187,8 +189,13 @@ class TrackingPipeline:
     def __call__(self, frame: PreprocessedFrame) -> dict:
         """Process one frame; returns the "objects" and "calibration" parts of the result."""
         self.spatial.update(frame)
-        detections = self.detect(frame)
         tap = self.session["target_px"]
+        # Once the user's object is selected, only it is followed (see _pick_target), so the
+        # other detectors' work would be thrown away: skipping them roughly halves the time
+        # per frame, and a faster stream means smaller jumps between frames. Collisions are
+        # the exception, since the physics stage needs the second object too.
+        following = tap is not None and not self._pending_selection and self._manual.original is not None
+        detections = [] if following and self.session["mode"] != "collision" else self.detect(frame)
         manual = None
         if tap is not None:
             if self._pending_selection:
