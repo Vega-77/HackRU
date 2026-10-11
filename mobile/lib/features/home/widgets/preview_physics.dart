@@ -239,7 +239,7 @@ abstract final class PreviewPhysics {
         potential: weight * length * (1 - math.cos(theta)),
         thermal: 0,
       ),
-      extras: {'angle_deg': theta * 180 / math.pi},
+      extras: {'theta_deg': theta * 180 / math.pi, 'length_m': length},
     );
   }
 
@@ -332,7 +332,7 @@ abstract final class PreviewPhysics {
         potential: 0,
         thermal: m * decel * travelled,
       ),
-      extras: {'momentum': m * v},
+      extras: {'momentum_x': m * v, 'momentum_y': 0},
     );
   }
 

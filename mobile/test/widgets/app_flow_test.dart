@@ -447,6 +447,25 @@ void main() {
     await unmount(tester);
   });
 
+  testWidgets('ramp switches between a rolling ball and a sliding block', (
+    tester,
+  ) async {
+    await pumpApp(tester, at: Routes.experiment);
+
+    expect(find.text('Rolling ball'), findsOneWidget);
+    expect(find.text('Theory check'), findsOneWidget);
+    expect(find.text('a = 5/7 g sin θ'), findsOneWidget);
+    expect(find.text('Friction coefficient'), findsNothing);
+
+    await tester.tap(find.text('Sliding block'));
+    await tester.pump();
+
+    expect(find.text('a = g sin θ'), findsOneWidget);
+    expect(find.text('Friction coefficient'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+    await unmount(tester);
+  });
+
   testWidgets('experiment screen copies the debug log', (tester) async {
     final copied = mockClipboard(tester);
     await pumpApp(tester, at: Routes.experiment);
@@ -463,6 +482,8 @@ void main() {
           )
           .first,
     );
+    await tester.ensureVisible(copy);
+    await tester.pump();
     await tester.tap(copy);
     await tester.pump();
 

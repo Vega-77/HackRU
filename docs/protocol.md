@@ -61,6 +61,7 @@ changes a setting.
 | `target_px` | `{x,y}` or null | where the user tapped the object, frame pixels; null means "auto-detect" |
 | `target_bbox` | `{x,y,w,h}` or null | optional box around the tapped object in frame pixels; helps track objects outside detector categories |
 | `second_target_px`, `second_target_bbox` | as above, optional | collision mode only: the other object, selected the same way. It is followed the same way as the first and reported in `objects` with `label: "selected_2"`; the first is `label: "selected"` and stays the `target` |
+| `sliding_body` | boolean, optional | ramp only: `true` for a block that slides, `false` (default) for a ball that rolls. Only a sliding body gets `mu` and thermal energy |
 | `debug_tracking` | boolean, optional | return numeric search bounds, candidate count, score and rejection reason; no images are stored |
 | `frame_size` | `{w,h}` | size of the JPEGs that follow |
 | `ar_plane` | object or null | iOS only: the surface the object moves on, from an ARKit raycast. `{"point": [x,y,z], "normal": [x,y,z], "offset_m": 0.0}` in ARKit world metres. `offset_m` moves it towards the camera, such as by a ball's radius. Takes priority over `px_per_m`; null removes it |
@@ -233,7 +234,7 @@ Replaces `frame` once the kinematics stage is in. This is what the app draws.
 | `position_3d`, `velocity_3d`, `acceleration_3d`, `forces_3d` | with an `ar_plane` only: the same vectors in ARKit world space, for a renderer that anchors arrows in 3D |
 | `collision_objects[].forces` | collision mode: the normal forces on each object, as in `forces` |
 | `energy` | joules; any key may be omitted |
-| `extras` | mode-specific values the app shows as readouts (`angle_deg`, `mu`, `theta_deg`, `momentum`, `restitution`, ...) |
+| `extras` | mode-specific values the app shows as readouts by mode. Ramp: `angle_deg`, and `mu` with `sliding_body`. Pendulum: `theta_deg`, `length_m`. Collision: `momentum_x`, `momentum_y` of the target, and after an impact `restitution`, `momentum_before`, `momentum_after`, `momentum_delta`, `kinetic_before`, `kinetic_after` |
 
 Extra fields (`process_ms`, `stats`, ...) are allowed and ignored.
 

@@ -42,6 +42,7 @@ class SessionConfig {
     this.debugTracking = false,
     this.initializationRequired = false,
     this.surface,
+    this.slidingBody = false,
     this.arSurfaces = const [],
   });
 
@@ -67,6 +68,10 @@ class SessionConfig {
   /// maps positions with the camera pose instead of [pxPerM].
   final ArSurface? surface;
 
+  /// Ramp only: the object slides rather than rolls, so the backend reports
+  /// friction and thermal energy.
+  final bool slidingBody;
+
   /// Every plane ARKit has found, iOS only: what the object can rest
   /// against, for normal forces.
   final List<ArSurface> arSurfaces;
@@ -89,6 +94,7 @@ class SessionConfig {
     'second_target_bbox': secondTargetBbox?.toJson(),
     'frame_size': frameSize.toJson(),
     'ar_plane': surface?.toJson(),
+    if (mode == ExperimentMode.ramp) 'sliding_body': slidingBody,
     if (arSurfaces.isNotEmpty)
       'ar_surfaces': [for (final s in arSurfaces) s.toSurfaceJson()],
     if (debugTracking) 'debug_tracking': true,

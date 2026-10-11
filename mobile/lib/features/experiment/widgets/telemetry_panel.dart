@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -10,6 +11,7 @@ import '../../../models/experiment_mode.dart';
 import '../../../models/physics_state.dart';
 import '../../../state/experiment_settings.dart';
 import '../../../state/session_controller.dart';
+import '../../../state/theory_check.dart';
 import '../../debug/copy_debug_log.dart';
 import 'energy_bars.dart';
 import 'physics_symbol.dart';
@@ -99,8 +101,25 @@ class _TelemetryPanelState extends ConsumerState<TelemetryPanel> {
           ],
         ),
         const SizedBox(height: AppSpace.md),
+        if (settings.mode == ExperimentMode.ramp) ...[
+          _BodyPicker(sliding: settings.slidingBody),
+          const SizedBox(height: AppSpace.md),
+        ],
         // Current measurements lead the panel; visibility controls follow.
-        _Readouts(mode: settings.mode, state: latest),
+        _Readouts(
+          mode: settings.mode,
+          slidingBody: settings.slidingBody,
+          state: latest,
+        ),
+        const SizedBox(height: AppSpace.md),
+        _TheoryCard(
+          check: theoryCheck(
+            mode: settings.mode,
+            slidingBody: settings.slidingBody,
+            latest: latest?.tracked == true ? latest : null,
+            samples: samples,
+          ),
+        ),
         const SizedBox(height: AppSpace.xl),
         const Divider(),
         const SizedBox(height: AppSpace.lg),
@@ -328,12 +347,17 @@ class _LayerToggle extends StatelessWidget {
 }
 
 /// Big live numbers: speed and acceleration magnitude, plus whatever the
-/// current experiment adds (ramp angle and friction, swing angle,
-/// momentum).
+/// current experiment adds (ramp angle and friction, swing angle and
+/// length, momentum and bounciness).
 class _Readouts extends StatelessWidget {
-  const _Readouts({required this.mode, required this.state});
+  const _Readouts({
+    required this.mode,
+    required this.slidingBody,
+    required this.state,
+  });
 
   final ExperimentMode mode;
+  final bool slidingBody;
   final PhysicsState? state;
 
   @override
@@ -359,16 +383,17 @@ class _Readouts extends StatelessWidget {
         unit: 'm/s²',
         spokenUnit: 'metres per second squared',
       ),
-      if (mode == ExperimentMode.ramp || mode == ExperimentMode.pendulum)
+      if (mode == ExperimentMode.ramp)
         _Readout(
           symbol: 'θ',
-          spoken: 'Angle',
+          spoken: 'Ramp angle',
           value: extra('angle_deg'),
           unit: '°',
           spokenUnit: 'degrees',
           decimals: 1,
         ),
-      if (mode == ExperimentMode.ramp)
+      // Only a sliding block has a friction coefficient to measure.
+      if (mode == ExperimentMode.ramp && slidingBody)
         _Readout(
           symbol: 'μ',
           spoken: 'Friction coefficient',
@@ -376,15 +401,41 @@ class _Readouts extends StatelessWidget {
           unit: '',
           spokenUnit: '',
         ),
-      if (mode == ExperimentMode.collision)
+      if (mode == ExperimentMode.pendulum) ...[
+        _Readout(
+          symbol: 'θ',
+          spoken: 'Swing angle',
+          value: extra('theta_deg'),
+          unit: '°',
+          spokenUnit: 'degrees',
+          decimals: 1,
+          signed: true,
+        ),
+        _Readout(
+          symbol: 'L',
+          spoken: 'String length',
+          value: extra('length_m'),
+          unit: 'm',
+          spokenUnit: 'metres',
+        ),
+      ],
+      if (mode == ExperimentMode.collision) ...[
         _Readout(
           symbol: 'p',
           spoken: 'Momentum',
-          value: extra('momentum'),
+          value: _magnitude(extra('momentum_x'), extra('momentum_y')),
           unit: 'kg m/s',
           spokenUnit: 'kilogram metres per second',
-          signed: true,
+          decimals: 3,
         ),
+        _Readout(
+          symbol: 'e',
+          spoken: 'Restitution',
+          value: extra('restitution'),
+          unit: '',
+          spokenUnit: '',
+        ),
+      ],
     ];
 
     return LayoutBuilder(
@@ -404,6 +455,9 @@ class _Readouts extends StatelessWidget {
     );
   }
 }
+
+double? _magnitude(double? x, double? y) =>
+    x == null || y == null ? null : math.sqrt(x * x + y * y);
 
 class _Readout extends StatelessWidget {
   const _Readout({
@@ -425,7 +479,7 @@ class _Readout extends StatelessWidget {
   final String spokenUnit;
   final int decimals;
 
-  /// Show a sign (momentum has a direction along the track).
+  /// Show a sign (a swing angle is left or right of straight down).
   final bool signed;
 
   @override
@@ -501,6 +555,180 @@ class _Readout extends StatelessWidget {
                     ),
                   ),
               ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Rolling ball or sliding block: they need different models on the ramp.
+class _BodyPicker extends ConsumerWidget {
+  const _BodyPicker({required this.sliding});
+
+  final bool sliding;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final c = ref.read(experimentSettingsProvider.notifier);
+    return Row(
+      children: [
+        Expanded(
+          child: _Choice(
+            label: 'Rolling ball',
+            selected: !sliding,
+            onTap: () => c.setSlidingBody(false),
+          ),
+        ),
+        const SizedBox(width: AppSpace.sm),
+        Expanded(
+          child: _Choice(
+            label: 'Sliding block',
+            selected: sliding,
+            onTap: () => c.setSlidingBody(true),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _Choice extends StatelessWidget {
+  const _Choice({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Semantics(
+      button: true,
+      selected: selected,
+      label: label,
+      excludeSemantics: true,
+      child: Material(
+        color: selected
+            ? scheme.onSurface.withValues(alpha: 0.1)
+            : Colors.transparent,
+        shape: RoundedRectangleBorder(
+          borderRadius: const BorderRadius.all(Radius.circular(6)),
+          side: BorderSide(
+            color: selected ? scheme.onSurface : scheme.outline,
+            width: 1.5,
+          ),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: onTap,
+          child: SizedBox(
+            height: 44,
+            child: Center(
+              child: Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.fade,
+                softWrap: false,
+                style: AppType.label.copyWith(
+                  color: selected ? scheme.onSurface : scheme.onSurfaceVariant,
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Measured against predicted, so a run can confirm or bust the textbook.
+class _TheoryCard extends StatelessWidget {
+  const _TheoryCard({required this.check});
+
+  final TheoryCheck check;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final caption = AppType.caption.copyWith(color: scheme.onSurfaceVariant);
+    final decimals = check.symbol == 'p' ? 3 : 2;
+    String number(double? v) =>
+        v == null ? 'n/a' : v.toStringAsFixed(decimals).replaceFirst('-', '−');
+    final measured = number(check.measured);
+    final predicted = number(check.predicted);
+    final off = check.percentOff;
+    final verdict = off == null
+        ? check.waitingFor
+        : off <= 10
+        ? 'Within ${off.toStringAsFixed(0)}% of the prediction.'
+        : '${off.toStringAsFixed(0)}% away from the prediction.';
+
+    Widget row(String label, String value) => Padding(
+      padding: const EdgeInsets.only(top: AppSpace.xs),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.baseline,
+        textBaseline: TextBaseline.alphabetic,
+        children: [
+          Expanded(child: Text(label, style: caption)),
+          Text(
+            value,
+            style: AppType.readoutSmall.copyWith(color: scheme.onSurface),
+          ),
+          const SizedBox(width: AppSpace.xs),
+          Text(check.unit, style: caption),
+        ],
+      ),
+    );
+
+    return Semantics(
+      label:
+          'Theory check, ${check.quantity}. Measured $measured, '
+          'predicted $predicted ${check.spokenUnit}. $verdict',
+      excludeSemantics: true,
+      child: Container(
+        padding: const EdgeInsets.all(AppSpace.md),
+        decoration: BoxDecoration(
+          color: AppColors.graphiteDeep,
+          border: Border.all(color: scheme.outline.withValues(alpha: 0.65)),
+          borderRadius: const BorderRadius.all(Radius.circular(8)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    'Theory check',
+                    style: AppType.label.copyWith(color: scheme.onSurface),
+                  ),
+                ),
+                Flexible(
+                  child: Text(
+                    check.model,
+                    textAlign: TextAlign.end,
+                    style: AppType.variable.copyWith(
+                      fontSize: 15,
+                      color: scheme.onSurface,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: AppSpace.xs),
+            Text(check.quantity, style: caption),
+            row('Measured', measured),
+            row('Predicted', predicted),
+            const SizedBox(height: AppSpace.sm),
+            Text(
+              verdict,
+              style: AppType.caption.copyWith(color: scheme.onSurface),
             ),
           ],
         ),

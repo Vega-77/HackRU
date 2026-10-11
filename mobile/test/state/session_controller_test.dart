@@ -274,6 +274,34 @@ void main() {
     },
   );
 
+  test('sends a new config when the ramp object changes', () async {
+    final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+    addTearDown(() => server.close(force: true));
+    final configs = <Map<String, dynamic>>[];
+    server.transform(WebSocketTransformer()).listen((ws) {
+      ws.listen((message) {
+        if (message is! String) return;
+        final data = jsonDecode(message) as Map<String, dynamic>;
+        if (data['type'] == 'config') configs.add(data);
+      });
+    });
+    final settings = container.read(experimentSettingsProvider.notifier)
+      ..setMode(ExperimentMode.ramp)
+      ..setBackendUrl('ws://127.0.0.1:${server.port}/ws/frames');
+    await session().start();
+    for (var i = 0; i < 50 && configs.isEmpty; i++) {
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+    }
+    expect(configs.last['sliding_body'], isFalse);
+
+    settings.setSlidingBody(true);
+    for (var i = 0; i < 50 && configs.length < 2; i++) {
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+    }
+    expect(configs.last['sliding_body'], isTrue);
+    await session().stop();
+  });
+
   test('releases the camera it opened itself', () async {
     await session().start();
     expect(camera.isRunning, isTrue);
