@@ -98,10 +98,8 @@ final class ArSessionPlugin: NSObject, FlutterPlugin {
   private func run(width: Int, result: FlutterResult) {
     let config = ARWorldTrackingConfiguration()
     config.planeDetection = [.horizontal, .vertical]
-    // Hands in front of the arrows hide them, on phones that can tell.
-    if ARWorldTrackingConfiguration.supportsFrameSemantics(.personSegmentationWithDepth) {
-      config.frameSemantics.insert(.personSegmentationWithDepth)
-    }
+    // No people occlusion for now: it adds work on every frame, and the
+    // build that had it got replies at about a third of the usual rate.
     if !running {
       session.run(config)
       running = true

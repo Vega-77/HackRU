@@ -211,8 +211,9 @@ Then the arrows are drawn in 3D instead of 2D:
    while the phone moves, and they glide between replies.
 3. An invisible sphere the size of the ball (from its bounding box) sits
    at the anchor and fills only the depth buffer, so the real ball hides
-   the parts of the arrows inside or behind it. On phones that support
-   it, ARKit people occlusion does the same for hands.
+   the parts of the arrows inside or behind it. Hands don't hide arrows:
+   ARKit people occlusion adds work on every frame, and the build that
+   had it lost the ball more often.
 4. The 2D overlay keeps the marker and trail, and stops drawing arrows.
 
 Lengths use the 2D proportions: every frame the native side scales the
