@@ -6,7 +6,7 @@ from math import hypot, isfinite
 
 from .contact import Body, ContactTracker, Surface, gravity_in_plane, plane_support, ramp_surface
 from .kinematics import KinematicsEngine, KinematicsResult, Vector2D
-from .models import GRAVITY_MPS2, collision_metrics, motion_model
+from .models import GRAVITY_MPS2, collision_metrics, gravity_supports, motion_model
 
 
 # An object missing for longer than this starts a fresh history when it is seen again,
@@ -151,7 +151,8 @@ class PhysicsSession:
         if target_result.acceleration_valid:
             state["acceleration"] = _vec(target_result.acceleration_mps2)
 
-        contact_forces = self._contact_forces(frame, results, mode, mass, settings, calibration.get("plane"))
+        gravity = gravity_in_plane(calibration.get("plane"), settings.get("view"))
+        contact_forces = self._contact_forces(frame, results, mode, mass, settings, gravity)
         if contact_forces is not None:
             state["contacts"] = [_contact_summary(f) for f in contact_forces.get(int(target["id"]), [])]
 
@@ -159,7 +160,7 @@ class PhysicsSession:
             target_id = int(target["id"])
             model_settings = dict(settings)
             model_settings["normal_from_contacts"] = contact_forces is not None
-            if mode == "ramp" and model_settings.get("ramp_angle_deg") is None:
+            if mode == "ramp" and model_settings.get("ramp_angle_deg") is None and not gravity_supports(gravity):
                 model_settings["ramp_angle_deg"] = self.engines[target_id].trajectory_angle_deg()
             if mode == "pendulum" and model_settings.get("pendulum_pivot_m") is None:
                 estimated_pivot = self.engines[target_id].estimate_circle_center()
@@ -174,6 +175,7 @@ class PhysicsSession:
                 mass,
                 model_settings,
                 energy_at_start,
+                gravity,
             )
             state.update(model)
             if (
@@ -211,13 +213,12 @@ class PhysicsSession:
 
     def _contact_forces(
         self, frame: dict, results: dict[int, KinematicsResult], mode: str | None, mass: float,
-        settings: dict, plane: dict | None,
+        settings: dict, gravity: tuple[float, float, float],
     ) -> dict[int, list[dict]] | None:
         """Normal forces on every tracked object from the surfaces and objects it rests
         against (see contact.py), or None where contact doesn't apply (a pendulum hangs)."""
         if mode == "pendulum":
             return None
-        gravity = gravity_in_plane(plane, settings.get("view"))
         masses = settings.get("collision_masses_kg") if mode == "collision" else None
         ids = sorted(results)
         shared = [s for s in (Surface.from_dict(d) for d in frame.get("surfaces", [])) if s is not None]
@@ -241,7 +242,9 @@ class PhysicsSession:
             )
             bodies.append(body)
             own = [s for s in (Surface.from_dict(d) for d in obj.get("surfaces", [])) if s is not None]
-            if mode == "ramp" and obj.get("target"):
+            # On a tilted plane the plane itself is the ramp, already a shared surface;
+            # a path's slope there is a direction across it, not an angle.
+            if mode == "ramp" and obj.get("target") and support is None:
                 angle = settings.get("ramp_angle_deg")
                 if angle is None:
                     angle = self.engines[object_id].trajectory_angle_deg()

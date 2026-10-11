@@ -228,13 +228,13 @@ Replaces `frame` once the kinematics stage is in. This is what the app draws.
 | `tracked` | false means everything below may be missing or null |
 | `pixel`, `bbox` | client frame pixels |
 | `position`, `velocity`, `acceleration` | world space, SI, already smoothed |
-| `forces` | list; known names: `gravity`, `normal`, `friction`, `tension`, `gravity_parallel`, `gravity_perpendicular`, `net`, plus `normal_2` (a second surface pushing, such as a wall) and `normal_contact` (another tracked object pushing). Unknown names are drawn in a neutral colour. Normal forces only appear while the object touches something, and carry `point` (where, plane metres) and, when the surface the object sits on is the plane itself (a table seen from above), `z`: newtons out of the plane, towards the camera |
+| `forces` | list; known names: `gravity`, `normal`, `friction`, `tension`, `gravity_parallel`, `gravity_perpendicular`, `net`, plus `normal_2` (a second surface pushing, such as a wall) and `normal_contact` (another tracked object pushing). Unknown names are drawn in a neutral colour. Normal forces only appear while the object touches something, and carry `point` (where, plane metres) and, when the surface the object sits on is the plane itself (a table seen from above), `z`: newtons out of the plane, towards the camera. `gravity` and `gravity_perpendicular` also carry `z` when the plane is not a side-on board: gravity is always straight down in the world, so on a level or tilted plane most of it points into the plane |
 | `contacts` | what the target is touching this frame: `[{"name", "surface", "source", "point"}]`; `source` is `edge`, `path`, `ramp_angle`, `tap`, `ar_surface`, `ar_plane` or `object`. Missing in pendulum mode |
 | `screen_axes` | as in `frame` objects; the app draws vectors along them when present |
 | `position_3d`, `velocity_3d`, `acceleration_3d`, `forces_3d` | with an `ar_plane` only: the same vectors in ARKit world space, for a renderer that anchors arrows in 3D |
 | `collision_objects[].forces` | collision mode: the normal forces on each object, as in `forces` |
 | `energy` | joules; any key may be omitted |
-| `extras` | mode-specific values the app shows as readouts by mode. Ramp: `angle_deg`, and `mu` with `sliding_body`. Pendulum: `theta_deg`, `length_m`. Collision: `momentum_x`, `momentum_y` of the target, and after an impact `restitution`, `momentum_before`, `momentum_after`, `momentum_delta`, `kinetic_before`, `kinetic_after` |
+| `extras` | mode-specific values the app shows as readouts by mode. Ramp: `angle_deg`, and `mu` with `sliding_body`. When the `ar_plane` is the surface the ball rolls on (gravity mostly into it), `angle_deg` is that plane's tilt, known before anything moves; on a side-on board it comes from `ramp_angle_deg` or the ball's path. Pendulum: `theta_deg`, `length_m`. Collision: `momentum_x`, `momentum_y` of the target, and after an impact `restitution`, `momentum_before`, `momentum_after`, `momentum_delta`, `kinetic_before`, `kinetic_after` |
 
 Additional diagnostic fields are optional and backward compatible:
 
@@ -309,6 +309,12 @@ gave the same error.
    a later version.
 
 ## Changelog
+
+- **v0.3, gravity in the plane**: `gravity` is gravity in the plane's own
+  coordinates instead of always `-y`, so with a level or tilted `ar_plane` it has
+  a `z` part and `gravity` in `forces_3d` points straight down. Picking the ramp
+  itself as the `ar_plane` gives `angle_deg` and the gravity components from its
+  tilt. Side-on boards and clients with no `ar_plane` see no change.
 
 - **v0.3, normal forces**: `config` may carry `ar_surfaces`, `surface_px` and
   `view`. `frame` objects add `height_m` and `surfaces`; `state` adds `contacts`,

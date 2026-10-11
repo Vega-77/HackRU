@@ -6,15 +6,31 @@ only add quantities justified by the selected model and available geometry.
 
 from __future__ import annotations
 
-from math import atan2, cos, degrees, hypot, radians, sin
+from math import atan2, cos, degrees, hypot, radians, sin, sqrt
 
 from .kinematics import Vector2D
 
 GRAVITY_MPS2 = 9.81
 
 
-def _force(name: str, x: float, y: float) -> dict:
-    return {"name": name, "x": x, "y": y}
+def _force(name: str, x: float, y: float, z: float = 0.0) -> dict:
+    """A protocol force; ``z`` (out of the plane) only when there is one."""
+    force = {"name": name, "x": x, "y": y}
+    if abs(z) > 1e-9:
+        force["z"] = z
+    return force
+
+
+def gravity_supports(gravity: tuple[float, float, float]) -> bool:
+    """True when most of gravity points into the plane, so objects rest on the plane
+    itself (a table, a tilted board) instead of moving across it (a board behind a ramp)."""
+    g = sqrt(gravity[0] ** 2 + gravity[1] ** 2 + gravity[2] ** 2)
+    return g > 0 and -gravity[2] >= 0.5 * g
+
+
+def plane_tilt_deg(gravity: tuple[float, float, float]) -> float:
+    """How far the plane is tilted from level, from the share of gravity lying in it."""
+    return degrees(atan2(hypot(gravity[0], gravity[1]), abs(gravity[2])))
 
 
 def motion_model(
@@ -25,11 +41,15 @@ def motion_model(
     mass_kg: float,
     settings: dict,
     initial_energy_j: float | None = None,
+    gravity: tuple[float, float, float] | None = None,
 ) -> dict:
     """Return protocol ``forces``, ``energy`` and ``extras`` for one body.
 
     ``acceleration=None`` means the numerical acceleration is not valid yet.
     The model never substitutes a predicted acceleration for a measurement.
+
+    ``gravity`` is g (m/s^2) in the plane's coordinates, z out of the plane, from
+    ``contact.gravity_in_plane``. The default is a side-on board: straight down -y.
     """
 
     if mass_kg <= 0:
@@ -39,13 +59,36 @@ def motion_model(
     kinetic = 0.5 * mass_kg * velocity.magnitude**2
     energy = {"kinetic": kinetic}
 
+    gx, gy, gz = gravity if gravity is not None else (0.0, -GRAVITY_MPS2, 0.0)
+
     if mode in ("free_fall", "ramp", "pendulum"):
-        forces.append(_force("gravity", 0.0, -mass_kg * GRAVITY_MPS2))
+        forces.append(_force("gravity", mass_kg * gx, mass_kg * gy, mass_kg * gz))
 
     if mode in ("free_fall", "ramp"):
-        energy["potential"] = mass_kg * GRAVITY_MPS2 * position.y
+        # Height is distance against gravity, which on a tilted plane is not y.
+        energy["potential"] = -mass_kg * (gx * position.x + gy * position.y)
 
-    if mode == "ramp" and settings.get("ramp_angle_deg") is not None:
+    if mode == "ramp" and gravity_supports((gx, gy, gz)):
+        # The ball rolls on the picked plane itself, so the plane's tilt is the ramp
+        # angle, known before anything moves. Gravity splits into the part along the
+        # ramp (in the plane) and the part into it (out of the plane).
+        g_in = hypot(gx, gy)
+        down = Vector2D(gx / g_in, gy / g_in) if g_in > 1e-9 else Vector2D(0.0, 0.0)
+        parallel_magnitude = mass_kg * g_in
+        normal_magnitude = -mass_kg * gz
+        if not settings.get("normal_from_contacts"):
+            forces.append(_force("normal", 0.0, 0.0, normal_magnitude))
+        forces.append(_force("gravity_parallel", mass_kg * gx, mass_kg * gy))
+        forces.append(_force("gravity_perpendicular", 0.0, 0.0, mass_kg * gz))
+        extras["angle_deg"] = plane_tilt_deg((gx, gy, gz))
+        if acceleration is not None and g_in > 1e-9:
+            along = mass_kg * (acceleration.x * down.x + acceleration.y * down.y)
+            residual = along - parallel_magnitude
+            forces.append(_force("friction", residual * down.x, residual * down.y))
+            if settings.get("sliding_body") and normal_magnitude > 0:
+                extras["mu"] = abs(residual) / normal_magnitude
+
+    elif mode == "ramp" and settings.get("ramp_angle_deg") is not None:
         angle = radians(float(settings["ramp_angle_deg"]))
         # Positive angle is a ramp rising toward +X. A negative angle rises
         # toward -X. The plane's normal points upward.

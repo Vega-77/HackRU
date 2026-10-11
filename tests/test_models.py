@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 import unittest
 
 from physics_engine import PhysicsSession, Vector2D, collision_metrics, motion_model
@@ -19,6 +20,51 @@ class PhysicsModelTests(unittest.TestCase):
         self.assertAlmostEqual(forces["net"]["x"], 0.2)
         self.assertAlmostEqual(result["energy"]["potential"], 0.2 * 9.81 * 0.3)
         self.assertNotIn("mu", result["extras"])
+
+    def test_level_plane_puts_gravity_into_the_plane(self) -> None:
+        # A floor picked with ARKit: gravity is out of the plane, not along its y axis.
+        result = motion_model(
+            "ramp", Vector2D(0.1, 0.4), Vector2D(0.0, 0.0), None, 0.2, {},
+            gravity=(0.0, 0.0, -9.81),
+        )
+        forces = {item["name"]: item for item in result["forces"]}
+
+        self.assertAlmostEqual(forces["gravity"]["x"], 0.0)
+        self.assertAlmostEqual(forces["gravity"]["y"], 0.0)
+        self.assertAlmostEqual(forces["gravity"]["z"], -1.962)
+        self.assertAlmostEqual(result["energy"]["potential"], 0.0)
+        self.assertAlmostEqual(result["extras"]["angle_deg"], 0.0)
+
+    def test_tilted_plane_is_the_ramp_and_gives_its_angle_at_rest(self) -> None:
+        tilt = math.radians(20)
+        gravity = (0.0, -9.81 * math.sin(tilt), -9.81 * math.cos(tilt))
+        result = motion_model(
+            "ramp", Vector2D(0.0, 0.5), Vector2D(0.0, 0.0), None, 0.1, {},
+            gravity=gravity,
+        )
+        forces = {item["name"]: item for item in result["forces"]}
+
+        self.assertAlmostEqual(result["extras"]["angle_deg"], 20.0)
+        self.assertAlmostEqual(forces["gravity_parallel"]["y"], -0.981 * math.sin(tilt))
+        self.assertAlmostEqual(forces["gravity_perpendicular"]["z"], -0.981 * math.cos(tilt))
+        self.assertAlmostEqual(forces["normal"]["z"], 0.981 * math.cos(tilt))
+        self.assertNotIn("friction", forces)
+        # Half a metre up the slope is 0.5 sin(20) m higher.
+        self.assertAlmostEqual(result["energy"]["potential"], 0.981 * 0.5 * math.sin(tilt))
+
+    def test_rolling_down_a_tilted_plane_has_friction_up_the_slope(self) -> None:
+        tilt = math.radians(30)
+        g_in = 9.81 * math.sin(tilt)
+        result = motion_model(
+            "ramp", Vector2D(0.0, 0.0), Vector2D(0.0, -0.5), Vector2D(0.0, -5 / 7 * g_in), 0.1,
+            {"sliding_body": True, "normal_from_contacts": True},
+            gravity=(0.0, -g_in, -9.81 * math.cos(tilt)),
+        )
+        forces = {item["name"]: item for item in result["forces"]}
+
+        self.assertNotIn("normal", forces)
+        self.assertAlmostEqual(forces["friction"]["y"], 0.1 * 2 / 7 * g_in)
+        self.assertAlmostEqual(result["extras"]["mu"], 2 / 7 * math.tan(tilt))
 
     def test_pendulum_at_bottom_has_radial_tension(self) -> None:
         result = motion_model(
@@ -91,6 +137,36 @@ class PhysicsSessionTests(unittest.TestCase):
         self.assertAlmostEqual(result["velocity"]["y"], -0.1)
         self.assertAlmostEqual(result["acceleration"]["x"], 0.0)
         self.assertIn("gravity_parallel", {force["name"] for force in result["forces"]})
+
+    def test_ball_at_rest_on_a_tilted_arkit_plane_shows_the_ramp(self) -> None:
+        tilt = math.radians(15)
+        plane = {"x_axis": [1.0, 0.0, 0.0], "y_axis": [0.0, math.sin(tilt), -math.cos(tilt)],
+                 "normal": [0.0, math.cos(tilt), math.sin(tilt)]}
+        session = PhysicsSession()
+        for index in range(6):
+            frame = self.frame(index, 0.1)
+            frame["calibration"] = {"method": "arkit", "plane": plane}
+            result = session.process_frame(frame, {"mode": "ramp", "mass_kg": 0.1})
+
+        forces = {item["name"]: item for item in result["forces"]}
+        self.assertAlmostEqual(result["extras"]["angle_deg"], 15.0)
+        self.assertIn("gravity_parallel", forces)
+        # In the world, gravity points straight down whatever the plane.
+        gravity_3d = next(f for f in result["forces_3d"] if f["name"] == "gravity")
+        self.assertAlmostEqual(gravity_3d["x"], 0.0, places=5)
+        self.assertAlmostEqual(gravity_3d["y"], -0.981, places=5)
+        self.assertAlmostEqual(gravity_3d["z"], 0.0, places=5)
+
+    def test_path_across_a_level_plane_is_not_a_ramp_angle(self) -> None:
+        plane = {"x_axis": [1.0, 0.0, 0.0], "y_axis": [0.0, 0.0, -1.0], "normal": [0.0, 1.0, 0.0]}
+        session = PhysicsSession()
+        for index in range(6):
+            frame = self.frame(index, 0.02 * index)
+            frame["calibration"] = {"method": "arkit", "plane": plane}
+            result = session.process_frame(frame, {"mode": "ramp", "mass_kg": 0.1})
+
+        self.assertAlmostEqual(result["extras"]["angle_deg"], 0.0)
+        self.assertNotIn("ramp_angle", {c["source"] for c in result.get("contacts", [])})
 
     def test_no_calibration_does_not_fabricate_si_vectors(self) -> None:
         result = PhysicsSession().process_frame(

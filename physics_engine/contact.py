@@ -22,6 +22,7 @@ from dataclasses import dataclass, field
 from math import cos, hypot, isfinite, radians, sin, sqrt
 
 from .kinematics import Vector2D
+from .models import gravity_supports
 
 # A contact appears after this many frames in a row, and goes after this many misses.
 ON_FRAMES = 2
@@ -245,8 +246,7 @@ def gravity_in_plane(plane: dict | None, view: str | None) -> tuple[float, float
 def plane_support(gravity: tuple[float, float, float]) -> Surface | None:
     """The plane of motion itself, as a surface, when objects sit on it: when most of
     gravity points into it (a table, a tilted board), not along it (a board behind a ramp)."""
-    g = _norm(gravity)
-    if g <= 0 or -gravity[2] < 0.5 * g:
+    if not gravity_supports(gravity):
         return None
     return Surface("plane", "ar_plane", (0.0, 0.0, 0.0), (0.0, 0.0, 1.0), on_plane=True)
 
