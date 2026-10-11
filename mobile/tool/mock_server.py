@@ -74,7 +74,7 @@ def pendulum(t, m):
     forces = [("gravity", 0.0, -m * G), ("tension", inward[0] * tension, inward[1] * tension)]
     energy = {"kinetic": 0.5 * m * (vel[0] ** 2 + vel[1] ** 2),
               "potential": m * G * length * (1 - math.cos(th)), "thermal": 0.0}
-    return pos, vel, acc, forces, energy, {"angle_deg": math.degrees(th)}
+    return pos, vel, acc, forces, energy, {"theta_deg": math.degrees(th), "length_m": length}
 
 
 MODES = {"ramp": ramp, "free_fall": free_fall, "pendulum": pendulum, "collision": ramp}

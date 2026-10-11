@@ -174,9 +174,11 @@ class SessionController extends Notifier<SessionState> {
       if (previous.backendUrl != next.backendUrl) {
         log.i('Backend changed mid-session to ${next.backendUrl}');
         _startSocket(next.backendUrl);
-      } else if (previous.mode != next.mode || previous.massKg != next.massKg) {
+      } else if (previous.mode != next.mode ||
+          previous.massKg != next.massKg ||
+          previous.slidingBody != next.slidingBody) {
         telemetry.clear();
-        _sendConfig('mode or mass changed');
+        _sendConfig('mode, mass or ramp body changed');
       }
     });
     ref.listen(calibrationProvider, (previous, next) {
@@ -597,6 +599,7 @@ class SessionController extends Notifier<SessionState> {
       debugTracking: const bool.fromEnvironment('TRACKING_DIAGNOSTICS'),
       initializationRequired: calibration.selectionFrame != null,
       surface: calibration.surface,
+      slidingBody: settings.slidingBody,
       arSurfaces: calibration.surface == null ? const [] : _arSurfaces,
     );
   }
