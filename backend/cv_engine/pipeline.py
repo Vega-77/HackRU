@@ -17,7 +17,7 @@ from cv_engine.detect import DEFAULT_COLORS, ColorDetector, Detection, MediaPipe
 from cv_engine.preprocess import PreprocessedFrame
 from cv_engine.spatial import SpatialMapper
 from cv_engine.tracker import CentroidTracker, Track
-from cv_engine.universal import ManualTracker
+from cv_engine.universal import ManualTracker, box_from_tap
 
 log = logging.getLogger(__name__)
 
@@ -150,6 +150,7 @@ class TrackingPipeline:
             t = session["target_px"]
             self._target_last = (t["x"], t["y"]) if t else None
             self._manual.reset()
+            self.tracker.forget_manual()
             self._pending_selection = t is not None
         self.session = session
         plane_before = self.spatial.ar_plane
@@ -190,14 +191,7 @@ class TrackingPipeline:
                 point = (tap["x"] * frame.scale, tap["y"] * frame.scale)
                 box = self.session["target_bbox"]
                 if box is None:
-                    containing = [d for d in self.color.detect(frame)
-                                  if d.bbox[0] <= point[0] < d.bbox[0] + d.bbox[2]
-                                  and d.bbox[1] <= point[1] < d.bbox[1] + d.bbox[3]]
-                    if len(containing) == 1:
-                        x, y, w, h = containing[0].bbox
-                        s = frame.scale
-                        box = {"x": (x - 2) / s, "y": (y - 2) / s,
-                               "w": (w + 4) / s, "h": (h + 4) / s}
+                    box = self._box_from_tap(frame, point)
                 self._manual.select(frame, point, box)
                 self._pending_selection = False
             else:
@@ -231,6 +225,24 @@ class TrackingPipeline:
             result["tracking_debug"] = {"frame_id": frame.frame_id, "timestamp": frame.timestamp,
                                         "detections": len(detections), **self._manual.debug}
         return result
+
+    def _box_from_tap(self, frame: PreprocessedFrame, point: tuple[float, float]) -> dict | None:
+        """A box (client px) around the object under a tap without a drawn box: the one
+        detector-coloured blob containing it, else whatever stands out from its surroundings
+        there. None leaves the tracker to ask for a box (selection_required)."""
+        containing = [d for d in self.color.detect(frame)
+                      if d.bbox[0] <= point[0] < d.bbox[0] + d.bbox[2]
+                      and d.bbox[1] <= point[1] < d.bbox[1] + d.bbox[3]]
+        if len(containing) == 1:
+            x, y, w, h = containing[0].bbox
+            x, y, w, h = x - 2, y - 2, w + 4, h + 4
+        else:
+            found = box_from_tap(frame, point)
+            if found is None:
+                return None
+            x, y, w, h = found
+        s = frame.scale
+        return {"x": x / s, "y": y / s, "w": w / s, "h": h / s}
 
     def _pick_target(self, tracks: list[Track], frame: PreprocessedFrame) -> Track | None:
         """The object the app cares about: the one the user tapped (target_px), followed by
