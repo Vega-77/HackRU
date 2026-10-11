@@ -159,3 +159,55 @@ def test_physics_keeps_history_over_one_missed_frame():
         session.process_frame(frame(i, visible=False), settings)
     assert 3 not in session.engines
     assert "velocity" not in session.process_frame(frame(20), settings)
+
+
+def _bouncing_ball(speed, fps, seconds, radius=11, exposure=1 / 60):
+    """A tennis ball crossing the table at a constant speed and turning back at each side,
+    filmed with motion blur. Yields (jpeg, centre)."""
+    import numpy as np
+
+    background = motion_scenes._background(3)
+    colors = ((60, 220, 200), (235, 240, 240))
+
+    def centre(t):
+        span = 280.0
+        d = (speed * t) % (2 * span)
+        return 20 + (d if d < span else 2 * span - d), 120 + 50 * math.sin(math.pi * t)
+
+    for i in range(int(seconds * fps)):
+        t = i / fps
+        moving = speed if i else 0.0
+        picture = np.zeros_like(background, dtype=np.float32)
+        for k in range(8):
+            tt = t + k / 8 * exposure
+            canvas = background.astype(np.float32)
+            sprite, alpha = motion_scenes._ball_sprite(radius, moving * tt / radius, colors)
+            motion_scenes._paste(canvas, sprite, alpha, centre(tt) if i else centre(0.0))
+            picture += canvas
+        ok, jpeg = cv2.imencode(".jpg", np.clip(picture / 8, 0, 255).astype(np.uint8),
+                                [cv2.IMWRITE_JPEG_QUALITY, 70])
+        yield jpeg.tobytes(), centre(t + exposure / 2) if i else centre(0.0)
+
+
+@pytest.mark.parametrize("speed,fps,seconds", [(750, 25, 2.5), (1000, 30, 6.5)])
+def test_fast_ball_is_kept_through_bounces(speed, fps, seconds):
+    # Turning back at a side, the ball left the search aimed along its old direction. The
+    # background it had just crossed matched weakly there, and tracking stayed on it for
+    # seconds while still reporting the object as detected.
+    radius = 11
+    cv2.setRNGSeed(0)  # the selection's segmentation
+    pipe = TrackingPipeline()
+    for i, (jpeg, (x, y)) in enumerate(_bouncing_ball(speed, fps, seconds, radius)):
+        if i == 0:
+            pipe.apply_config({"type": "config", "target_px": {"x": x, "y": y}, "px_per_m": 400.0,
+                               "target_bbox": {"x": x - radius - 2, "y": y - radius - 2,
+                                               "w": 2 * radius + 4, "h": 2 * radius + 4},
+                               "frame_size": {"w": motion_scenes.W, "h": motion_scenes.H},
+                               "mode": "free_fall"})
+        result = pipe(preprocess_frame(decode_jpeg(jpeg), i, i / fps))
+        if i == 0:
+            continue
+        target = next((o for o in result["objects"] if o["target"]), None)
+        assert target is not None, f"lost at frame {i}"
+        error = math.hypot(target["pixel"]["x"] - x, target["pixel"]["y"] - y)
+        assert error <= radius, f"frame {i} is {error:.0f} px off"
