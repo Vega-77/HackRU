@@ -30,6 +30,9 @@ class PhysicsState {
     this.acceleration3d,
     this.forces3d = const [],
     this.partner,
+    this.physicsQuality = const {},
+    this.processMs,
+    this.queueMs,
   });
 
   /// Echo of the `frame_id` the client sent with the frame.
@@ -57,6 +60,9 @@ class PhysicsState {
   final ScreenAxes? screenAxes;
   final Map<String, dynamic> trackingDebug;
   final String? trackingStatus;
+  final Map<String, dynamic> physicsQuality;
+  final double? processMs;
+  final double? queueMs;
 
   /// The object's centre in ARKit world space (metres). Null without an
   /// `ar_plane`.
@@ -110,6 +116,11 @@ class PhysicsState {
       frameId: (json['frame_id'] as num?)?.toInt() ?? -1,
       t: (json['timestamp'] as num?)?.toDouble() ?? 0,
       tracked: json['tracked'] == true,
+      physicsQuality: json['physics_quality'] is Map<String, dynamic>
+          ? json['physics_quality'] as Map<String, dynamic>
+          : const {},
+      processMs: (json['process_ms'] as num?)?.toDouble(),
+      queueMs: (json['queue_ms'] as num?)?.toDouble(),
       trackingStatus: json['tracking_status'] as String?,
       pixel: Vec2.tryParse(json['pixel']),
       bbox: PixelRect.tryParse(json['bbox']),
