@@ -144,10 +144,40 @@ the marker and the x(t) chart from the object marked `"target": true`:
   bare or evenly textured background, or on an object cut off by the frame edge,
   reports `selection_required`: draw an object box. Invalid or flat boxes report
   `invalid_selection` or `insufficient_contrast`. The selected object keeps one `id`
-  for as long as it is followed, and gets a new one when the selection changes.
+  for as long as it is followed, and gets a new one when the selection changes. Its
+  `bbox` is the object the backend separated inside the user's box (not the fingers
+  or table the box also took in), so it can be smaller than `target_bbox`.
   After loss, recovery compares the retained original appearance across the full
   frame and rejects ambiguous or different-color matches.
   `confidence` equals the object's existing `score`. No predicted or demo objects are sent.
+
+### Selection proposal and initialization handshake
+
+Selection messages use the same WebSocket and metadata-plus-JPEG framing.
+Coordinates are in the attached JPEG's pixels. Each request includes a
+`selection_id`, increasing `frame_id`, and original capture `timestamp`.
+
+1. Send metadata with `type: "acquire"` and `target_px: {x,y}`, then the exact
+   selected JPEG. The reply is `type: "acquisition"`, echoing the IDs and timestamp,
+   with `status: "proposed"`, `bbox: {x,y,w,h}`, and a `reason`. Unclear regions
+   return `status: "manual_required"` and `bbox: null`; malformed images return
+   `status: "failed"`. All proposal replies have `tracked: false`.
+2. Display the proposed box on that image and obtain user confirmation. Allow a
+   manual replacement. Send normal `config` with the confirmed `target_px`,
+   `target_bbox`, `frame_size`, and `initialization_required: true`.
+3. Send metadata with `type: "initialize"`, then the same selected JPEG. This
+   image bypasses the replaceable live-frame slot and is processed under the
+   pipeline lock. The reply is `type: "initialization"`, echoing the request IDs
+   and timestamp, with `status: "initialized"` or `"failed"`, `reason`, `bbox`,
+   and `tracked: false`. Wait for this acknowledgment before sending live frames.
+4. After success, send ordinary live frames. Only a subsequent image can report
+   visual detection. After failure, stop live frames and offer reselection; a
+   new config and initialization request can retry on the same connection.
+
+Normal frames retain the latest-frame dropping policy. Reconnects require
+initialization again. Legacy clients that omit `initialization_required` retain
+their existing frame flow; the new frontend always uses the handshake for a
+captured manual selection. No fixed-size tap template is created.
 
 ### `state` (text, JSON): physics result, one per processed frame
 

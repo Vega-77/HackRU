@@ -17,6 +17,9 @@ class Calibration {
     this.target,
     this.targetBbox,
     this.selectionFrame,
+    this.selectionPending = false,
+    this.selectionConfirmed = false,
+    this.selectionError,
     this.surface,
   });
 
@@ -26,6 +29,9 @@ class Calibration {
   final Vec2? target;
   final PixelRect? targetBbox;
   final EncodedFrame? selectionFrame;
+  final bool selectionPending;
+  final bool selectionConfirmed;
+  final String? selectionError;
   final ArSurface? surface;
 
   /// Frame pixels per metre, or null until both ruler ends are placed.
@@ -49,6 +55,9 @@ class Calibration {
     Vec2? target,
     PixelRect? targetBbox,
     EncodedFrame? selectionFrame,
+    bool? selectionPending,
+    bool? selectionConfirmed,
+    String? selectionError,
     ArSurface? surface,
   }) => Calibration(
     rulerStart: rulerStart ?? this.rulerStart,
@@ -57,6 +66,9 @@ class Calibration {
     target: target ?? this.target,
     targetBbox: targetBbox ?? this.targetBbox,
     selectionFrame: selectionFrame ?? this.selectionFrame,
+    selectionPending: selectionPending ?? this.selectionPending,
+    selectionConfirmed: selectionConfirmed ?? this.selectionConfirmed,
+    selectionError: selectionError ?? this.selectionError,
     surface: surface ?? this.surface,
   );
 
@@ -74,5 +86,8 @@ class Calibration {
     target: target,
     targetBbox: targetBbox,
     selectionFrame: selectionFrame,
+    selectionPending: selectionPending,
+    selectionConfirmed: selectionConfirmed,
+    selectionError: selectionError,
   );
 }

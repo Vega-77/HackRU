@@ -36,8 +36,7 @@ def test_recovery_after_occlusion_and_motion_uses_original_identity(position):
     assert recovered["tracked"]
     target = next(o for o in recovered["objects"] if o["target"])
     assert target["pixel"] == pytest.approx({"x": x, "y": y}, abs=2)
-    # Near where it was lost, the widening search finds it; far away, the whole frame does.
-    assert recovered["tracking_debug"]["global"] == (x == 250)
+    assert recovered["tracking_debug"]["global"]
     np.testing.assert_array_equal(original, pipe._manual.original)
 
 
@@ -65,9 +64,8 @@ def test_different_color_distractor_does_not_replace_red_target():
 def test_ambiguous_global_recovery_stays_lost():
     pipe = selected()
     assert not pipe(preprocess_frame(scene(), 2, .4))["tracked"]
-    # Two lookalikes, neither near where the object was lost: no way to tell which it is.
-    result = pipe(preprocess_frame(scene([(200, 40, (180, 180, 180)),
-                                          (250, 140, (180, 180, 180))]), 3, .6))
+    result = pipe(preprocess_frame(scene([(80, 90, (180, 180, 180)),
+                                          (250, 90, (180, 180, 180))]), 3, .6))
     assert not result["tracked"]
     assert result["tracking_debug"]["reason"] == "ambiguous_match"
 
@@ -102,5 +100,5 @@ def test_diagnostics_are_opt_in_and_contain_no_image_data():
     result = pipe(preprocess_frame(scene(), 2, .4))
     assert set(result["tracking_debug"]) <= {
         "frame_id", "timestamp", "detections", "reason", "search", "global",
-        "score", "candidates", "missed", "bbox",
+        "score", "candidates", "missed", "bbox", "method",
     }

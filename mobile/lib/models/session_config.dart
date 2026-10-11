@@ -38,6 +38,7 @@ class SessionConfig {
     this.targetPx,
     this.targetBbox,
     this.debugTracking = false,
+    this.initializationRequired = false,
     this.surface,
   });
 
@@ -52,6 +53,7 @@ class SessionConfig {
   final Vec2? targetPx;
   final PixelRect? targetBbox;
   final bool debugTracking;
+  final bool initializationRequired;
 
   /// The AR surface the object moves on, iOS only. When set, the backend
   /// maps positions with the camera pose instead of [pxPerM].
@@ -74,6 +76,7 @@ class SessionConfig {
     'frame_size': frameSize.toJson(),
     'ar_plane': surface?.toJson(),
     if (debugTracking) 'debug_tracking': true,
+    if (initializationRequired) 'initialization_required': true,
   };
 
   String encode() => jsonEncode(toJson());

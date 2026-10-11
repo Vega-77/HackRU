@@ -22,7 +22,7 @@ void main() {
 
   // Both tests look at the same stream, so it only runs once.
   Future<_Run>? run;
-  Future<_Run> streamed() => run ??= _streamBall(url!);
+  Future<_Run> streamed() => run ??= _streamBall(url!, handshake: !mock);
 
   test('streams real JPEGs and every reply is matched to a frame', () async {
     final r = await streamed();
@@ -119,7 +119,7 @@ class _Run {
   final double drawnSpeedPxPerS;
 }
 
-Future<_Run> _streamBall(String url) async {
+Future<_Run> _streamBall(String url, {required bool handshake}) async {
   final socket = PhysicsSocket(url);
   final replies = <ServerMessage>[];
   final sub = socket.messages.listen(replies.add);
@@ -132,6 +132,7 @@ Future<_Run> _streamBall(String url) async {
           frameSize: _size,
           pxPerM: _pxPerM,
           targetPx: _ballCentre(0),
+          initializationRequired: handshake,
         ),
       )
       ..connect();
@@ -139,8 +140,16 @@ Future<_Run> _streamBall(String url) async {
         .firstWhere((s) => s == ConnectionStatus.live)
         .timeout(const Duration(seconds: 5));
 
-    final clock = Stopwatch()..start();
     final captureTimes = <double>[];
+    if (handshake) {
+      final ack = await socket.initialize(
+        EncodedFrame(jpeg: _ballFrame(0), size: _size, captureTime: 0),
+      );
+      expect(ack.frameId, 0);
+      expect(ack.status, 'initialized', reason: ack.reason);
+      captureTimes.add(0);
+    }
+    final clock = Stopwatch()..start();
     while (captureTimes.length < _frames &&
         clock.elapsed < const Duration(seconds: 10)) {
       final i = captureTimes.length;

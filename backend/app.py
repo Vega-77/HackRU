@@ -65,6 +65,7 @@ from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.responses import HTMLResponse, StreamingResponse
 
 from cv_engine.frame_slot import LatestFrameSlot
+from cv_engine.acquisition import propose_region
 from cv_engine.overlay import TrailHistory, draw_overlay
 from cv_engine.pipeline import PipelineConfig, TrackingPipeline
 from cv_engine.preprocess import PreprocessedFrame, decode_jpeg, preprocess_frame
@@ -151,6 +152,8 @@ async def frames_ws(ws: WebSocket) -> None:
     conn_id = next(_connection_ids)
     trails = TrailHistory()
     send_lock = asyncio.Lock()
+    initialization_required = False
+    initialized = False
 
     async def send(payload: dict) -> None:
         async with send_lock:
@@ -209,8 +212,15 @@ async def frames_ws(ws: WebSocket) -> None:
                         continue
                     pending_meta["frame_id"] = frame_id
                     next_id = frame_id + 1
-                    slot.put(IncomingFrame(msg["bytes"], pending_meta, time.time()))
+                    incoming = IncomingFrame(msg["bytes"], pending_meta, time.time())
                     pending_meta = {}
+                    if incoming.meta.get("type") in ("acquire", "initialize"):
+                        await selection_image(incoming)
+                    elif initialization_required and not initialized:
+                        await send({"type": "error", "frame_id": frame_id,
+                                    "message": "Initialize the selected image before sending live frames"})
+                    else:
+                        slot.put(incoming)
         finally:
             slot.close()
 
@@ -218,11 +228,44 @@ async def frames_ws(ws: WebSocket) -> None:
     pipeline_lock = asyncio.Lock()
 
     async def apply_config(message: dict) -> None:
+        nonlocal initialization_required, initialized
         try:
             async with pipeline_lock:
+                before = (pipeline.session["target_px"], pipeline.session["target_bbox"])
                 await asyncio.to_thread(pipeline.apply_config, message)
+                initialization_required = bool(pipeline.session.get("initialization_required"))
+                if before != (pipeline.session["target_px"], pipeline.session["target_bbox"]):
+                    initialized = False
+                    slot.discard()
         except (TypeError, ValueError, OSError, RuntimeError) as e:
             await send({"type": "error", "message": f"bad config: {e}"})
+
+    async def selection_image(frame: IncomingFrame) -> None:
+        nonlocal initialization_required, initialized
+        kind = frame.meta["type"]
+        reply = {"type": "acquisition" if kind == "acquire" else "initialization",
+                 "selection_id": frame.meta.get("selection_id"),
+                 "frame_id": frame.meta["frame_id"], "timestamp": frame.meta.get("timestamp"),
+                 "tracked": False}
+        try:
+            async with pipeline_lock:
+                image = await asyncio.to_thread(decode_jpeg, frame.data)
+                if kind == "acquire":
+                    point = frame.meta.get("target_px", {})
+                    if not all(isinstance(point.get(k), (int, float)) and math.isfinite(point[k]) for k in ("x", "y")):
+                        raise ValueError("target_px must contain finite x and y")
+                    result = await asyncio.to_thread(propose_region, image, (point["x"], point["y"]))
+                else:
+                    initialization_required = True
+                    initialized = False
+                    slot.discard()
+                    pf = preprocess_frame(image, frame.meta["frame_id"], frame.meta.get("timestamp"), WORKING_WIDTH)
+                    result = await asyncio.to_thread(pipeline.initialize, pf)
+                await send({**reply, **result})
+                if kind == "initialize":
+                    initialized = result["status"] == "initialized"
+        except (ValueError, TypeError, cv2.error) as error:
+            await send({**reply, "status": "failed", "reason": str(error), "bbox": None})
 
     async def apply_calibration(request: dict) -> None:
         try:
@@ -238,6 +281,8 @@ async def frames_ws(ws: WebSocket) -> None:
             t0 = time.perf_counter()
             try:
                 async with pipeline_lock:
+                    if initialization_required and not initialized:
+                        continue
                     result, image = await asyncio.to_thread(_process_with_physics, frame, pipeline, physics)
             except FrameDecodeError as e:
                 stats["decode_errors"] += 1

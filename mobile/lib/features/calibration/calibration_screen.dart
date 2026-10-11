@@ -99,7 +99,9 @@ class _CalibrationScreenState extends ConsumerState<CalibrationScreen> {
     };
     final steps = _Steps(surfaces: surfaces, frameSize: _cameraFrame);
     final start = FilledButton(
-      onPressed: _startExperiment,
+      onPressed: ref.watch(calibrationProvider).selectionConfirmed
+          ? _startExperiment
+          : null,
       child: const Text('Start experiment'),
     );
 
@@ -360,21 +362,36 @@ class _Steps extends ConsumerWidget {
           _Step(
             number: ++number,
             title: 'Mark the object',
-            body: calibration.target == null
-                ? 'Drag a box tightly around the object. A tap also works '
-                      'for a distinct red, blue, green or yellow object. '
-                      'With a keyboard, focus the picture and press Enter; '
-                      'arrows move the box and + or - resize it.'
-                : 'Picture held for selection. Check the box, then start. '
-                      'Clear to select again from the live picture.',
-            done: calibration.target != null,
-            trailing: calibration.target == null
+            body: calibration.selectionPending
+                ? 'Finding the boundary in this picture. Hold the object still until tracking starts.'
+                : calibration.selectionError ??
+                      (calibration.target == null
+                          ? 'Tap the object to propose its boundary, or drag a box around it. '
+                                'With a keyboard, focus the picture and press Enter; '
+                                'arrows move the box and + or - resize it.'
+                          : calibration.selectionConfirmed
+                          ? 'Object region confirmed. Keep the object visible when starting.'
+                          : 'Does the box enclose the whole object? Confirm it, or draw a better box on this picture.'),
+            done: calibration.selectionConfirmed,
+            footer: calibration.target == null
                 ? null
-                : TextButton(
-                    onPressed: ref
-                        .read(calibrationProvider.notifier)
-                        .clearTarget,
-                    child: const Text('Clear'),
+                : Wrap(
+                    children: [
+                      if (calibration.targetBbox != null &&
+                          !calibration.selectionConfirmed)
+                        TextButton(
+                          onPressed: ref
+                              .read(calibrationProvider.notifier)
+                              .confirmSelection,
+                          child: const Text('Confirm object'),
+                        ),
+                      TextButton(
+                        onPressed: ref
+                            .read(calibrationProvider.notifier)
+                            .clearTarget,
+                        child: const Text('Retry selection'),
+                      ),
+                    ],
                   ),
           ),
           _Step(

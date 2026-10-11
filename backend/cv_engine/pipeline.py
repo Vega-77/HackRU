@@ -13,6 +13,7 @@ from dataclasses import dataclass, field
 import numpy as np
 
 from cv_engine.ar_plane import ArPlane, image_axes
+from cv_engine.acquisition import propose_region
 from cv_engine.detect import DEFAULT_COLORS, ColorDetector, Detection, MediaPipeDetector, MotionDetector
 from cv_engine.preprocess import PreprocessedFrame
 from cv_engine.spatial import SpatialMapper
@@ -58,6 +59,9 @@ class PipelineConfig:
 def validated_session(current: dict, changes: dict) -> dict:
     """Merge the app's session settings, checking the fields the CV engine relies on."""
     s = {**current, **changes}
+    for key in ("initialization_required", "debug_tracking"):
+        if key in s and not isinstance(s[key], bool):
+            raise ValueError(f"{key} must be a boolean")
     if s["mode"] is not None and s["mode"] not in EXPERIMENT_MODES:
         raise ValueError(f"mode must be one of {EXPERIMENT_MODES}")
     if s["px_per_m"] is not None and not (isinstance(s["px_per_m"], (int, float)) and s["px_per_m"] > 0):
@@ -226,21 +230,36 @@ class TrackingPipeline:
                                         "detections": len(detections), **self._manual.debug}
         return result
 
+    def initialize(self, frame: PreprocessedFrame) -> dict:
+        """Retry acquisition on this exact image; initialization is never a detection."""
+        self._manual.reset()
+        self._target_id = None
+        self.tracker = CentroidTracker(self.config.max_distance, self.config.max_missed, self.config.min_hits)
+        self._pending_selection = self.session["target_px"] is not None
+        expected = self.session["frame_size"]
+        if expected is not None and frame.source_size != (expected["w"], expected["h"]):
+            return {"status": "failed", "reason": "selection_image_size_mismatch", "tracked": False, "bbox": None}
+        self(frame)
+        return {"status": "initialized" if self._manual.original is not None else "failed",
+                "reason": self._manual.debug["reason"], "tracked": False,
+                "bbox": None if self._manual.bbox is None else
+                    {key: value / frame.scale for key, value in zip(("x", "y", "w", "h"), self._manual.bbox)}}
+
     def _box_from_tap(self, frame: PreprocessedFrame, point: tuple[float, float]) -> dict | None:
-        """A box (client px) around the object under a tap without a drawn box: the one
-        detector-coloured blob containing it, else whatever stands out from its surroundings
-        there. None leaves the tracker to ask for a box (selection_required)."""
-        containing = [d for d in self.color.detect(frame)
-                      if d.bbox[0] <= point[0] < d.bbox[0] + d.bbox[2]
-                      and d.bbox[1] <= point[1] < d.bbox[1] + d.bbox[3]]
-        if len(containing) == 1:
-            x, y, w, h = containing[0].bbox
-            x, y, w, h = x - 2, y - 2, w + 4, h + 4
-        else:
+        """A box (client px) around the object under a tap without a drawn box, or None to
+        ask the user for one (selection_required). A stable flood-filled region is best on a
+        plain background; on a textured one it leaks or finds many outlines, and the object
+        is found by how it stands out from its surroundings instead."""
+        proposal = propose_region(frame.bgr, point)
+        found = None
+        if proposal["reason"] != "stable_seeded_region":
             found = box_from_tap(frame, point)
-            if found is None:
-                return None
+        if found is not None:
             x, y, w, h = found
+        elif proposal["bbox"]:
+            x, y, w, h = (proposal["bbox"][k] for k in ("x", "y", "w", "h"))
+        else:
+            return None
         s = frame.scale
         return {"x": x / s, "y": y / s, "w": w / s, "h": h / s}
 

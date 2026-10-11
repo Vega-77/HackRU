@@ -22,6 +22,7 @@ class PhysicsState {
     this.extras = const {},
     this.screenAxes,
     this.trackingDebug = const {},
+    this.trackingStatus,
   });
 
   /// Echo of the `frame_id` the client sent with the frame.
@@ -48,6 +49,7 @@ class PhysicsState {
   /// metric calibration.
   final ScreenAxes? screenAxes;
   final Map<String, dynamic> trackingDebug;
+  final String? trackingStatus;
 
   factory PhysicsState.fromJson(Map<String, dynamic> json) {
     final rawForces = json['forces'];
@@ -56,6 +58,7 @@ class PhysicsState {
       frameId: (json['frame_id'] as num?)?.toInt() ?? -1,
       t: (json['timestamp'] as num?)?.toDouble() ?? 0,
       tracked: json['tracked'] == true,
+      trackingStatus: json['tracking_status'] as String?,
       pixel: Vec2.tryParse(json['pixel']),
       bbox: PixelRect.tryParse(json['bbox']),
       position: Vec2.tryParse(json['position']),
@@ -208,12 +211,25 @@ sealed class ServerMessage {
         'state' => StateMessage(PhysicsState.fromJson(json)),
         'frame' => FrameAckMessage.fromJson(json),
         'error' => ErrorMessage.fromJson(json),
+        'initialization' => InitializationMessage(
+          (json['frame_id'] as num?)?.toInt() ?? -1,
+          '${json['status']}',
+          '${json['reason']}',
+        ),
         _ => UnknownMessage(raw),
       };
     } on FormatException {
       return UnknownMessage(raw);
     }
   }
+}
+
+class InitializationMessage extends ServerMessage {
+  const InitializationMessage(this.frameId, this.status, this.reason);
+  @override
+  final int frameId;
+  final String status;
+  final String reason;
 }
 
 class StateMessage extends ServerMessage {

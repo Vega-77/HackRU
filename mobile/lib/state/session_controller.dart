@@ -164,7 +164,11 @@ class SessionController extends Notifier<SessionState> {
         _sendConfig('mode or mass changed');
       }
     });
-    ref.listen(calibrationProvider, (_, _) {
+    ref.listen(calibrationProvider, (previous, next) {
+      if (previous?.selectionFrame != next.selectionFrame ||
+          previous?.targetBbox != next.targetBbox) {
+        _selectionFrame = next.selectionFrame;
+      }
       if (_socket != null) _sendConfig('calibration changed');
     });
 
@@ -325,6 +329,9 @@ class SessionController extends Notifier<SessionState> {
     _subscriptions
       ..add(
         socket.statusChanges.listen((status) {
+          if (status == ConnectionStatus.live) {
+            _selectionFrame = ref.read(calibrationProvider).selectionFrame;
+          }
           state = state.copyWith(connection: status);
         }),
       )
@@ -344,6 +351,8 @@ class SessionController extends Notifier<SessionState> {
               }
             case final ErrorMessage error:
               _onServerError(error);
+            case InitializationMessage():
+              break;
             case UnknownMessage(:final raw):
               log.w('Unrecognised message from the backend: ${_clip(raw)}');
           }
@@ -381,7 +390,38 @@ class SessionController extends Notifier<SessionState> {
     _capturing = true;
     final capturing = Stopwatch()..start();
     try {
-      final frame = _selectionFrame ?? await _camera.capture();
+      if (_selectionFrame case final selected?) {
+        try {
+          final ack = await socket.initialize(selected);
+          if (!ref.mounted || socket != _socket) return;
+          log.i(
+            'Initialization ${ack.status}: ${ack.reason}, frame ${ack.frameId}, capture ${selected.captureTime}',
+          );
+          if (ack.status != 'initialized') {
+            _onServerError(
+              ErrorMessage(
+                'Object initialization failed (${ack.reason}). Return to setup and retry selection.',
+              ),
+            );
+            state = state.copyWith(phase: SessionPhase.failed);
+            return;
+          }
+          _selectionFrame = null;
+          _framesSent++;
+          _framesSentThisSecond++;
+        } catch (error, stack) {
+          if (!ref.mounted || socket != _socket) return;
+          log.w('Initialization handshake failed', error, stack);
+          _onServerError(
+            const ErrorMessage(
+              'Object initialization was not acknowledged. Return to setup and retry selection.',
+            ),
+          );
+          state = state.copyWith(phase: SessionPhase.failed);
+        }
+        return;
+      }
+      final frame = await _camera.capture();
       if (frame == null) {
         _missingFrames++;
         if (_missingFrames % _repeatLogEvery == 1) {
@@ -471,6 +511,7 @@ class SessionController extends Notifier<SessionState> {
       targetPx: calibration.target,
       targetBbox: calibration.targetBbox,
       debugTracking: const bool.fromEnvironment('TRACKING_DIAGNOSTICS'),
+      initializationRequired: calibration.selectionFrame != null,
       surface: calibration.surface,
     );
   }

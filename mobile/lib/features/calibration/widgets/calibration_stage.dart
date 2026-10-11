@@ -12,6 +12,8 @@ import '../../../models/session_config.dart';
 import '../../../models/vec2.dart';
 import '../../../state/calibration_controller.dart';
 import '../../../state/session_controller.dart';
+import '../../../state/experiment_settings.dart';
+import '../../../services/network/acquisition_client.dart';
 import '../../experiment/widgets/coordinate_mapper.dart';
 
 /// The picture with the calibration marks on it:
@@ -62,6 +64,12 @@ class _CalibrationStageState extends ConsumerState<CalibrationStage> {
   EncodedFrame? _previewFrame;
   int _selectionEpoch = 0;
   bool _focused = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _previewFrame = ref.read(calibrationProvider).selectionFrame;
+  }
 
   KeyEventResult _onKey(
     KeyEvent event,
@@ -120,11 +128,19 @@ class _CalibrationStageState extends ConsumerState<CalibrationStage> {
   }
 
   Future<EncodedFrame?> _freezeSelection(int epoch) async {
+    if (_previewFrame != null) return _previewFrame;
     EncodedFrame? frame;
     try {
       frame = await ref.read(frameSourceProvider).capture();
     } catch (error, stack) {
       log.w('Could not capture the selection picture', error, stack);
+      if (mounted && epoch == _selectionEpoch) {
+        ref
+            .read(calibrationProvider.notifier)
+            .acquisitionFailed(
+              'Could not capture the picture. Tap the object again to retry.',
+            );
+      }
       return null;
     }
     if (!mounted || epoch != _selectionEpoch) return null;
@@ -292,13 +308,35 @@ class _CalibrationStageState extends ConsumerState<CalibrationStage> {
     final epoch = ++_selectionEpoch;
     final frame = await _freezeSelection(epoch);
     if (!mounted || frame == null || epoch != _selectionEpoch) return;
-    ref
-        .read(calibrationProvider.notifier)
-        .selectObject(
-          mapper.clampToVisible(mapper.toFrame(touch)),
-          null,
-          frame,
+    final point = mapper.clampToVisible(mapper.toFrame(touch));
+    final controller = ref.read(calibrationProvider.notifier);
+    controller.beginAcquisition(point, frame);
+    try {
+      final proposal = await ref
+          .read(acquisitionClientProvider)
+          .propose(
+            ref.read(experimentSettingsProvider).backendUrl,
+            point,
+            frame,
+          );
+      if (!mounted || epoch != _selectionEpoch) return;
+      log.i(
+        'Acquisition proposal: ${proposal.reason}, box ${proposal.box?.toJson()}',
+      );
+      if (proposal.box case final box?) {
+        controller.selectObject(point, box, frame);
+      } else {
+        controller.acquisitionFailed(
+          'No clear object boundary at this point. Draw a box around the object, or retry.',
         );
+      }
+    } catch (error, stack) {
+      if (!mounted || epoch != _selectionEpoch) return;
+      log.w('Object acquisition request failed', error, stack);
+      controller.acquisitionFailed(
+        'Could not reach object selection. Check the backend connection and retry, or draw a box.',
+      );
+    }
   }
 
   void _onPanStart(Offset touch, CoordinateMapper mapper, Calibration c) {

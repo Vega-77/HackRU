@@ -43,7 +43,26 @@ class CalibrationController extends Notifier<Calibration> {
       targetBbox: box,
       selectionFrame: frame,
     );
-    log.i('Object selected at $point in captured frame ${frame.captureTime}');
+    log.i(
+      'Object selected at $point, box ${box?.toJson()}, in captured frame ${frame.captureTime}',
+    );
+  }
+
+  void beginAcquisition(Vec2 point, EncodedFrame frame) {
+    selectObject(point, null, frame);
+    state = state.copyWith(selectionPending: true);
+  }
+
+  void acquisitionFailed(String message) {
+    state = state.copyWith(selectionPending: false, selectionError: message);
+    log.w(message);
+  }
+
+  void confirmSelection() {
+    if (state.targetBbox != null && !state.selectionPending) {
+      state = state.copyWith(selectionConfirmed: true);
+      log.i('Object region confirmed: ${state.targetBbox!.toJson()}');
+    }
   }
 
   void clearTarget() {

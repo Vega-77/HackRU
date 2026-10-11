@@ -1,17 +1,23 @@
 """Tracking for the object the user selected in the app.
 
-The selection gives one picture of the object. Each frame it is found again from three
-cues, because each one alone fails on real experiments:
+The selection gives one picture of the object. Inside the user's box the object is first
+separated from whatever else the box took in (the fingers holding a ball, the table), and
+only the object is followed. Each frame it is found again from these cues, because each
+one alone fails on real experiments:
 
-  * appearance: normalized cross-correlation with the original picture and with a copy
-    that is slowly updated, since a rolling ball or a swinging bob turns as it moves;
+  * appearance: normalized cross-correlation over the object's own pixels with the
+    original picture and with a copy that is slowly updated, since a rolling ball or a
+    swinging bob turns as it moves;
+  * outline: for a round object, its silhouette against the background, which is still
+    there when its markings turn out of view, and a check that a match has the object's
+    colours inside a round outline (so a wrist or a face is not taken for a grey ball);
   * colour: for coloured objects, a hue-saturation model of the object against the rest
     of the picture, back-projected into the frame. It survives rotation and motion blur;
   * motion: a constant-velocity prediction, so the search follows a fast object and a
     lookalike elsewhere in the picture cannot win while the object is in view.
 
-If the object is not near its prediction, the whole frame is searched; a match there
-must be strong, of the right colour, and clearly better than any other candidate.
+If the object is not near its prediction, or was lost, the whole frame is searched; a
+match there must be strong, of the right colour, and clearly better than any other.
 """
 
 from __future__ import annotations
@@ -23,15 +29,37 @@ import cv2
 import numpy as np
 
 from cv_engine.detect import Detection
+from cv_engine.foreground import RoundReference, selected_foreground
 from cv_engine.preprocess import PreprocessedFrame
 
 HIST_CHANNELS = [0, 1]
 HIST_BINS = [18, 16]  # hue, saturation
 HIST_RANGES = [0, 180, 0, 256]
 COLOR_FLOOR = 0.01
+MIN_SATURATION = 50  # of 255: below this an object is neutral and gets no colour model
 # Template scales tried near the prediction and across the whole frame.
 LOCAL_SCALES = (0.85, 1.0, 1.15)
-GLOBAL_SCALES = (0.7, 0.85, 1.0, 1.2, 1.4)
+GLOBAL_SCALES = (0.55, 0.7, 0.85, 1.0, 1.2, 1.4)
+ROUND_GLOBAL_SCORE = 0.7  # far from the prediction, for a round object checked by its outline
+
+
+def weighted_scores(search, references, weights):
+    """Normalized correlation with shared weighted image moments across references."""
+    pixels = search.astype(np.float32)
+    total = float(weights.sum())
+    mean_sum = cv2.matchTemplate(pixels, weights, cv2.TM_CCORR)
+    variance = cv2.matchTemplate(pixels * pixels, weights, cv2.TM_CCORR) - mean_sum * mean_sum / total
+    variance = np.maximum(variance, 0)
+    best = np.full(variance.shape, -1, np.float32)
+    for reference in references:
+        reference = reference.astype(np.float32)
+        centered = reference - float(np.sum(reference * weights)) / total
+        energy = float(np.sum(centered * centered * weights))
+        denominator = np.sqrt(variance * energy)
+        numerator = cv2.matchTemplate(pixels, centered * weights, cv2.TM_CCORR)
+        scores = np.divide(numerator, denominator, out=np.full_like(numerator, -1), where=denominator > 1)
+        best = np.maximum(best, np.clip(scores, -1, 1))
+    return best
 
 
 @dataclass
@@ -67,13 +95,20 @@ class ManualTracker:
         self.template: np.ndarray | None = None
         self.original: np.ndarray | None = None
         self.color_model: np.ndarray | None = None
+        self.foreground: np.ndarray | None = None  # the object's pixels in the user's box
+        self.round_reference: RoundReference | None = None
+        self.silhouette: np.ndarray | None = None
+        self.match_channel: int | None = None  # Lab channel matched instead of brightness
         self.bbox: tuple[int, int, int, int] | None = None
         self.missed = 0
         self.debug: dict = {"reason": "selection_required"}
+        self._mask: np.ndarray | None = None  # matching weights: the object's shape in the box
+        self._outline: np.ndarray | None = None  # matching weights for the silhouette
         self._center = (0.0, 0.0)
         self._size = (0.0, 0.0)
         self._velocity = (0.0, 0.0)  # working px per second
         self._time = 0.0
+        self._image: np.ndarray | None = None  # this frame in the matched channel
 
     # Selection
 
@@ -89,25 +124,73 @@ class ManualTracker:
         if w < 8 or h < 8 or not (x <= point[0] < right and y <= point[1] < bottom):
             self.debug = {"reason": "invalid_selection"}
             return
-        patch = frame.gray[y:bottom, x:right]
-        color_model = _color_model(frame, x, y, w, h)
-        if float(patch.std()) < 3 and color_model is None:
-            self.debug = {"reason": "insufficient_contrast"}
-            return
+        colors = frame.bgr[y:bottom, x:right]
+        seed = (min(w - 2, max(1, round(point[0] - x))), min(h - 2, max(1, round(point[1] - y))))
+        foreground = selected_foreground(colors, seed)
+        if foreground is not None:
+            # Follow the object alone, not the fingers or table the box also took in, with
+            # a margin so its outline against the background is part of the picture.
+            fx, fy, fw, fh = cv2.boundingRect(foreground)
+            pad = max(2, round(0.15 * max(fw, fh)))
+            ox, oy = max(0, fx - pad), max(0, fy - pad)
+            ox1, oy1 = min(w, fx + fw + pad), min(h, fy + fh + pad)
+            mask = foreground[oy:oy1, ox:ox1]
+            tx, ty, tw, th = x + ox, y + oy, ox1 - ox, oy1 - oy
+        else:
+            mask = None
+            tx, ty, tw, th = x, y, w, h
+        color_model = _color_model(frame, tx, ty, tw, th, mask)
+        patch = frame.gray[ty:ty + th, tx:tx + tw]
+        if float(patch.std()) < 3:
+            # Different colours can have the same brightness: match the Lab channel that
+            # tells the object from its surroundings instead.
+            lab = cv2.cvtColor(frame.bgr[ty:ty + th, tx:tx + tw], cv2.COLOR_BGR2LAB)
+            channel = 1 + int(np.argmax(lab[:, :, 1:].std(axis=(0, 1))))
+            if float(lab[:, :, channel].std()) >= 3:
+                self.match_channel = channel
+                patch = lab[:, :, channel]
+            elif color_model is None:
+                self.debug = {"reason": "insufficient_contrast"}
+                return
+        self.foreground = foreground
+        self.round_reference = RoundReference.from_mask(colors, foreground)
         self.original = patch.copy()
         self.template = patch.astype(np.float32)
         self.color_model = color_model
-        self.bbox = (x, y, w, h)
-        self._center = (x + w / 2, y + h / 2)
-        self._size = (float(w), float(h))
+        if mask is None:
+            self._mask = _ellipse_mask(tw, th)
+        else:
+            # Keep a little of the object's edge against the background.
+            kernel = np.ones((3, 3), np.uint8)
+            self._mask = mask + 0.2 * cv2.dilate(mask, np.ones((5, 5), np.uint8)).astype(np.float32)
+            inside = mask > 0
+            if self.round_reference is not None and not inside.all():
+                silhouette = np.full(patch.shape, np.median(patch[~inside]), np.float32)
+                silhouette[inside] = np.median(patch[inside])
+                self.silhouette = cv2.GaussianBlur(silhouette, (5, 5), 0)
+                ring = cv2.dilate(mask, kernel) - cv2.erode(mask, kernel)
+                self._outline = (0.1 * mask + ring).astype(np.float32)
+        self.bbox = (tx, ty, tw, th)
+        self._center = (tx + tw / 2, ty + th / 2)
+        self._size = (float(tw), float(th))
         self._time = frame.timestamp
         self.debug = {"reason": "initialized", "bbox": list(self.bbox)}
+
+    @property
+    def method(self) -> str:
+        if self.round_reference is not None and self.color_model is None:
+            return "foreground_verified"
+        return "masked_template" if self.foreground is not None else "template"
 
     # Tracking
 
     def detect(self, frame: PreprocessedFrame) -> Detection | None:
         if self.original is None or self.bbox is None:
             return None
+        if self.match_channel is None:
+            self._image = frame.gray
+        else:
+            self._image = cv2.cvtColor(frame.bgr, cv2.COLOR_BGR2LAB)[:, :, self.match_channel]
         fw, fh = frame.size
         dt = min(1.0, max(0.0, frame.timestamp - self._time))
         px = self._center[0] + self._velocity[0] * dt
@@ -119,8 +202,12 @@ class ManualTracker:
                   min(fw, int(px + reach + w / 2) + 1), min(fh, int(py + reach + h / 2) + 1))
 
         best = None
-        if bounds[2] - bounds[0] >= 8 and bounds[3] - bounds[1] >= 8:
+        # While the object is in view it is looked for near where it is heading. Once it
+        # was lost, the whole frame is searched, so a lookalike that turned up elsewhere in
+        # the meantime makes the match ambiguous instead of going unnoticed.
+        if self.missed == 0 and bounds[2] - bounds[0] >= 8 and bounds[3] - bounds[1] >= 8:
             best = self._search(frame, bounds, (px, py), reach, global_search=False)
+        recovered = best is None
         if best is None:
             best = self._search(frame, (0, 0, fw, fh), (px, py), reach, global_search=True)
         if best is None:
@@ -129,50 +216,64 @@ class ManualTracker:
             return None
 
         confidence = best.confidence(self.color_model is not None)
-        self._update(frame, best, dt)
+        self._update(frame, best, dt, recovered)
         self.missed = 0
         self.debug.update(reason="detected", bbox=list(self.bbox), score=round(confidence, 3))
         x, y, bw, bh = self.bbox
-        return Detection("selected", (best.cx, best.cy), self.bbox, float(bw * bh), confidence, "manual")
+        # Positions here are continuous (a box from x to x + w has its middle at x + w / 2);
+        # detections report pixel indices, like the other detectors' centroids.
+        return Detection("selected", (best.cx - 0.5, best.cy - 0.5), self.bbox, float(bw * bh), confidence, "manual")
 
     def _search(self, frame: PreprocessedFrame, bounds, predicted, reach, global_search: bool):
         left, top, right, bottom = bounds
         has_color = self.color_model is not None
         prob = _back_project(frame, self.color_model, bounds) if has_color else None
-        candidates = self._template_candidates(frame, bounds, prob, global_search)
+        candidates = self._template_candidates(bounds, prob, global_search)
         if has_color:
             candidates += self._color_candidates(frame, bounds, prob)
 
-        threshold = self.global_score if global_search else self.local_score
+        # A round object without a colour of its own (a grey or white ball) is checked by
+        # its outline and shading at every match instead. That check lets a weaker picture
+        # match count far from the prediction.
+        check_outline = self.round_reference is not None and not has_color
+        far_score = ROUND_GLOBAL_SCORE if check_outline else self.global_score
         passing = []
         for c in candidates:
             if has_color and c.color < self.min_color:
                 continue  # the right shape in the wrong colour
-            # Far from the prediction there is no motion to go on, so both the picture
-            # and the colour have to match well on their own.
-            if global_search and (c.appearance < 0.65 or (has_color and c.color < 0.5)):
-                continue
             score = c.confidence(has_color)
-            if score < threshold:
-                continue
             distance = math.hypot(c.cx - predicted[0], c.cy - predicted[1]) / max(reach, 1.0)
-            if not global_search and distance > 1.0:
+            near = distance <= 1.0
+            if global_search and not near:
+                # Far from the prediction there is no motion to go on, so both the picture
+                # and the colour have to match well on their own.
+                if c.appearance < 0.65 or (has_color and c.color < 0.5) or score < far_score:
+                    continue
+            elif not near or score < self.local_score:
+                continue
+            if check_outline and not self._verified(frame, c):
                 continue
             # Near the prediction, prefer the closer of two good matches.
-            rank = score if global_search else score * (1.0 - 0.3 * min(1.0, distance) ** 2)
+            rank = score * (1.0 - 0.3 * min(1.0, distance) ** 2)
             passing.append((rank, score, c))
         passing.sort(key=lambda item: item[0], reverse=True)
         self.debug = {"search": [int(left), int(top), int(right), int(bottom)], "global": global_search,
-                      "candidates": len(passing), "missed": self.missed}
+                      "candidates": len(passing), "missed": self.missed, "method": self.method}
         if not passing:
             self.debug["reason"] = "appearance_rejected"
             return None
         rank, score, best = passing[0]
         self.debug["score"] = round(score, 3)
         if global_search:
+            # Part of a blurred or half-hidden object can match a shrunken picture better
+            # than the whole of it does: of overlapping matches, take the largest that is
+            # nearly as good.
+            best = max((c for _, s, c in passing
+                        if s >= score - 0.1 and math.hypot(c.cx - best.cx, c.cy - best.cy) < 0.5 * max(c.w, best.w)),
+                       key=lambda c: c.w * c.h)
             size = max(best.w, best.h)
-            for other_rank, _, other in passing[1:]:
-                if math.hypot(other.cx - best.cx, other.cy - best.cy) > size * 0.6 and rank - other_rank < 0.08:
+            for _, other_score, other in passing[1:]:
+                if math.hypot(other.cx - best.cx, other.cy - best.cy) > size * 0.6 and score - other_score < 0.08:
                     self.debug["reason"] = "ambiguous_match"
                     return None
         if not best.from_color:
@@ -187,24 +288,61 @@ class ManualTracker:
                                   best.appearance, max(best.color, blob.color))
         return best
 
-    def _template_candidates(self, frame, bounds, prob, global_search: bool) -> list[_Candidate]:
+    def _verified(self, frame: PreprocessedFrame, c: _Candidate) -> bool:
+        """A round object's colours fill a round outline at the candidate, and are not all
+        around it as they would be on a wrist, a face or a wall."""
+        tw, th = max(8, round(c.w)), max(8, round(c.h))
+        fw, fh = frame.size
+        bx = min(max(0, int(round(c.cx - tw / 2))), fw - tw)
+        by = min(max(0, int(round(c.cy - th / 2))), fh - th)
+        if bx < 0 or by < 0:
+            return False
+        # The box keeps a margin around the object, for the ring verify() compares it with.
+        outline = cv2.resize((self._mask >= 1).astype(np.uint8), (tw, th), interpolation=cv2.INTER_NEAREST)
+        verified = self.round_reference.verify(frame.bgr[by:by + th, bx:bx + tw], outline)
+        if verified is None:
+            return False
+        _, inside, outside = verified
+        # Weak evidence from the shading needs a stronger picture match.
+        return c.appearance >= 0.76 or (inside >= 0.85 and inside - outside >= 0.4)
+
+    def _references(self, tw: int, th: int):
+        """(weights, pictures) to match at this size. Usually the object's own pixels,
+        against the original and updated pictures. A grey or white ball's surface says
+        little (its markings turn out of view, glare comes and goes), so it is matched by
+        its outline instead, and against its silhouette as well."""
+        pictures = [cv2.resize(self.original.astype(np.float32), (tw, th)), cv2.resize(self.template, (tw, th))]
+        if self.silhouette is not None and self.color_model is None:
+            weights = cv2.resize(self._outline, (tw, th), interpolation=cv2.INTER_NEAREST)
+            pictures.append(cv2.resize(self.silhouette, (tw, th)))
+        else:
+            weights = cv2.resize(self._mask, (tw, th), interpolation=cv2.INTER_NEAREST)
+        return weights * weights, pictures
+
+    def _template_candidates(self, bounds, prob, global_search: bool) -> list[_Candidate]:
         left, top, right, bottom = bounds
-        search = frame.gray[top:bottom, left:right].astype(np.float32)
+        search = self._image[top:bottom, left:right].astype(np.float32)
         w, h = self._size
-        references = [self.original.astype(np.float32)]
-        if self.template is not None:
-            references.append(self.template)
         out = []
-        for scale in GLOBAL_SCALES if global_search else LOCAL_SCALES:
-            tw, th = max(8, round(w * scale)), max(8, round(h * scale))
+        tried = set()
+        oh, ow = self.original.shape
+        # Near the prediction the object is about the size it just was. Anywhere else it
+        # can be any size it can take (see _update), so the sizes are the selected one's;
+        # a much smaller picture matches any patch of texture.
+        if global_search:
+            sizes = [(ow * scale, oh * scale) for scale in GLOBAL_SCALES]
+        else:
+            sizes = [(w * scale, h * scale) for scale in LOCAL_SCALES]
+        for sw, sh in sizes:
+            tw = max(8, round(float(np.clip(sw, 0.5 * ow, 2.0 * ow))))
+            th = max(8, round(float(np.clip(sh, 0.5 * oh, 2.0 * oh))))
+            if (tw, th) in tried:
+                continue
+            tried.add((tw, th))
             if search.shape[0] < th or search.shape[1] < tw:
                 continue
-            mask = _ellipse_mask(tw, th)
-            scores = None
-            for reference in references:
-                s = cv2.matchTemplate(search, cv2.resize(reference, (tw, th)), cv2.TM_CCOEFF_NORMED, mask=mask)
-                s = np.nan_to_num(s, nan=-1.0, posinf=-1.0, neginf=-1.0)
-                scores = s if scores is None else np.maximum(scores, s)
+            weights, references = self._references(tw, th)
+            scores = np.nan_to_num(weighted_scores(search, references, weights), nan=-1.0, posinf=-1.0, neginf=-1.0)
             for _ in range(3):
                 _, score, _, (sx, sy) = cv2.minMaxLoc(scores)
                 if score < 0.3:
@@ -229,7 +367,7 @@ class ManualTracker:
             area = stats[i, cv2.CC_STAT_AREA]
             if not 0.2 * expected <= area <= 4 * expected:
                 continue
-            cx, cy = centroids[i]
+            cx, cy = centroids[i] + 0.5  # from pixel indices to continuous, like the picture matches
             color = _mean_in_ellipse(prob, cx, cy, w, h)
             appearance = self._appearance_at(frame, left + cx, top + cy)
             out.append(_Candidate(left + cx, top + cy, w, h, appearance, color, from_color=True))
@@ -244,59 +382,71 @@ class ManualTracker:
         x1, y1 = x0 + w + 2 * slack, y0 + h + 2 * slack
         if x0 < 0 or y0 < 0 or x1 > fw or y1 > fh:
             return 0.0
-        region = frame.gray[y0:y1, x0:x1].astype(np.float32)
-        mask = _ellipse_mask(w, h)
-        best = -1.0
-        for reference in (self.original.astype(np.float32), self.template):
-            if reference is None:
-                continue
-            s = cv2.matchTemplate(region, cv2.resize(reference, (w, h)), cv2.TM_CCOEFF_NORMED, mask=mask)
-            best = max(best, float(np.nan_to_num(s, nan=-1.0, posinf=-1.0, neginf=-1.0).max()))
-        return best
+        region = self._image[y0:y1, x0:x1].astype(np.float32)
+        weights, references = self._references(w, h)
+        return float(np.nan_to_num(weighted_scores(region, references, weights), nan=-1.0).max())
 
-    def _update(self, frame: PreprocessedFrame, best: _Candidate, dt: float) -> None:
+    def _update(self, frame: PreprocessedFrame, best: _Candidate, dt: float, recovered: bool) -> None:
+        """Move to the match. After a recovery from the whole frame, nothing about how the
+        object got there is known, so the motion starts over and its size is taken as found."""
         cx, cy = best.cx, best.cy
-        if dt > 0 and self.missed < 3:
+        if dt > 0 and not recovered:
             vx, vy = (cx - self._center[0]) / dt, (cy - self._center[1]) / dt
             # Follow changes in speed quickly (a falling ball), but not frame-to-frame jitter.
             self._velocity = (0.4 * self._velocity[0] + 0.6 * vx, 0.4 * self._velocity[1] + 0.6 * vy)
         else:
             self._velocity = (0.0, 0.0)
         oh, ow = self.original.shape
-        w = float(np.clip(0.7 * self._size[0] + 0.3 * best.w, 0.5 * ow, 2.0 * ow))
-        h = float(np.clip(0.7 * self._size[1] + 0.3 * best.h, 0.5 * oh, 2.0 * oh))
+        blend = 1.0 if recovered else 0.3
+        w = float(np.clip((1 - blend) * self._size[0] + blend * best.w, 0.5 * ow, 2.0 * ow))
+        h = float(np.clip((1 - blend) * self._size[1] + blend * best.h, 0.5 * oh, 2.0 * oh))
         self._center, self._size, self._time = (cx, cy), (w, h), frame.timestamp
         fw, fh = frame.size
         x = int(round(min(max(cx - w / 2, 0), fw - w)))
         y = int(round(min(max(cy - h / 2, 0), fh - h)))
         self.bbox = (x, y, int(round(w)), int(round(h)))
-        # Learn the current look only from a confident, clearly visible match.
-        if best.appearance >= 0.55 and (self.color_model is None or best.color >= 0.5):
-            patch = frame.gray[y:y + self.bbox[3], x:x + self.bbox[2]]
+        # Learn the current look only from a confident, clearly visible match that follows
+        # on from the last one: a recovery may be a lookalike, and learning it would make
+        # the mistake stick.
+        if not recovered and best.appearance >= 0.55 and (self.color_model is None or best.color >= 0.5):
+            patch = self._image[y:y + self.bbox[3], x:x + self.bbox[2]]
             if patch.shape[0] >= 4 and patch.shape[1] >= 4:
                 th, tw = self.template.shape
                 self.template = 0.8 * self.template + 0.2 * cv2.resize(patch.astype(np.float32), (tw, th))
 
 
-def _color_model(frame: PreprocessedFrame, x: int, y: int, w: int, h: int) -> np.ndarray | None:
+def _color_model(frame: PreprocessedFrame, x: int, y: int, w: int, h: int,
+                 mask: np.ndarray | None = None) -> np.ndarray | None:
     """How likely each hue-saturation bin is to be the object rather than the rest of the
     picture, or None when the object's colour does not set it apart (grey objects, or
-    colours that are all over the background)."""
-    core = np.zeros((h, w), np.uint8)
-    cv2.ellipse(core, (w // 2, h // 2), (max(1, w * 2 // 5), max(1, h * 2 // 5)), 0, 0, 360, 255, -1)
+    colours that are all over the background). `mask` marks the object's pixels in the
+    box; without one, the middle of the box is taken to be the object."""
+    if mask is None:
+        core = np.zeros((h, w), np.uint8)
+        cv2.ellipse(core, (w // 2, h // 2), (max(1, w * 2 // 5), max(1, h * 2 // 5)), 0, 0, 360, 255, -1)
+    else:
+        core = (mask > 0).astype(np.uint8) * 255
+    # Hue means little on a grey, white or black object, and JPEG bleeds the colour of a
+    # logo into the grey around it; such objects are followed by their picture and outline.
+    if float(np.median(frame.hsv[y:y + h, x:x + w, 1][core > 0])) < MIN_SATURATION:
+        return None
+    # Everything but the object counts against it, including fingers beside it in the box.
     outside = np.full(frame.hsv.shape[:2], 255, np.uint8)
-    outside[y:y + h, x:x + w] = 0
+    outside[y:y + h, x:x + w][core > 0] = 0
     obj = cv2.calcHist([frame.hsv[y:y + h, x:x + w]], HIST_CHANNELS, core, HIST_BINS, HIST_RANGES)
     rest = cv2.calcHist([frame.hsv], HIST_CHANNELS, outside, HIST_BINS, HIST_RANGES)
-    # Blur along saturation only: light changes saturation, but hue is what tells a red
-    # ball from a skin-coloured hand.
-    obj = cv2.GaussianBlur(obj / max(float(obj.sum()), 1.0), (3, 1), 0)
-    rest = cv2.GaussianBlur(rest / max(float(rest.sum()), 1.0), (3, 1), 0)
+    # Spread along saturation only, by about 50 of 255 each way: light and motion blur
+    # change saturation (a ball selected mid-throw is washed out by its surroundings and
+    # sharper once it slows down), but hue is what tells a red ball from a skin-coloured hand.
+    obj = cv2.GaussianBlur(obj / max(float(obj.sum()), 1.0), (7, 1), 0)
+    rest = cv2.GaussianBlur(rest / max(float(rest.sum()), 1.0), (7, 1), 0)
     # The floor stands in for colours not in this picture yet (a hand that reaches in
     # later): a colour the object barely has must not count as the object.
     model = (obj / (obj + rest + COLOR_FLOOR)).astype(np.float32)
     prob = _back_project(frame, model, (0, 0) + frame.size)
-    inside = _mean_in_ellipse(prob, x + w / 2, y + h / 2, w, h)
+    # Most of the object has to be that colour: a grey ball with a coloured logo is grey,
+    # and a model of the logo alone loses the ball as soon as it turns.
+    inside = float(np.median(prob[y:y + h, x:x + w][core > 0]))
     pad = max(w, h) // 2 + 4
     ring = np.zeros(prob.shape, np.uint8)
     ring[max(0, y - pad):y + h + pad, max(0, x - pad):x + w + pad] = 1

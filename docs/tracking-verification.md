@@ -1,18 +1,20 @@
 # Tracking change verification
 
-Scope: the object-selection additions in calibration and the tracking recovery
-change. This report does not claim a fresh audit of unrelated application screens.
+Scope: tap proposals, region confirmation, manual fallback, retry and initialization
+feedback in calibration and experiments. The prior tracking recovery is preserved.
+This report does not claim a fresh audit of unrelated application screens.
 The direction is the existing scientific instrument interface: ENERGY 1,
 RHYTHM 2, MOTION 1. Rectangles describe the actual selected pixels; neutral marks
 use the existing vellum/ink palette to avoid implying a physical force. Holding
 the captured image lets the user check what the backend will initialize from.
 Keyboard focus uses light and dark borders to remain visible over camera images.
 
-Validation: 133 backend/physics tests and 122 Flutter tests passed; two optional
+Validation: 153 backend/physics tests and 128 Flutter tests passed; two optional
 live-backend tests were skipped. Dart formatting and Flutter analysis passed.
-The release web build completed. The widget tests exercise box drawing, frozen
-selection, clearing, keyboard movement and resizing. The socket test checks the
-first image bytes, original timestamp and ROI. The app-flow tests exercise setup,
+The current app is launched locally in Chrome for user verification. The widget tests
+exercise tap proposal confirmation, manual fallback, retry, frozen selection and
+keyboard movement and resizing. Socket tests check original image bytes, capture
+timestamp, ROI and waiting for initialization acknowledgment. App-flow tests exercise setup,
 experiment, settings, error handling, log copying and landscape layout.
 
 ## Antislop delivery gate
@@ -20,19 +22,19 @@ experiment, settings, error handling, log copying and landscape layout.
 | Item | Status and evidence for this change |
 | --- | --- |
 | R-02 | PASS: new copy and comments use ordinary punctuation. |
-| R-03 | PASS: existing wrapping step body and scroll layout retained; landscape app-flow test passed. |
+| R-03 | PASS: confirmation/retry controls wrap below the instructions; phone and landscape app-flow tests passed. |
 | R-17 | PASS: copy contains no statistics or marketing metrics. |
 | R-18 | PASS: no testimonials. |
 | R-23 | PASS: selected image comes from the user's camera; no fabricated assets or navigation. |
-| R-24 | PASS: no navigation links added. |
+| R-24 | PASS: Select again returns to setup; existing route pop/go targets are used. |
 | R-25 | PASS: instructional text inherits the existing themed text style; image marks have a contrasting halo. |
-| R-26 | PASS: drag, clear, Enter, arrows and resize keys are exercised in widget tests. |
-| R-27 | PASS: existing camera loading/error states retained; failed capture is logged; Clear restores live preview. |
+| R-26 | PASS: tap, confirmation, manual box, retry and keyboard controls are exercised in widget/socket tests. |
+| R-27 | PASS: finding-boundary, manual-required, request error and confirmed states have explicit copy; retry restores live preview. |
 | R-28 | PASS: no FAQ. |
 | R-32 | PASS: selection supports focus, Enter, arrows and resize keys; visible focus border and keyboard test added. |
 | R-33 | PASS: changes written as source patches. |
 | R-34 | PASS: theme behavior retained; added marks use established calibration colors. |
-| R-35 | PASS: release web build and app-flow tests passed; new selection interactions exercised by widget tests. |
+| R-35 | PASS: current app launched in Chrome; tests exercise proposal confirmation, failure, manual fallback and retry. |
 | R-36 | PASS: no fabricated security, customer or real-world tracking claims. |
 | R-37 | PASS: existing scientific instrument direction retained; dials stated above. |
 | R-38 | PASS: copy describes actual selection actions and their implemented behavior. |
@@ -55,13 +57,13 @@ experiment, settings, error handling, log copying and landscape layout.
 | Motif | PASS: box and focus marks extend the existing ruler/crosshair language. |
 | Design read | PASS: scientific measurement setup for experiment users, using the existing instrument interface. |
 | C-1 | PASS: selection rectangle, snapshot and focus borders each have functional reasons stated above. |
-| C-2 | PASS: selection/clear/keyboard actions are implemented and tested. |
+| C-2 | PASS: proposal, confirmation, retry, manual selection and keyboard actions are implemented and tested. |
 | C-3 | PASS: selection fits the existing calibration step; no filler sections. |
 | C-4 | PASS: app-flow, landscape, selection and keyboard tests passed. |
 | C-5 | PASS: generated sequences are explicitly synthetic; real experiments require validation. |
 | R-05 | PASS: actual calibration content dictates the existing layout. |
 | R-11 | PASS: ROI is rectangular to match frame coordinates; panel radii retained. |
-| R-15 | PASS: Clear and Start experiment retain their specific actions. |
+| R-15 | PASS: Confirm object, Retry selection, Select again and Start experiment name their actual actions. |
 | R-16 | PASS: instructions name concrete gestures and expected behavior. |
 | R-20 | PASS: existing instrument identity retained through calibration marks and typography. |
 | R-21 | PASS: existing theme controls retained; no theme feature added or deferred. |
@@ -71,7 +73,10 @@ experiment, settings, error handling, log copying and landscape layout.
 
 ## Limits
 
-There are no real bottle/ball recordings in the supplied diagnostic package.
+The acquisition report predates the subsequently supplied gray-ball screen recording.
+The follow-up evidence, tracking correction and physical-camera test steps are in
+[`foreground-tracking-verification.md`](foreground-tracking-verification.md).
+The earlier acquisition method comparison is in `tap-acquisition-verification.md`.
 Replay and synthetic regressions verify the reproduced mechanisms, not tracking
 recall under arbitrary clutter, lighting, rotation or indistinguishable objects.
 The replay tool reports processing throughput; it cannot measure live network
