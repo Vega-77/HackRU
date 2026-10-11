@@ -16,6 +16,7 @@ import 'package:hands_on_physics/models/vec2.dart';
 import 'package:hands_on_physics/models/physics_state.dart';
 import 'package:hands_on_physics/services/network/acquisition_client.dart';
 import 'package:hands_on_physics/features/calibration/widgets/calibration_stage.dart';
+import 'package:hands_on_physics/features/experiment/widgets/telemetry_panel.dart';
 import 'package:hands_on_physics/state/calibration_controller.dart';
 import 'package:hands_on_physics/state/experiment_settings.dart';
 import 'package:hands_on_physics/state/session_controller.dart';
@@ -29,9 +30,16 @@ class _FakeCamera implements FrameSource {
   int stops = 0;
   bool running = false;
 
+  /// What the next start throws, as a broken camera plugin might.
+  Object? startError;
+
+  /// Opens without a picture yet, so it has no frame size.
+  bool sizeless = false;
+
   @override
   Future<void> start() async {
     if (running) return;
+    if (startError case final error?) throw error;
     starts++;
     running = true;
   }
@@ -47,7 +55,8 @@ class _FakeCamera implements FrameSource {
   bool get isRunning => running;
 
   @override
-  FrameSize? get frameSize => running ? const FrameSize(320, 240) : null;
+  FrameSize? get frameSize =>
+      running && !sizeless ? const FrameSize(320, 240) : null;
 
   @override
   Future<EncodedFrame?> capture({int width = 320}) async => EncodedFrame(
@@ -188,8 +197,10 @@ void main() {
     tester,
   ) async {
     final container = await pumpApp(tester);
-    expect(find.textContaining('Live from'), findsOneWidget);
+    expect(find.textContaining('Backend:'), findsOneWidget);
 
+    await tester.ensureVisible(find.textContaining('Set up'));
+    await tester.pump();
     await tester.tap(find.textContaining('Set up'));
     await tester.pump(const Duration(milliseconds: 600));
     expect(find.text('Start experiment'), findsOneWidget);
@@ -260,6 +271,8 @@ void main() {
     tester.view.physicalSize = const Size(600, 900) * 3;
     await tester.pump();
 
+    await tester.ensureVisible(find.textContaining('Set up'));
+    await tester.pump();
     await tester.tap(find.textContaining('Set up'));
     await tester.pump(const Duration(milliseconds: 600));
     expect(camera.isRunning, isTrue);
@@ -288,6 +301,50 @@ void main() {
     await unmount(tester);
   });
 
+  testWidgets('setup offers a retry when the camera fails to start', (
+    tester,
+  ) async {
+    camera.startError = StateError('plugin crashed');
+    await pumpApp(tester);
+    await tester.ensureVisible(find.textContaining('Set up'));
+    await tester.pump();
+    await tester.tap(find.textContaining('Set up'));
+    await tester.pump(const Duration(milliseconds: 600));
+    await tester.pump(); // the start's outcome lands after that frame
+    expect(find.textContaining('Starting camera'), findsNothing);
+    expect(find.textContaining('The camera did not start'), findsOneWidget);
+
+    camera.startError = null;
+    await tester.tap(find.text('Try again'));
+    await tester.pump(const Duration(milliseconds: 100));
+    await tester.pump();
+    expect(find.textContaining('The camera did not start'), findsNothing);
+    expect(find.byType(CalibrationStage), findsOneWidget);
+
+    await unmount(tester);
+  });
+
+  testWidgets('setup offers a retry when the camera sends no picture', (
+    tester,
+  ) async {
+    camera.sizeless = true;
+    await pumpApp(tester);
+    await tester.ensureVisible(find.textContaining('Set up'));
+    await tester.pump();
+    await tester.tap(find.textContaining('Set up'));
+    await tester.pump(const Duration(milliseconds: 600));
+    await tester.pump(); // the start's outcome lands after that frame
+    expect(find.textContaining('sent no picture'), findsOneWidget);
+
+    camera.sizeless = false;
+    await tester.tap(find.text('Try again'));
+    await tester.pump(const Duration(milliseconds: 100));
+    await tester.pump();
+    expect(find.byType(CalibrationStage), findsOneWidget);
+
+    await unmount(tester);
+  });
+
   testWidgets('with ARKit, setup finds the surface instead of a ruler', (
     tester,
   ) async {
@@ -295,6 +352,8 @@ void main() {
     camera = ar;
     final container = await pumpApp(tester);
 
+    await tester.ensureVisible(find.textContaining('Set up'));
+    await tester.pump();
     await tester.tap(find.textContaining('Set up'));
     await tester.pump(const Duration(milliseconds: 600));
     await tester.pump(); // the camera's frame size arrives after start()
@@ -318,6 +377,8 @@ void main() {
       tester,
       acquisition: _Acquisition(fail: true),
     );
+    await tester.ensureVisible(find.textContaining('Set up'));
+    await tester.pump();
     await tester.tap(find.textContaining('Set up'));
     await tester.pump(const Duration(milliseconds: 600));
     await tester.pump();
@@ -363,11 +424,11 @@ void main() {
     await tester.pump();
     expect(container.read(calibrationProvider).selectionConfirmed, isTrue);
     await tester.scrollUntilVisible(
-      find.text('Retry selection'),
+      find.text('Select again'),
       100,
       scrollable: find.byType(Scrollable).first,
     );
-    await tester.tap(find.text('Retry selection'));
+    await tester.tap(find.text('Select again'));
     await tester.pump();
     expect(container.read(calibrationProvider).selectionFrame, isNull);
     expect(container.read(calibrationProvider).selectionError, isNull);
@@ -387,7 +448,19 @@ void main() {
     final copied = mockClipboard(tester);
     await pumpApp(tester, at: Routes.experiment);
 
-    await tester.tap(find.byTooltip('Copy debug log'));
+    // At the end of the telemetry sheet, out of the physics' way.
+    final copy = find.text('Copy debug log');
+    await tester.scrollUntilVisible(
+      copy,
+      200,
+      scrollable: find
+          .descendant(
+            of: find.byType(TelemetryPanel),
+            matching: find.byType(Scrollable),
+          )
+          .first,
+    );
+    await tester.tap(copy);
     await tester.pump();
 
     expect(copied, hasLength(1));

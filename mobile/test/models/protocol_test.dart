@@ -13,6 +13,62 @@ import 'package:hands_on_physics/models/vec3.dart';
 /// If one fails after a protocol change, update the doc and Dev 4 too.
 void main() {
   group('ServerMessage.parse', () {
+    test('reads the second collision object with its velocity', () {
+      final message = ServerMessage.parse(
+        jsonEncode({
+          'type': 'state',
+          'frame_id': 3,
+          'timestamp': .2,
+          'tracked': true,
+          'pixel': {'x': 40, 'y': 120},
+          'objects': [
+            {
+              'id': 1,
+              'label': 'selected',
+              'target': true,
+              'pixel': {'x': 40, 'y': 120},
+            },
+            {
+              'id': 2,
+              'label': 'selected_2',
+              'target': false,
+              'pixel': {'x': 200, 'y': 121},
+              'bbox': {'x': 187, 'y': 108, 'w': 26, 'h': 26},
+            },
+          ],
+          'collision_objects': [
+            {
+              'id': 2,
+              'velocity': {'x': .3, 'y': 0},
+            },
+          ],
+        }),
+      );
+      final partner = (message as StateMessage).state.partner!;
+      expect(partner.pixel, const Vec2(200, 121));
+      expect(partner.bbox?.w, 26);
+      expect(partner.velocity, const Vec2(.3, 0));
+      expect(partner.tracked, isTrue);
+    });
+
+    test('has no partner without a second selected object', () {
+      final message = ServerMessage.parse(
+        jsonEncode({
+          'type': 'frame',
+          'frame_id': 3,
+          'objects': [
+            {
+              'id': 1,
+              'label': 'selected',
+              'target': true,
+              'pixel': {'x': 40, 'y': 120},
+            },
+          ],
+        }),
+      );
+      expect((message as FrameAckMessage).target?.partner, isNull);
+    });
+
     test('parses a full state message', () {
       const raw = '''
       {
@@ -156,6 +212,24 @@ void main() {
   });
 
   group('SessionConfig', () {
+    test('sends the second collision object', () {
+      final json = SessionConfig(
+        mode: ExperimentMode.collision,
+        massKg: .1,
+        frameSize: const FrameSize(320, 240),
+        targetPx: const Vec2(40, 120),
+        secondTargetPx: const Vec2(200, 120),
+        secondTargetBbox: const PixelRect(187, 107, 26, 26),
+      ).toJson();
+      expect(json['second_target_px'], {'x': 200.0, 'y': 120.0});
+      expect(json['second_target_bbox'], {
+        'x': 187.0,
+        'y': 107.0,
+        'w': 26.0,
+        'h': 26.0,
+      });
+    });
+
     test('encodes the documented config message', () {
       const config = SessionConfig(
         mode: ExperimentMode.ramp,
@@ -171,6 +245,8 @@ void main() {
         'px_per_m': 812.5,
         'target_px': {'x': 161.0, 'y': 118.5},
         'target_bbox': null,
+        'second_target_px': null,
+        'second_target_bbox': null,
         'frame_size': {'w': 320, 'h': 240},
         'ar_plane': null,
       });

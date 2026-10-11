@@ -15,11 +15,13 @@ import '../../../state/session_controller.dart';
 import '../../../state/experiment_settings.dart';
 import '../../../services/network/acquisition_client.dart';
 import '../../experiment/widgets/coordinate_mapper.dart';
+import 'selection_region_painter.dart';
 
 /// The picture with the calibration marks on it:
 ///
 /// * a ruler line with two draggable ends, which you lay over a real ruler;
-/// * a target ring where you tapped the object to track.
+/// * a target ring where you tapped the object to track, and in a
+///   collision a second one for the other object.
 ///
 /// While you drag an end, a loupe above your finger shows the end magnified,
 /// so you can place it on a millimetre mark. The line snaps level or upright
@@ -68,7 +70,18 @@ class _CalibrationStageState extends ConsumerState<CalibrationStage> {
   @override
   void initState() {
     super.initState();
-    _previewFrame = ref.read(calibrationProvider).selectionFrame;
+    // Back from an experiment, a confirmed selection's picture is old: show
+    // the live camera rather than a still that looks frozen.
+    _previewFrame = _heldFrame(ref.read(calibrationProvider));
+  }
+
+  /// The picture to hold when no gesture is in progress: the selection's,
+  /// while it waits for the user to confirm it, else none (live camera).
+  static EncodedFrame? _heldFrame(Calibration c) {
+    if (c.second case final second? when !second.confirmed) {
+      return second.frame;
+    }
+    return c.target == null || c.selectionConfirmed ? null : c.selectionFrame;
   }
 
   KeyEventResult _onKey(
@@ -97,7 +110,9 @@ class _CalibrationStageState extends ConsumerState<CalibrationStage> {
       });
       return KeyEventResult.handled;
     }
-    final box = c.targetBbox, frame = c.selectionFrame;
+    final second = ref.read(calibrationProvider.notifier).choosingSecond;
+    final box = second ? c.second?.box : c.targetBbox;
+    final frame = second ? c.second?.frame : c.selectionFrame;
     if (box == null || frame == null) return KeyEventResult.ignored;
     var x = box.x, y = box.y, w = box.w, h = box.h;
     if (key == LogicalKeyboardKey.arrowLeft) {
@@ -144,6 +159,14 @@ class _CalibrationStageState extends ConsumerState<CalibrationStage> {
       return null;
     }
     if (!mounted || epoch != _selectionEpoch) return null;
+    if (frame == null) {
+      ref
+          .read(calibrationProvider.notifier)
+          .acquisitionFailed(
+            'The camera has no picture yet. Wait a moment, then try again.',
+          );
+      return null;
+    }
     setState(() => _previewFrame = frame);
     return frame;
   }
@@ -152,8 +175,16 @@ class _CalibrationStageState extends ConsumerState<CalibrationStage> {
   Widget build(BuildContext context) {
     final calibration = ref.watch(calibrationProvider);
     ref.listen(calibrationProvider, (previous, next) {
-      if (next.target == null) {
+      if ((previous?.target != null && next.target == null) ||
+          (previous?.second != null && next.second == null)) {
         _selectionEpoch++;
+        setState(() => _previewFrame = null);
+      } else if ((next.selectionConfirmed &&
+              !(previous?.selectionConfirmed ?? false)) ||
+          ((next.second?.confirmed ?? false) &&
+              !(previous?.second?.confirmed ?? false))) {
+        // Confirmed: back to the live camera, to check the object is in
+        // view before starting.
         setState(() => _previewFrame = null);
       }
     });
@@ -192,7 +223,7 @@ class _CalibrationStageState extends ConsumerState<CalibrationStage> {
                   _dragging = null;
                   _boxStart = null;
                   _boxEnd = null;
-                  _previewFrame = calibration.selectionFrame;
+                  _previewFrame = _heldFrame(calibration);
                 });
               },
               child: Stack(
@@ -203,14 +234,14 @@ class _CalibrationStageState extends ConsumerState<CalibrationStage> {
                   else
                     widget.background,
                   if (_boxStart != null && _boxEnd != null)
-                    Positioned.fromRect(
-                      rect: Rect.fromPoints(
-                        screen(_boxStart)!,
-                        screen(_boxEnd)!,
-                      ),
-                      child: DecoratedBox(
-                        decoration: BoxDecoration(
-                          border: Border.all(color: AppColors.vellum),
+                    IgnorePointer(
+                      child: CustomPaint(
+                        painter: SelectionRegionPainter(
+                          box: Rect.fromPoints(
+                            screen(_boxStart)!,
+                            screen(_boxEnd)!,
+                          ),
+                          drawing: true,
                         ),
                       ),
                     ),
@@ -225,6 +256,12 @@ class _CalibrationStageState extends ConsumerState<CalibrationStage> {
                       label: _lengthLabel(calibration.rulerLengthM),
                       active: _dragging,
                       snapped: _snapped,
+                      confirmed: calibration.selectionConfirmed,
+                      second: screen(calibration.second?.point),
+                      secondBox: calibration.second?.box == null
+                          ? null
+                          : mapper.rectToScreen(calibration.second!.box!),
+                      secondConfirmed: calibration.second?.confirmed ?? false,
                     ),
                   ),
                   if (active != null) _loupe(active, view),
@@ -395,17 +432,25 @@ class _CalibrationStageState extends ConsumerState<CalibrationStage> {
         _boxStart = null;
         _boxEnd = null;
       });
-      if (start == null || end == null || frame == null) return;
-      final x = math.min(start.x, end.x), y = math.min(start.y, end.y);
-      final w = (start.x - end.x).abs(), h = (start.y - end.y).abs();
-      if (w < 8 || h < 8) return;
+      final box = start == null || end == null
+          ? null
+          : PixelRect(
+              math.min(start.x, end.x),
+              math.min(start.y, end.y),
+              (start.x - end.x).abs(),
+              (start.y - end.y).abs(),
+            );
+      if (frame == null || box == null || box.w < 8 || box.h < 8) {
+        // Too small to be a box, or no picture: let go of the picture held
+        // for drawing, or the stage stays on it.
+        setState(
+          () => _previewFrame = _heldFrame(ref.read(calibrationProvider)),
+        );
+        return;
+      }
       ref
           .read(calibrationProvider.notifier)
-          .selectObject(
-            Vec2(x + w / 2, y + h / 2),
-            PixelRect(x, y, w, h),
-            frame,
-          );
+          .selectObject(Vec2(box.x + box.w / 2, box.y + box.h / 2), box, frame);
       return;
     }
     setState(() {
@@ -441,6 +486,7 @@ class _CalibrationStageState extends ConsumerState<CalibrationStage> {
         'Ruler line set to ${_lengthLabel(c.rulerLengthM)}, '
             '${scale.round()} pixels per metre.',
       c.target == null ? 'No object marked.' : 'Object marked.',
+      if (c.second != null) 'Second object marked.',
       'Enter selects a box. Arrow keys move it. Plus and minus resize it.',
     ].join(' ');
   }
@@ -457,6 +503,10 @@ class _MarksPainter extends CustomPainter {
     required this.label,
     required this.active,
     required this.snapped,
+    required this.confirmed,
+    this.second,
+    this.secondBox,
+    this.secondConfirmed = false,
   });
 
   final Offset? start;
@@ -466,28 +516,29 @@ class _MarksPainter extends CustomPainter {
   final String label;
   final _End? active;
   final bool snapped;
+  final bool confirmed;
+  final Offset? second;
+  final Rect? secondBox;
+  final bool secondConfirmed;
 
   static const _ink = AppColors.vellum;
   static const _halo = Color(0x99000000);
 
   @override
   void paint(Canvas canvas, Size size) {
-    if (target != null) _paintTarget(canvas, target!);
+    if (target != null && targetBox == null) _paintTarget(canvas, target!);
     if (targetBox != null) {
-      canvas.drawRect(
-        targetBox!,
-        Paint()
-          ..color = _halo
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = 4,
-      );
-      canvas.drawRect(
-        targetBox!,
-        Paint()
-          ..color = _ink
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = 1.5,
-      );
+      SelectionRegionPainter(
+        box: targetBox!,
+        confirmed: confirmed,
+      ).paint(canvas, size);
+    }
+    if (second != null && secondBox == null) _paintTarget(canvas, second!);
+    if (secondBox != null) {
+      SelectionRegionPainter(
+        box: secondBox!,
+        confirmed: secondConfirmed,
+      ).paint(canvas, size);
     }
     if (start != null && end != null) _paintRuler(canvas, size, start!, end!);
   }
@@ -515,7 +566,7 @@ class _MarksPainter extends CustomPainter {
       }
     }
 
-    // The ends: a hollow ring you can grab, its centre exactly on the point.
+    // The centre remains the exact endpoint; the larger outline aids touch.
     for (final (point, which) in [(a, _End.start), (b, _End.end)]) {
       final grabbed = active == which;
       final radius = grabbed ? 13.0 : 10.0;
@@ -524,14 +575,38 @@ class _MarksPainter extends CustomPainter {
         point,
         radius,
         Paint()
-          ..color = _ink
+          ..color = grabbed ? AppColors.instrumentAccentDark : _ink
           ..style = PaintingStyle.stroke
           ..strokeWidth = 2,
       );
       canvas.drawCircle(point, 1.8, Paint()..color = _ink);
+      final endpoint = TextPainter(
+        text: TextSpan(
+          text: which == _End.start ? 'A' : 'B',
+          style: AppType.label.copyWith(color: _ink),
+        ),
+        textDirection: TextDirection.ltr,
+      )..layout();
+      final x = (point.dx - endpoint.width / 2)
+          .clamp(4.0, math.max(4.0, size.width - endpoint.width - 4))
+          .toDouble();
+      final y = (point.dy + 18)
+          .clamp(4.0, math.max(4.0, size.height - endpoint.height - 4))
+          .toDouble();
+      final tag = Rect.fromLTWH(
+        x - 4,
+        y - 2,
+        endpoint.width + 8,
+        endpoint.height + 4,
+      );
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(tag, const Radius.circular(3)),
+        Paint()..color = AppColors.graphiteDeep,
+      );
+      endpoint.paint(canvas, Offset(x, y));
     }
 
-    // The length, in a pill beside the middle of the line.
+    // Place the reference length beside the dimension, away from its ends.
     final text = TextPainter(
       text: TextSpan(
         text: label,
@@ -556,13 +631,17 @@ class _MarksPainter extends CustomPainter {
     if (size.width > pillSize.width) {
       centre = Offset(centre.dx.clamp(halfW, size.width - halfW), centre.dy);
     }
+    final halfH = pillSize.height / 2;
+    if (size.height > pillSize.height) {
+      centre = Offset(centre.dx, centre.dy.clamp(halfH, size.height - halfH));
+    }
     final pill = RRect.fromRectAndRadius(
       Rect.fromCenter(
         center: centre,
         width: pillSize.width,
         height: pillSize.height,
       ),
-      const Radius.circular(999),
+      const Radius.circular(4),
     );
     canvas.drawRRect(pill, Paint()..color = _ink);
     text.paint(canvas, centre - Offset(text.width / 2, text.height / 2));
@@ -580,15 +659,6 @@ class _MarksPainter extends CustomPainter {
       ..strokeWidth = 1.5;
     for (final paint in [halo, ink]) {
       canvas.drawCircle(p, r, paint);
-      // Crosshair ticks outside the ring, so the object itself stays visible.
-      for (final dir in const [
-        Offset(1, 0),
-        Offset(-1, 0),
-        Offset(0, 1),
-        Offset(0, -1),
-      ]) {
-        canvas.drawLine(p + dir * (r + 3), p + dir * (r + 10), paint);
-      }
     }
   }
 
@@ -600,5 +670,9 @@ class _MarksPainter extends CustomPainter {
       old.targetBox != targetBox ||
       old.label != label ||
       old.active != active ||
-      old.snapped != snapped;
+      old.snapped != snapped ||
+      old.confirmed != confirmed ||
+      old.second != second ||
+      old.secondBox != secondBox ||
+      old.secondConfirmed != secondConfirmed;
 }

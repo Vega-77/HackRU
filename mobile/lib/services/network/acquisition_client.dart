@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -45,7 +46,9 @@ class AcquisitionClient {
         '${data['reason'] ?? 'no_clear_boundary'}',
       );
     } finally {
-      await channel.sink.close();
+      // Closing a socket that never connected can wait forever, which would
+      // leave setup stuck on finding the boundary. The reply is all we need.
+      unawaited(channel.sink.close().catchError((Object _) => null));
     }
   }
 }

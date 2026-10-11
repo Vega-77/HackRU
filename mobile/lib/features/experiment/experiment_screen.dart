@@ -135,8 +135,11 @@ class _ExperimentScreenState extends ConsumerState<ExperimentScreen> {
         const Expanded(child: _StageWithHud()),
         SizedBox(
           width: 360,
-          child: ColoredBox(
-            color: AppColors.graphiteRaised,
+          child: DecoratedBox(
+            decoration: const BoxDecoration(
+              color: AppColors.graphiteRaised,
+              border: Border(left: BorderSide(color: AppColors.ruleDark)),
+            ),
             child: SafeArea(
               left: false,
               child: const TelemetryPanel(showHandle: false),
@@ -238,15 +241,9 @@ class _TopBar extends ConsumerWidget {
                 ),
               ),
               const SizedBox(width: AppSpace.sm),
-              const _StatusChip(),
+              _StatusChip(compact: MediaQuery.sizeOf(context).width < 430),
             ],
           ),
-        ),
-        const SizedBox(width: AppSpace.sm),
-        _GlassIconButton(
-          icon: AppIcons.copy,
-          tooltip: 'Copy debug log',
-          onPressed: () => copyDebugLog(context),
         ),
         const SizedBox(width: AppSpace.sm),
         _GlassIconButton(
@@ -312,7 +309,9 @@ class _TopBar extends ConsumerWidget {
 /// How the connection to the backend is doing. Neutral on purpose: colour
 /// on this screen means physics.
 class _StatusChip extends ConsumerWidget {
-  const _StatusChip();
+  const _StatusChip({this.compact = false});
+
+  final bool compact;
 
   /// Leaves the experiment pill room on a small phone.
   static const _maxWidth = 140.0;
@@ -322,10 +321,11 @@ class _StatusChip extends ConsumerWidget {
     final connection = ref.watch(sessionProvider.select((s) => s.connection));
     final latency = ref.watch(sessionProvider.select((s) => s.latencyMs));
 
+    // The broadcast icon already says live, so the round trip stands alone.
     final (IconData icon, String text) = switch (connection) {
       ConnectionStatus.live => (
         AppIcons.broadcast,
-        latency == null ? 'Live' : 'Live ${latency.round()} ms',
+        latency == null ? 'Live' : '${latency.round()} ms',
       ),
       ConnectionStatus.connecting => (AppIcons.arrowClockwise, 'Connecting'),
       ConnectionStatus.offline => (AppIcons.wifiSlash, 'Offline'),
@@ -334,25 +334,31 @@ class _StatusChip extends ConsumerWidget {
 
     return Semantics(
       liveRegion: true,
-      label: text,
+      label: connection == ConnectionStatus.live && latency != null
+          ? 'Live, $text round trip'
+          : text,
       excludeSemantics: true,
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: _maxWidth),
+        constraints: BoxConstraints(maxWidth: compact ? 40 : _maxWidth),
         child: _GlassPill(
           dense: true,
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
               Icon(icon, size: 14, color: AppColors.inkMutedDark),
-              const SizedBox(width: 6),
-              Flexible(
-                child: Text(
-                  text,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: AppType.readoutSmall.copyWith(color: AppColors.vellum),
+              if (!compact) ...[
+                const SizedBox(width: 6),
+                Flexible(
+                  child: Text(
+                    text,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: AppType.readoutSmall.copyWith(
+                      color: AppColors.vellum,
+                    ),
+                  ),
                 ),
-              ),
+              ],
             ],
           ),
         ),
@@ -581,33 +587,56 @@ class _CameraFailed extends ConsumerWidget {
             AppSpace.xl,
           ),
           child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 360),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Icon(
-                  AppIcons.cameraSlash,
-                  size: 32,
-                  color: AppColors.vellum,
+            constraints: const BoxConstraints(maxWidth: 380),
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                color: AppColors.graphiteRaised,
+                borderRadius: AppRadii.panelAll,
+                border: Border.all(color: AppColors.ruleDark),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.all(AppSpace.xl),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        const Icon(
+                          AppIcons.cameraSlash,
+                          size: 20,
+                          color: AppColors.instrumentAccentDark,
+                        ),
+                        const SizedBox(width: AppSpace.sm),
+                        Text(
+                          'Camera input',
+                          style: AppType.label.copyWith(
+                            color: AppColors.inkMutedDark,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: AppSpace.lg),
+                    Text(
+                      'The camera did not start',
+                      style: Theme.of(context).textTheme.titleLarge,
+                    ),
+                    const SizedBox(height: AppSpace.sm),
+                    Text(
+                      '${error ?? 'No camera was found.'} '
+                      'Check that the app may use the camera, then try again.',
+                      style: AppType.body.copyWith(
+                        color: AppColors.inkMutedDark,
+                      ),
+                    ),
+                    const SizedBox(height: AppSpace.xl),
+                    FilledButton(
+                      onPressed: session.start,
+                      child: const Text('Try again'),
+                    ),
+                  ],
                 ),
-                const SizedBox(height: AppSpace.lg),
-                Text(
-                  'The camera did not start',
-                  style: Theme.of(context).textTheme.titleLarge,
-                ),
-                const SizedBox(height: AppSpace.sm),
-                Text(
-                  '${error ?? 'No camera was found.'} '
-                  'Check that the app may use the camera, then try again.',
-                  style: AppType.body.copyWith(color: AppColors.inkMutedDark),
-                ),
-                const SizedBox(height: AppSpace.xl),
-                FilledButton(
-                  onPressed: session.start,
-                  child: const Text('Try again'),
-                ),
-              ],
+              ),
             ),
           ),
         ),

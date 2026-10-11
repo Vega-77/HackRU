@@ -50,6 +50,12 @@ class CentroidTracker:
         self.tracks: dict[int, Track] = {}
         self._next_id = 1
 
+    def forget_manual(self, label: str | None = None) -> None:
+        """Drop the selected object's track (only the one with `label`, when given), when the
+        user selects something else."""
+        self.tracks = {i: t for i, t in self.tracks.items()
+                       if t.source != "manual" or (label is not None and t.label != label)}
+
     def update(self, detections: list[Detection]) -> list[Track]:
         """Feed one frame's detections; returns the confirmed tracks seen this frame."""
         pairs = []
@@ -59,7 +65,10 @@ class CentroidTracker:
                 if d.label != t.label:
                     continue
                 dist = math.hypot(d.centroid[0] - px, d.centroid[1] - py)
-                if dist <= self.max_distance:
+                # The selected object keeps its ID wherever ManualTracker finds it: that
+                # tracker already checked it is the same object, and a new ID would
+                # restart its velocity history.
+                if dist <= self.max_distance or (d.source == "manual" and t.source == "manual"):
                     pairs.append((dist, ti, di))
         pairs.sort()
 

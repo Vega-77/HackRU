@@ -3,8 +3,10 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../core/logging/debug_log.dart';
 import '../../core/routing/router.dart';
 import '../../core/theme/app_icons.dart';
+import '../../core/theme/app_theme.dart';
 import '../../core/theme/tokens.dart';
 import '../../models/experiment_mode.dart';
 import '../../models/session_config.dart';
@@ -15,6 +17,7 @@ import '../../state/experiment_settings.dart';
 import '../../state/session_controller.dart';
 import 'mass_steps.dart';
 import 'widgets/calibration_stage.dart';
+import 'widgets/measurement_chrome.dart';
 
 /// Three steps before an experiment: set the scale with a ruler, mark the
 /// object, enter its mass. On iOS with ARKit there is a step before them:
@@ -37,6 +40,10 @@ class _CalibrationScreenState extends ConsumerState<CalibrationScreen> {
   FrameSize? _cameraFrame;
   String? _cameraError;
 
+  /// Only the latest start may update the screen; Try again can start a new
+  /// one while an old one is still waiting.
+  int _cameraAttempt = 0;
+
   @override
   void initState() {
     super.initState();
@@ -51,15 +58,30 @@ class _CalibrationScreenState extends ConsumerState<CalibrationScreen> {
   }
 
   Future<void> _startCamera() async {
+    final attempt = ++_cameraAttempt;
     setState(() => _cameraError = null);
+    // Any failure has to reach the screen: an uncaught one would leave it
+    // on "Starting camera" for good.
+    String? error;
     try {
       await _camera.start();
     } on CameraUnavailableException catch (e) {
-      if (mounted) setState(() => _cameraError = e.message);
+      error = e.message;
+    } catch (e, stack) {
+      log.e('The camera failed to start', e, stack);
+      error = 'Close other apps using the camera, then try again.';
+    }
+    if (!mounted || attempt != _cameraAttempt) return;
+    final frame = _camera.frameSize;
+    if (error == null && frame == null) {
+      log.w('The camera started without a picture size');
+      error = 'It opened but sent no picture. Try again.';
+    }
+    if (error != null) {
+      setState(() => _cameraError = error);
       return;
     }
-    if (!mounted) return;
-    setState(() => _cameraFrame = _camera.frameSize);
+    setState(() => _cameraFrame = frame);
     _placeDefaults();
   }
 
@@ -99,95 +121,118 @@ class _CalibrationScreenState extends ConsumerState<CalibrationScreen> {
     };
     final steps = _Steps(surfaces: surfaces, frameSize: _cameraFrame);
     final start = FilledButton(
-      onPressed: ref.watch(calibrationProvider).selectionConfirmed
+      style: FilledButton.styleFrom(
+        minimumSize: const Size(48, 56),
+        backgroundColor: AppColors.instrumentAccentDark,
+        foregroundColor: AppColors.graphiteDeep,
+      ),
+      // A collision needs both objects, so the physics has a pair to compare.
+      onPressed:
+          (mode == ExperimentMode.collision
+              ? ref.watch(calibrationProvider).pairConfirmed
+              : ref.watch(calibrationProvider).selectionConfirmed)
           ? _startExperiment
           : null,
       child: const Text('Start experiment'),
     );
 
-    return Scaffold(
-      appBar: AppBar(
-        title: Text('Set up ${mode.label.toLowerCase()}'),
-        leading: IconButton(
-          tooltip: 'Back',
-          icon: const Icon(AppIcons.arrowLeft),
-          onPressed: () =>
-              context.canPop() ? context.pop() : context.go(Routes.home),
+    return Theme(
+      data: AppTheme.dark(),
+      child: Scaffold(
+        appBar: AppBar(
+          title: Text('Set up ${mode.label.toLowerCase()}'),
+          leading: IconButton(
+            tooltip: 'Back',
+            icon: const Icon(AppIcons.arrowLeft),
+            onPressed: () =>
+                context.canPop() ? context.pop() : context.go(Routes.home),
+          ),
         ),
-      ),
-      body: LayoutBuilder(
-        builder: (context, constraints) {
-          if (constraints.maxWidth >= 760) {
-            // Landscape or tablet: picture left, steps right.
-            return Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
+        body: LayoutBuilder(
+          builder: (context, constraints) {
+            final shortWorkspace = constraints.maxHeight < 500;
+            if (constraints.maxWidth >= 960 ||
+                (constraints.maxWidth >= 760 && shortWorkspace)) {
+              // Landscape or tablet: picture left, steps right.
+              return Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(
+                        AppSpace.lg,
+                        0,
+                        AppSpace.sm,
+                        AppSpace.lg,
+                      ),
+                      child: Column(
+                        children: [
+                          if (!shortWorkspace) const WorkspaceHeading(),
+                          Expanded(child: Center(child: stage)),
+                          if (!shortWorkspace) const WorkspaceFooter(),
+                        ],
+                      ),
+                    ),
+                  ),
+                  SizedBox(
+                    width: 360,
+                    child: SafeArea(
+                      left: false,
+                      top: false,
+                      child: Column(
+                        children: [
+                          Expanded(child: SingleChildScrollView(child: steps)),
+                          Padding(
+                            padding: const EdgeInsets.all(AppSpace.lg),
+                            child: SizedBox(
+                              width: double.infinity,
+                              child: start,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              );
+            }
+            // Portrait: picture on top (fixed, so dragging on it never
+            // scrolls the page), steps scroll underneath.
+            return Column(
               children: [
-                Expanded(
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: AppSpace.lg),
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(
+                      maxHeight: constraints.maxHeight * 0.45,
+                    ),
+                    child: stage,
+                  ),
+                ),
+                Expanded(child: SingleChildScrollView(child: steps)),
+                SafeArea(
+                  top: false,
                   child: Padding(
                     padding: const EdgeInsets.fromLTRB(
                       AppSpace.lg,
-                      0,
                       AppSpace.sm,
                       AppSpace.lg,
+                      AppSpace.sm,
                     ),
-                    child: Center(child: stage),
-                  ),
-                ),
-                SizedBox(
-                  width: 380,
-                  child: SafeArea(
-                    left: false,
-                    top: false,
-                    child: Column(
-                      children: [
-                        Expanded(child: SingleChildScrollView(child: steps)),
-                        Padding(
-                          padding: const EdgeInsets.all(AppSpace.lg),
-                          child: SizedBox(width: double.infinity, child: start),
-                        ),
-                      ],
-                    ),
+                    child: SizedBox(width: double.infinity, child: start),
                   ),
                 ),
               ],
             );
-          }
-          // Portrait: picture on top (fixed, so dragging on it never
-          // scrolls the page), steps scroll underneath.
-          return Column(
-            children: [
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: AppSpace.lg),
-                child: ConstrainedBox(
-                  constraints: BoxConstraints(
-                    maxHeight: constraints.maxHeight * 0.45,
-                  ),
-                  child: stage,
-                ),
-              ),
-              Expanded(child: SingleChildScrollView(child: steps)),
-              SafeArea(
-                top: false,
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(
-                    AppSpace.lg,
-                    AppSpace.sm,
-                    AppSpace.lg,
-                    AppSpace.sm,
-                  ),
-                  child: SizedBox(width: double.infinity, child: start),
-                ),
-              ),
-            ],
-          );
-        },
+          },
+        ),
       ),
     );
   }
 }
 
 /// The dark picture panel: the camera, or why there is none.
-class _Stage extends StatelessWidget {
+class _Stage extends ConsumerWidget {
   const _Stage({
     required this.frameSize,
     required this.error,
@@ -201,7 +246,7 @@ class _Stage extends StatelessWidget {
   final FrameSource camera;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final frame = frameSize;
     final Widget content;
     if (error != null) {
@@ -211,7 +256,9 @@ class _Stage extends StatelessWidget {
         onAction: onRetry,
       );
     } else if (frame == null) {
-      content = const _CameraMessage(text: 'Starting camera');
+      content = const _CameraMessage(
+        text: 'Starting camera. If asked, allow camera access.',
+      );
     } else {
       content = CalibrationStage(
         frameSize: frame,
@@ -220,11 +267,18 @@ class _Stage extends StatelessWidget {
       );
     }
 
-    return ClipRRect(
-      borderRadius: AppRadii.panelAll,
-      child: AspectRatio(
-        aspectRatio: 4 / 3,
-        child: ColoredBox(color: AppColors.graphiteDeep, child: content),
+    return AspectRatio(
+      aspectRatio: 4 / 3,
+      child: Column(
+        children: [
+          CameraStatusStrip(frame: frame, unavailable: error != null),
+          Expanded(
+            child: ClipRRect(
+              borderRadius: const BorderRadius.all(Radius.circular(4)),
+              child: ColoredBox(color: AppColors.graphiteDeep, child: content),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -239,29 +293,83 @@ class _CameraMessage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (action != null) {
+      return Center(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(AppSpace.lg),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 380),
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                color: AppColors.graphiteRaised,
+                borderRadius: AppRadii.panelAll,
+                border: Border.all(color: AppColors.ruleDark),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.all(AppSpace.md),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Icon(
+                      AppIcons.cameraSlash,
+                      size: 20,
+                      color: AppColors.instrumentAccentDark,
+                    ),
+                    const SizedBox(height: AppSpace.sm),
+                    Text(
+                      text,
+                      style: AppType.body.copyWith(color: AppColors.vellum),
+                    ),
+                    const SizedBox(height: AppSpace.sm),
+                    OutlinedButton(
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: AppColors.vellum,
+                        side: const BorderSide(
+                          color: AppColors.ruleDark,
+                          width: 1.5,
+                        ),
+                      ),
+                      onPressed: onAction,
+                      child: Text(action!),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(AppSpace.xl),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              text,
-              textAlign: TextAlign.center,
-              style: AppType.body.copyWith(color: AppColors.vellum),
-            ),
-            if (action != null) ...[
-              const SizedBox(height: AppSpace.md),
-              OutlinedButton(
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: AppColors.vellum,
-                  side: const BorderSide(color: AppColors.ruleDark, width: 1.5),
-                ),
-                onPressed: onAction,
-                child: Text(action!),
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                text,
+                textAlign: TextAlign.center,
+                style: AppType.body.copyWith(color: AppColors.vellum),
               ),
+              if (action != null) ...[
+                const SizedBox(height: AppSpace.md),
+                OutlinedButton(
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppColors.vellum,
+                    side: const BorderSide(
+                      color: AppColors.ruleDark,
+                      width: 1.5,
+                    ),
+                  ),
+                  onPressed: onAction,
+                  child: Text(action!),
+                ),
+              ],
             ],
-          ],
+          ),
         ),
       ),
     );
@@ -284,12 +392,16 @@ class _Steps extends ConsumerWidget {
     final scale = calibration.pxPerM;
     final surfaces = this.surfaces;
     final hasSurface = surfaces != null && calibration.surface != null;
+    final collision =
+        ref.watch(experimentSettingsProvider.select((s) => s.mode)) ==
+        ExperimentMode.collision;
+    final total = (surfaces == null ? 3 : 4) + (collision ? 1 : 0);
     var number = 0;
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(
         AppSpace.lg,
-        AppSpace.md,
+        AppSpace.xl,
         AppSpace.lg,
         AppSpace.md,
       ),
@@ -303,33 +415,35 @@ class _Steps extends ConsumerWidget {
               AppSpace.xs,
               AppSpace.lg,
             ),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.end,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'CALIBRATION',
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: Text(
+                        'Measurement panel',
                         style: AppType.label.copyWith(
                           color: scheme.primary,
                           fontSize: 12,
                         ),
                       ),
-                      const SizedBox(height: AppSpace.xs),
-                      Text(
-                        'Prepare the measurement',
-                        style: Theme.of(context).textTheme.titleLarge,
+                    ),
+                    const SizedBox(width: 12),
+                    Text(
+                      '$total steps',
+                      style: AppType.readoutSmall.copyWith(
+                        color: scheme.onSurfaceVariant,
                       ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
+                const SizedBox(height: AppSpace.xs),
                 Text(
-                  '${surfaces == null ? 3 : 4} steps',
-                  style: AppType.readoutSmall.copyWith(
-                    color: scheme.onSurfaceVariant,
-                  ),
+                  'Prepare the measurement',
+                  style: Theme.of(context).textTheme.titleLarge,
                 ),
               ],
             ),
@@ -337,11 +451,13 @@ class _Steps extends ConsumerWidget {
           if (surfaces != null)
             _SurfaceStep(
               number: ++number,
+              total: total,
               finder: surfaces,
               frameSize: frameSize!,
             ),
           _Step(
             number: ++number,
+            total: total,
             title: 'Set the scale',
             body: hasSurface
                 ? 'Not needed while a surface is set. The surface measures '
@@ -350,54 +466,102 @@ class _Steps extends ConsumerWidget {
                       'Drag both ends of the line onto it.',
             done: scale != null || hasSurface,
             trailing: _RulerLengthField(lengthM: calibration.rulerLengthM),
-            footer: Text(
-              scale == null
-                  ? 'Place both ends to set the scale'
-                  : '${scale.round()} px per metre',
-              style: AppType.readoutSmall.copyWith(
-                color: scheme.onSurfaceVariant,
-              ),
-            ),
-          ),
-          _Step(
-            number: ++number,
-            title: 'Mark the object',
-            body: calibration.selectionPending
-                ? 'Finding the boundary in this picture. Hold the object still until tracking starts.'
-                : calibration.selectionError ??
-                      (calibration.target == null
-                          ? 'Tap the object to propose its boundary, or drag a box around it. '
-                                'With a keyboard, focus the picture and press Enter; '
-                                'arrows move the box and + or - resize it.'
-                          : calibration.selectionConfirmed
-                          ? 'Object region confirmed. Keep the object visible when starting.'
-                          : 'Does the box enclose the whole object? Confirm it, or draw a better box on this picture.'),
-            done: calibration.selectionConfirmed,
-            footer: calibration.target == null
-                ? null
-                : Wrap(
+            footer: hasSurface
+                ? const Text('AR surface sets the metric scale')
+                : Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      if (calibration.targetBbox != null &&
-                          !calibration.selectionConfirmed)
-                        TextButton(
-                          onPressed: ref
-                              .read(calibrationProvider.notifier)
-                              .confirmSelection,
-                          child: const Text('Confirm object'),
+                      MeasurementValue(
+                        label: 'Image scale',
+                        value: scale?.toStringAsFixed(1) ?? 'Not set',
+                        unit: scale == null ? '' : 'px/m',
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        scale == null
+                            ? 'Place both ends to set the scale'
+                            : 'Verify endpoints A and B against a real ruler.',
+                        style: AppType.caption.copyWith(
+                          color: scheme.onSurfaceVariant,
                         ),
-                      TextButton(
-                        onPressed: ref
-                            .read(calibrationProvider.notifier)
-                            .clearTarget,
-                        child: const Text('Retry selection'),
                       ),
                     ],
                   ),
           ),
           _Step(
             number: ++number,
+            total: total,
+            title: collision ? 'Mark the first object' : 'Mark the object',
+            // Keyboard controls are in the picture's screen reader label.
+            body: calibration.selectionPending
+                ? 'Finding the object in this picture. Hold it still.'
+                : calibration.selectionError ??
+                      (calibration.target == null
+                          ? 'Tap the object to propose its boundary, or drag a box around it.'
+                          : calibration.selectionConfirmed
+                          ? collision
+                                ? 'Now mark the object it will hit.'
+                                : 'Keep it in view when you start.'
+                          : 'Does the box fit the whole object? Confirm it, '
+                                'or draw a better one.'),
+            done: calibration.selectionConfirmed,
+            footer: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                AnimatedSwitcher(
+                  duration: MediaQuery.disableAnimationsOf(context)
+                      ? Duration.zero
+                      : AppMotion.standard,
+                  child: Text(
+                    selectionStatus(calibration),
+                    key: ValueKey(selectionStatus(calibration)),
+                    style: AppType.label.copyWith(
+                      color: calibration.selectionConfirmed
+                          ? AppColors.instrumentAccentDark
+                          : AppColors.vellum,
+                    ),
+                  ),
+                ),
+                if (calibration.targetBbox case final box?) ...[
+                  const SizedBox(height: 8),
+                  Text(
+                    '${box.w.toStringAsFixed(1)} × ${box.h.toStringAsFixed(1)} px · held selection picture',
+                    style: AppType.readoutSmall.copyWith(
+                      color: scheme.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+                if (calibration.target != null)
+                  Wrap(
+                    spacing: AppSpace.sm,
+                    runSpacing: AppSpace.sm,
+                    children: [
+                      if (calibration.targetBbox != null &&
+                          !calibration.selectionConfirmed)
+                        OutlinedButton.icon(
+                          onPressed: ref
+                              .read(calibrationProvider.notifier)
+                              .confirmSelection,
+                          icon: const Icon(AppIcons.check, size: 18),
+                          label: const Text('Confirm object'),
+                        ),
+                      TextButton(
+                        onPressed: ref
+                            .read(calibrationProvider.notifier)
+                            .clearTarget,
+                        child: const Text('Select again'),
+                      ),
+                    ],
+                  ),
+              ],
+            ),
+          ),
+          if (collision) _SecondObjectStep(number: ++number, total: total),
+          _Step(
+            number: ++number,
+            total: total,
             title: 'Enter its mass',
-            body: 'Forces and energy scale with mass. Weigh it if you can.',
+            body: 'Forces and energy scale with mass. Weigh it if you can. The current value is used when you start.',
             done: true,
             last: true,
             trailing: _MassStepper(
@@ -411,17 +575,90 @@ class _Steps extends ConsumerWidget {
   }
 }
 
+/// Marks the other object in a collision the same way as the first. It
+/// opens once the first object is confirmed, so a tap is never ambiguous.
+class _SecondObjectStep extends ConsumerWidget {
+  const _SecondObjectStep({required this.number, required this.total});
+
+  final int number;
+  final int total;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final calibration = ref.watch(calibrationProvider);
+    final controller = ref.read(calibrationProvider.notifier);
+    final second = calibration.second;
+    final scheme = Theme.of(context).colorScheme;
+    final String body;
+    if (!calibration.selectionConfirmed) {
+      body = 'Confirm the first object, then tap the second one.';
+    } else if (second?.pending ?? false) {
+      body = 'Finding the object in this picture. Hold it still.';
+    } else if (calibration.secondError case final error?) {
+      body = error;
+    } else if (second == null) {
+      body = 'Tap the other object, or drag a box around it.';
+    } else if (second.confirmed) {
+      body = 'Keep both objects in view when you start.';
+    } else {
+      body = 'Does the box fit the whole object? Confirm it, or draw a better one.';
+    }
+    return _Step(
+      number: number,
+      total: total,
+      title: 'Mark the second object',
+      body: body,
+      done: second?.confirmed ?? false,
+      footer: second == null
+          ? null
+          : Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (second.box case final box?) ...[
+                  Text(
+                    '${box.w.toStringAsFixed(1)} × ${box.h.toStringAsFixed(1)} px · held selection picture',
+                    style: AppType.readoutSmall.copyWith(
+                      color: scheme.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+                Wrap(
+                  spacing: AppSpace.sm,
+                  runSpacing: AppSpace.sm,
+                  children: [
+                    if (second.box != null &&
+                        !second.pending &&
+                        !second.confirmed)
+                      OutlinedButton.icon(
+                        onPressed: controller.confirmSelection,
+                        icon: const Icon(AppIcons.check, size: 18),
+                        label: const Text('Confirm object'),
+                      ),
+                    TextButton(
+                      onPressed: controller.clearSecond,
+                      child: const Text('Select again'),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+    );
+  }
+}
+
 /// Finds the board or table the object moves on with an ARKit raycast
 /// through the middle of the picture. Positions are then measured on that
 /// surface in 3D, so the phone may move during the experiment.
 class _SurfaceStep extends ConsumerStatefulWidget {
   const _SurfaceStep({
     required this.number,
+    required this.total,
     required this.finder,
     required this.frameSize,
   });
 
   final int number;
+  final int total;
   final SurfaceFinder finder;
   final FrameSize frameSize;
 
@@ -481,6 +718,7 @@ class _SurfaceStepState extends ConsumerState<_SurfaceStep> {
 
     return _Step(
       number: widget.number,
+      total: widget.total,
       title: 'Find the surface',
       body: wantsBoard
           ? 'Aim the middle of the picture at a board behind the experiment, '
@@ -503,6 +741,7 @@ class _SurfaceStepState extends ConsumerState<_SurfaceStep> {
 class _Step extends StatelessWidget {
   const _Step({
     required this.number,
+    required this.total,
     required this.title,
     required this.body,
     required this.done,
@@ -512,6 +751,7 @@ class _Step extends StatelessWidget {
   });
 
   final int number;
+  final int total;
   final String title;
   final String body;
   final bool done;
@@ -521,95 +761,15 @@ class _Step extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    return Semantics(
-      container: true,
-      label: 'Step $number of 3${done ? ', done' : ''}',
-      child: IntrinsicHeight(
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // The number, with a rule down to the next step.
-            Column(
-              children: [
-                AnimatedContainer(
-                  duration: AppMotion.quick,
-                  width: 28,
-                  height: 28,
-                  alignment: Alignment.center,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: done ? scheme.primary : Colors.transparent,
-                    border: Border.all(color: scheme.primary, width: 1.5),
-                  ),
-                  child: done
-                      ? Icon(AppIcons.check, size: 15, color: scheme.surface)
-                      : Text(
-                          '$number',
-                          style: AppType.label.copyWith(color: scheme.primary),
-                        ),
-                ),
-                if (!last)
-                  Expanded(
-                    child: Container(
-                      width: 1.5,
-                      margin: const EdgeInsets.symmetric(vertical: AppSpace.xs),
-                      color: scheme.outline,
-                    ),
-                  ),
-              ],
-            ),
-            const SizedBox(width: AppSpace.md),
-            Expanded(
-              child: Padding(
-                padding: EdgeInsets.only(bottom: last ? 0 : AppSpace.xl),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Padding(
-                                padding: const EdgeInsets.only(top: 4),
-                                child: Text(
-                                  title,
-                                  style: AppType.bodyStrong.copyWith(
-                                    fontSize: 16,
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(height: 2),
-                              Text(
-                                body,
-                                style: AppType.caption.copyWith(
-                                  fontSize: 13,
-                                  color: scheme.onSurfaceVariant,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        if (trailing != null) ...[
-                          const SizedBox(width: AppSpace.md),
-                          trailing!,
-                        ],
-                      ],
-                    ),
-                    if (footer != null) ...[
-                      const SizedBox(height: AppSpace.sm),
-                      footer!,
-                    ],
-                  ],
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
+    return MeasurementSection(
+      number: number,
+      total: total,
+      title: title,
+      body: body,
+      done: done,
+      trailing: trailing,
+      footer: footer,
+      last: last,
     );
   }
 }
@@ -663,7 +823,7 @@ class _RulerLengthFieldState extends ConsumerState<_RulerLengthField> {
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      width: 104,
+      width: double.infinity,
       child: TextField(
         controller: _text,
         onChanged: _onChanged,
@@ -672,12 +832,12 @@ class _RulerLengthFieldState extends ConsumerState<_RulerLengthField> {
           FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]')),
         ],
         textAlign: TextAlign.end,
-        style: AppType.readoutSmall.copyWith(fontSize: 17),
+        style: AppType.readout.copyWith(fontSize: 28),
         decoration: InputDecoration(
           isDense: true,
-          labelText: 'Length',
+          labelText: 'Reference length',
           suffixText: 'cm',
-          errorText: _invalid ? '1 to 500' : null,
+          errorText: _invalid ? 'Use 1 to 500 cm' : null,
           contentPadding: const EdgeInsets.symmetric(
             horizontal: AppSpace.md,
             vertical: AppSpace.md,
@@ -698,6 +858,7 @@ class _MassStepper extends StatelessWidget {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     Widget button(IconData icon, String tooltip, double? next) => IconButton(
+      style: IconButton.styleFrom(minimumSize: const Size(48, 48)),
       tooltip: tooltip,
       onPressed: next == null
           ? null
@@ -721,7 +882,10 @@ class _MassStepper extends StatelessWidget {
           : null,
       child: DecoratedBox(
         decoration: ShapeDecoration(
-          shape: StadiumBorder(side: BorderSide(color: scheme.outline)),
+          shape: RoundedRectangleBorder(
+            borderRadius: AppRadii.controlAll,
+            side: BorderSide(color: scheme.outline),
+          ),
           color: scheme.surfaceContainer,
         ),
         child: ExcludeSemantics(
@@ -733,12 +897,11 @@ class _MassStepper extends StatelessWidget {
                 'Lighter',
                 MassSteps.canGoDown(massKg) ? MassSteps.down(massKg) : null,
               ),
-              SizedBox(
-                width: 64,
+              Flexible(
                 child: Text(
                   MassSteps.format(massKg),
                   textAlign: TextAlign.center,
-                  style: AppType.readoutSmall.copyWith(fontSize: 16),
+                  style: AppType.readout.copyWith(fontSize: 28),
                 ),
               ),
               button(

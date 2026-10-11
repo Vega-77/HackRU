@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import logging
 import math
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 
 import numpy as np
 
@@ -18,7 +18,7 @@ from cv_engine.detect import DEFAULT_COLORS, ColorDetector, Detection, MediaPipe
 from cv_engine.preprocess import PreprocessedFrame
 from cv_engine.spatial import SpatialMapper
 from cv_engine.tracker import CentroidTracker, Track
-from cv_engine.universal import ManualTracker
+from cv_engine.universal import ManualTracker, box_from_tap
 
 log = logging.getLogger(__name__)
 
@@ -32,7 +32,12 @@ EXPERIMENT_MODES = ("free_fall", "ramp", "pendulum", "collision")
 # px_per_m (calibration fallback) and target_px (which object to follow); the rest is
 # kept for the physics stage. iOS ARKit clients may also send ar_plane, the surface the
 # object moves on: {"point": [x, y, z], "normal": [x, y, z], "offset_m": 0.0} in world metres.
-SESSION_DEFAULTS = {"mode": None, "mass_kg": 0.1, "px_per_m": None, "target_px": None, "target_bbox": None, "frame_size": None}
+# In collision mode the app can also select the other object (second_target_px and
+# second_target_bbox), which is then followed the same way as the first.
+SESSION_DEFAULTS = {"mode": None, "mass_kg": 0.1, "px_per_m": None, "target_px": None, "target_bbox": None,
+                    "second_target_px": None, "second_target_bbox": None, "frame_size": None}
+# Labels of the selected objects' detections, so the tracker never swaps their IDs.
+FIRST_LABEL, SECOND_LABEL = "selected", "selected_2"
 
 
 @dataclass
@@ -89,12 +94,15 @@ def validated_session(current: dict, changes: dict) -> dict:
         raise ValueError("collision_masses_kg must contain two positive masses")
     if s.get("ar_plane") is not None:
         ArPlane.from_request(s["ar_plane"])  # raises ValueError if malformed
-    for key, fields in (("target_px", ("x", "y")), ("target_bbox", ("x", "y", "w", "h")), ("frame_size", ("w", "h"))):
+    for key, fields in (("target_px", ("x", "y")), ("target_bbox", ("x", "y", "w", "h")),
+                        ("second_target_px", ("x", "y")), ("second_target_bbox", ("x", "y", "w", "h")),
+                        ("frame_size", ("w", "h"))):
         v = s[key]
         if v is not None and not (isinstance(v, dict) and all(isinstance(v.get(f), (int, float)) and math.isfinite(v[f]) for f in fields)):
             raise ValueError(f"{key} must be null or an object with numeric {', '.join(fields)}")
-    if s["target_bbox"] is not None and (s["target_bbox"]["w"] <= 0 or s["target_bbox"]["h"] <= 0):
-        raise ValueError("target_bbox must have positive width and height")
+    for key in ("target_bbox", "second_target_bbox"):
+        if s[key] is not None and (s[key]["w"] <= 0 or s[key]["h"] <= 0):
+            raise ValueError(f"{key} must have positive width and height")
     if s["frame_size"] is not None and (s["frame_size"]["w"] <= 0 or s["frame_size"]["h"] <= 0):
         raise ValueError("frame_size must have positive width and height")
     return s
@@ -109,6 +117,8 @@ class TrackingPipeline:
         self._target_last: tuple[float, float] | None = None  # client px
         self._manual = ManualTracker()
         self._pending_selection = False
+        self._second = ManualTracker()  # the other object in a collision, when the user selected it
+        self._second_pending = False
         self.configure(config or PipelineConfig())
 
     def configure(self, config: PipelineConfig) -> None:
@@ -136,6 +146,15 @@ class TrackingPipeline:
         self._target_id = None
         self._manual.reset()
         self._pending_selection = self.session["target_px"] is not None
+        self._second.reset()
+        self._second_pending = self.session["second_target_px"] is not None
+
+    @property
+    def follows_second(self) -> bool:
+        """Whether a second selected object is followed: only in collision mode, next to
+        the first selection."""
+        s = self.session
+        return s["mode"] == "collision" and s["target_px"] is not None and s["second_target_px"] is not None
 
     def apply_config(self, message: dict) -> dict:
         """Handle a {"type": "config"} message. Detector keys (see PipelineConfig) retune
@@ -154,7 +173,16 @@ class TrackingPipeline:
             t = session["target_px"]
             self._target_last = (t["x"], t["y"]) if t else None
             self._manual.reset()
+            self.tracker.forget_manual(FIRST_LABEL)
             self._pending_selection = t is not None
+            if t is None and self.motion:
+                self.motion.reset()  # its background stopped learning while a tap was followed
+        if (session["second_target_px"], session["second_target_bbox"]) != (
+            self.session["second_target_px"], self.session["second_target_bbox"]
+        ):
+            self._second.reset()
+            self.tracker.forget_manual(SECOND_LABEL)
+            self._second_pending = session["second_target_px"] is not None
         self.session = session
         plane_before = self.spatial.ar_plane
         self.spatial.set_ar_plane(session.get("ar_plane"))
@@ -186,26 +214,34 @@ class TrackingPipeline:
     def __call__(self, frame: PreprocessedFrame) -> dict:
         """Process one frame; returns the "objects" and "calibration" parts of the result."""
         self.spatial.update(frame)
-        detections = self.detect(frame)
         tap = self.session["target_px"]
-        manual = None
+        # Once the user's object is selected, only it is followed (see _pick_target), so the
+        # other detectors' work would be thrown away: skipping them roughly halves the time
+        # per frame, and a faster stream means smaller jumps between frames. Collisions need
+        # the other object too: the detectors keep running for it unless the user selected
+        # it as well, and then it is followed the same way as the first.
+        following = tap is not None and not self._pending_selection and self._manual.original is not None
+        second_tap = self.session["second_target_px"] if self.follows_second else None
+        second_following = second_tap is not None and not self._second_pending and self._second.original is not None
+        need_detectors = self.session["mode"] == "collision" and not second_following
+        detections = [] if following and not need_detectors else self.detect(frame)
+        selected = []
         if tap is not None:
             if self._pending_selection:
-                point = (tap["x"] * frame.scale, tap["y"] * frame.scale)
-                box = self.session["target_bbox"]
-                if box is None:
-                    proposal = propose_region(frame.bgr, point)
-                    if proposal["bbox"]:
-                        box = {key: value / frame.scale for key, value in proposal["bbox"].items()}
-                self._manual.select(frame, point, box)
+                self._select(self._manual, frame, tap, self.session["target_bbox"])
                 self._pending_selection = False
-            else:
-                manual = self._manual.detect(frame)
-        if manual is not None:
-            mx, my, mw, mh = manual.bbox
+            elif (manual := self._manual.detect(frame)) is not None:
+                selected.append(manual)
+        if second_tap is not None:
+            if self._second_pending:
+                self._select(self._second, frame, second_tap, self.session["second_target_bbox"])
+                self._second_pending = False
+            elif (second := self._second.detect(frame)) is not None:
+                selected.append(replace(second, label=SECOND_LABEL))
+        for mx, my, mw, mh in (d.bbox for d in selected):
             detections = [d for d in detections if not (mx < d.bbox[0] + d.bbox[2] and d.bbox[0] < mx + mw
                           and my < d.bbox[1] + d.bbox[3] and d.bbox[1] < my + mh)]
-            detections.append(manual)
+        detections += selected
         tracks = self.tracker.update(detections)
         target = self._pick_target(tracks, frame)
         objects = [track_to_json(t, frame, self.spatial) for t in tracks]
@@ -229,22 +265,64 @@ class TrackingPipeline:
         if self.session.get("debug_tracking"):
             result["tracking_debug"] = {"frame_id": frame.frame_id, "timestamp": frame.timestamp,
                                         "detections": len(detections), **self._manual.debug}
+            if second_tap is not None:
+                result["tracking_debug"]["second"] = dict(self._second.debug)
         return result
 
-    def initialize(self, frame: PreprocessedFrame) -> dict:
-        """Retry acquisition on this exact image; initialization is never a detection."""
-        self._manual.reset()
-        self._target_id = None
-        self.tracker = CentroidTracker(self.config.max_distance, self.config.max_missed, self.config.min_hits)
-        self._pending_selection = self.session["target_px"] is not None
+    def initialize(self, frame: PreprocessedFrame, which: str = "first") -> dict:
+        """Retry acquisition on this exact image; initialization is never a detection.
+        `which` is "second" for the other object in a collision, selected on its own image
+        after the first object was initialized (initializing the first one clears it)."""
+        if which == "second":
+            manual = self._second
+            manual.reset()
+            self.tracker.forget_manual(SECOND_LABEL)
+            self._second_pending = False
+        else:
+            manual = self._manual
+            manual.reset()
+            self._second.reset()
+            self._second_pending = False
+            self._target_id = None
+            self.tracker = CentroidTracker(self.config.max_distance, self.config.max_missed, self.config.min_hits)
+            self._pending_selection = self.session["target_px"] is not None
         expected = self.session["frame_size"]
         if expected is not None and frame.source_size != (expected["w"], expected["h"]):
             return {"status": "failed", "reason": "selection_image_size_mismatch", "tracked": False, "bbox": None}
-        self(frame)
-        return {"status": "initialized" if self._manual.original is not None else "failed",
-                "reason": self._manual.debug["reason"], "tracked": False,
-                "bbox": None if self._manual.bbox is None else
-                    {key: value / frame.scale for key, value in zip(("x", "y", "w", "h"), self._manual.bbox)}}
+        if which == "second":
+            if not self.follows_second:
+                return {"status": "failed", "reason": "no_second_selection", "tracked": False, "bbox": None}
+            self._select(manual, frame, self.session["second_target_px"], self.session["second_target_bbox"])
+        else:
+            self(frame)
+        return {"status": "initialized" if manual.original is not None else "failed",
+                "reason": manual.debug["reason"], "tracked": False,
+                "bbox": None if manual.bbox is None else
+                    {key: value / frame.scale for key, value in zip(("x", "y", "w", "h"), manual.bbox)}}
+
+    def _select(self, manual: ManualTracker, frame: PreprocessedFrame, tap: dict, box: dict | None) -> None:
+        point = (tap["x"] * frame.scale, tap["y"] * frame.scale)
+        if box is None:
+            box = self._box_from_tap(frame, point)
+        manual.select(frame, point, box)
+
+    def _box_from_tap(self, frame: PreprocessedFrame, point: tuple[float, float]) -> dict | None:
+        """A box (client px) around the object under a tap without a drawn box, or None to
+        ask the user for one (selection_required). A stable flood-filled region is best on a
+        plain background; on a textured one it leaks or finds many outlines, and the object
+        is found by how it stands out from its surroundings instead."""
+        proposal = propose_region(frame.bgr, point)
+        found = None
+        if proposal["reason"] != "stable_seeded_region":
+            found = box_from_tap(frame, point)
+        if found is not None:
+            x, y, w, h = found
+        elif proposal["bbox"]:
+            x, y, w, h = (proposal["bbox"][k] for k in ("x", "y", "w", "h"))
+        else:
+            return None
+        s = frame.scale
+        return {"x": x / s, "y": y / s, "w": w / s, "h": h / s}
 
     def _pick_target(self, tracks: list[Track], frame: PreprocessedFrame) -> Track | None:
         """The object the app cares about: the one the user tapped (target_px), followed by
@@ -253,7 +331,8 @@ class TrackingPipeline:
         if not tracks:
             return None
         by_id = {t.id: t for t in tracks}
-        manual_tracks = [t for t in tracks if t.source == "manual"] if self.session["target_px"] is not None else []
+        manual_tracks = [t for t in tracks if t.source == "manual" and t.label == FIRST_LABEL] \
+            if self.session["target_px"] is not None else []
         if manual_tracks:
             chosen = max(manual_tracks, key=lambda t: t.score)
         elif self.session["target_px"] is not None:
