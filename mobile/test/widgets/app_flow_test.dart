@@ -197,8 +197,10 @@ void main() {
     tester,
   ) async {
     final container = await pumpApp(tester);
-    expect(find.textContaining('Live from'), findsOneWidget);
+    expect(find.textContaining('Backend:'), findsOneWidget);
 
+    await tester.ensureVisible(find.textContaining('Set up'));
+    await tester.pump();
     await tester.tap(find.textContaining('Set up'));
     await tester.pump(const Duration(milliseconds: 600));
     expect(find.text('Start experiment'), findsOneWidget);
@@ -269,6 +271,8 @@ void main() {
     tester.view.physicalSize = const Size(600, 900) * 3;
     await tester.pump();
 
+    await tester.ensureVisible(find.textContaining('Set up'));
+    await tester.pump();
     await tester.tap(find.textContaining('Set up'));
     await tester.pump(const Duration(milliseconds: 600));
     expect(camera.isRunning, isTrue);
@@ -302,6 +306,8 @@ void main() {
   ) async {
     camera.startError = StateError('plugin crashed');
     await pumpApp(tester);
+    await tester.ensureVisible(find.textContaining('Set up'));
+    await tester.pump();
     await tester.tap(find.textContaining('Set up'));
     await tester.pump(const Duration(milliseconds: 600));
     await tester.pump(); // the start's outcome lands after that frame
@@ -323,6 +329,8 @@ void main() {
   ) async {
     camera.sizeless = true;
     await pumpApp(tester);
+    await tester.ensureVisible(find.textContaining('Set up'));
+    await tester.pump();
     await tester.tap(find.textContaining('Set up'));
     await tester.pump(const Duration(milliseconds: 600));
     await tester.pump(); // the start's outcome lands after that frame
@@ -344,6 +352,8 @@ void main() {
     camera = ar;
     final container = await pumpApp(tester);
 
+    await tester.ensureVisible(find.textContaining('Set up'));
+    await tester.pump();
     await tester.tap(find.textContaining('Set up'));
     await tester.pump(const Duration(milliseconds: 600));
     await tester.pump(); // the camera's frame size arrives after start()
@@ -367,6 +377,8 @@ void main() {
       tester,
       acquisition: _Acquisition(fail: true),
     );
+    await tester.ensureVisible(find.textContaining('Set up'));
+    await tester.pump();
     await tester.tap(find.textContaining('Set up'));
     await tester.pump(const Duration(milliseconds: 600));
     await tester.pump();
