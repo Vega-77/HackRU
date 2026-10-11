@@ -223,7 +223,32 @@ Replaces `frame` once the kinematics stage is in. This is what the app draws.
 | `energy` | joules; any key may be omitted |
 | `extras` | mode-specific values the app shows as readouts (`angle_deg`, `mu`, `theta_deg`, `momentum`, `restitution`, ...) |
 
-Extra fields (`process_ms`, `stats`, ...) are allowed and ignored.
+Additional diagnostic fields are optional and backward compatible:
+
+- `timestamp_source`: `capture` when the client supplied its frame timestamp,
+  otherwise `server_receive`. The latter allows pixel tracking but withholds
+  motion derivatives. Live capture timestamps must strictly increase.
+- `process_ms`: backend CV and physics duration. `queue_ms`: wait before that
+  processing starts. `latency_ms`: backend receive-to-result duration, not
+  network RTT. All three use the server's monotonic clock.
+- `physics_quality`: fit sample count, `span_s`, `position_residual_m`,
+  `acceleration_std_mps2`, derivative validity flags and `reason`.
+  Missing/uncertain acceleration is omitted, never replaced with gravity.
+  Reasons include `insufficient_samples`, `insufficient_time_span`,
+  `acceleration_uncertain`, and `capture_timestamp_missing`.
+- `stats`: cumulative received, processed, dropped, and error counters.
+
+The client logs observation age as local capture/encoding age plus frame RTT;
+it does not subtract clocks on different machines. Where the camera API only
+supplies frame presentation/availability time, that age excludes unknown
+sensor delay. A live marker older than one second is cleared with local status
+`stale`, without adding a fabricated sample to telemetry.
+
+Transport starts with two frame credits and expands to cover one measured live
+RTT at the requested capture cadence, capped at 32. Initialization duration
+does not size this window. Regular frames still use the backend's latest-frame
+slot; a response retires all older outstanding IDs. Duplicate captures and
+out-of-order state IDs/timestamps are discarded by the client.
 
 ### `error` (text, JSON)
 

@@ -180,7 +180,15 @@ class PhysicsSocket {
     );
     _channel!.sink.add(frame.jpeg);
     try {
-      return await completer.future.timeout(const Duration(seconds: 15));
+      final result = await completer.future.timeout(
+        const Duration(seconds: 15),
+      );
+      if (result.status == 'initialized') {
+        _lastCaptureTime = second
+            ? math.max(_lastCaptureTime ?? frame.captureTime, frame.captureTime)
+            : frame.captureTime;
+      }
+      return result;
     } finally {
       _initialization = null;
       _initializationFrameId = null;
@@ -268,7 +276,8 @@ class PhysicsSocket {
     if (message is InitializationMessage) {
       if (message.frameId == _initializationFrameId &&
           _initialization?.isCompleted == false) {
-        _recordReply(message.frameId);
+        // Segmentation time is not a live-frame RTT sample.
+        _inFlight.remove(message.frameId);
         _initialization?.complete(message);
       }
       return;

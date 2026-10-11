@@ -291,6 +291,10 @@ async def frames_ws(ws: WebSocket) -> None:
                 await send({**reply, **result})
                 if kind == "initialize" and result["status"] == "initialized":
                     initialized.add(which)
+                    selected_time = frame.meta.get("timestamp")
+                    if selected_time is not None:
+                        last_live_timestamp = (selected_time if last_live_timestamp is None
+                                               else max(last_live_timestamp, selected_time))
         except (ValueError, TypeError, cv2.error) as error:
             await send({**reply, "status": "failed", "reason": str(error), "bbox": None})
 

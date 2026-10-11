@@ -24,6 +24,9 @@ class PhysicsState {
     this.trackingDebug = const {},
     this.trackingStatus,
     this.partner,
+    this.physicsQuality = const {},
+    this.processMs,
+    this.queueMs,
   });
 
   /// Echo of the `frame_id` the client sent with the frame.
@@ -51,6 +54,9 @@ class PhysicsState {
   final ScreenAxes? screenAxes;
   final Map<String, dynamic> trackingDebug;
   final String? trackingStatus;
+  final Map<String, dynamic> physicsQuality;
+  final double? processMs;
+  final double? queueMs;
 
   /// In a collision, the other object the user selected: where it is and,
   /// once the backend knows, its velocity. No forces or energy.
@@ -96,6 +102,11 @@ class PhysicsState {
       frameId: (json['frame_id'] as num?)?.toInt() ?? -1,
       t: (json['timestamp'] as num?)?.toDouble() ?? 0,
       tracked: json['tracked'] == true,
+      physicsQuality: json['physics_quality'] is Map<String, dynamic>
+          ? json['physics_quality'] as Map<String, dynamic>
+          : const {},
+      processMs: (json['process_ms'] as num?)?.toDouble(),
+      queueMs: (json['queue_ms'] as num?)?.toDouble(),
       trackingStatus: json['tracking_status'] as String?,
       pixel: Vec2.tryParse(json['pixel']),
       bbox: PixelRect.tryParse(json['bbox']),

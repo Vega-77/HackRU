@@ -19,6 +19,7 @@ abstract final class AppConfig {
   static const int initialFramesInFlight = 2;
   static const int maxFramesInFlight = 32;
   static const Duration frameTimeout = Duration(seconds: 1);
+  static const Duration observationExpiry = Duration(seconds: 1);
   static const Duration reconnectDelay = Duration(seconds: 2);
 
   /// How long an opened camera may take to deliver its first picture before

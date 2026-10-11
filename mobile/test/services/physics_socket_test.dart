@@ -61,16 +61,24 @@ void main() {
     size: const FrameSize(320, 240),
     captureTime: 1.0,
   );
+  var captureTime = 1.0;
+  EncodedFrame nextFrame({double age = 0}) => EncodedFrame(
+    jpeg: frame.jpeg,
+    size: frame.size,
+    captureTime: captureTime += 1 / 30,
+    ageAtEncodingMs: age,
+  );
 
   String reply(int frameId) => jsonEncode({
     'type': 'state',
     'frame_id': frameId,
-    'timestamp': 1.0,
+    'timestamp': 1.0 + frameId / 30,
     'tracked': true,
   });
 
   setUp(() async {
     now = Duration.zero;
+    captureTime = 1.0;
     channel = _FakeChannel();
     socket = PhysicsSocket(
       'ws://test:8000/ws/frames',
@@ -89,6 +97,7 @@ void main() {
     'initialization blocks live frames until matching acknowledgement',
     () async {
       final pending = socket.initialize(frame);
+      now = const Duration(seconds: 1);
       expect(socket.sendFrame(frame), isFalse);
       expect(
         jsonDecode(
@@ -114,7 +123,17 @@ void main() {
         }),
       );
       expect((await pending).status, 'initialized');
-      expect(socket.sendFrame(frame), isTrue);
+      expect(
+        socket.frameWindow,
+        2,
+        reason: 'initial segmentation must not inflate live RTT',
+      );
+      expect(
+        socket.sendFrame(frame),
+        isFalse,
+        reason: 'selection is not a new observation',
+      );
+      expect(socket.sendFrame(nextFrame()), isTrue);
     },
   );
 
@@ -147,10 +166,10 @@ void main() {
     expect(jsonDecode(channel.sink.sent.first as String)['type'], 'config');
   });
 
-  test('allows at most two frames in flight', () {
+  test('starts with two credits for distinct camera frames', () {
     expect(socket.sendFrame(frame), isTrue);
-    expect(socket.sendFrame(frame), isTrue);
-    expect(socket.sendFrame(frame), isFalse);
+    expect(socket.sendFrame(nextFrame()), isTrue);
+    expect(socket.sendFrame(nextFrame()), isFalse);
     expect(socket.framesInFlight, 2);
   });
 
@@ -164,7 +183,7 @@ void main() {
   test('a reply to a newer frame settles the older ones', () async {
     socket
       ..sendFrame(frame)
-      ..sendFrame(frame);
+      ..sendFrame(nextFrame());
     channel.server.add(reply(1)); // the backend dropped frame 0
     await pumpEventQueue();
     expect(socket.framesInFlight, 0);
@@ -173,7 +192,7 @@ void main() {
   test('a CV frame report or a frame error also frees a slot', () async {
     socket
       ..sendFrame(frame)
-      ..sendFrame(frame);
+      ..sendFrame(nextFrame());
     channel.server.add('{"type":"frame","frame_id":0,"objects":[]}');
     channel.server.add('{"type":"error","message":"bad jpeg","frame_id":1}');
     await pumpEventQueue();
@@ -183,7 +202,7 @@ void main() {
   test('a reply frees a slot and measures latency', () async {
     socket
       ..sendFrame(frame)
-      ..sendFrame(frame);
+      ..sendFrame(nextFrame());
     now = const Duration(milliseconds: 40);
     channel.server.add(reply(0));
     await pumpEventQueue();
@@ -196,7 +215,7 @@ void main() {
   test('frames with no reply expire after the timeout', () {
     socket
       ..sendFrame(frame)
-      ..sendFrame(frame);
+      ..sendFrame(nextFrame());
     now = const Duration(milliseconds: 1100);
     expect(socket.framesInFlight, 0);
     expect(socket.canSendFrame, isTrue);
@@ -213,6 +232,65 @@ void main() {
     expect((received[0] as StateMessage).state.frameId, 5);
     expect((received[1] as ErrorMessage).message, 'lost the ball');
   });
+
+  test('rejects repeat captures and out-of-order states', () async {
+    expect(socket.sendFrame(frame), isTrue);
+    expect(socket.sendFrame(frame), isFalse);
+    expect(socket.sendFrame(nextFrame()), isTrue);
+    final delivered = <ServerMessage>[];
+    final sub = socket.messages.listen(delivered.add);
+    channel.server
+      ..add(reply(1))
+      ..add(reply(0))
+      ..add(reply(1))
+      ..add(jsonEncode({'type': 'state', 'frame_id': 2, 'timestamp': .5}));
+    await pumpEventQueue();
+    expect(delivered.map((m) => m.frameId), [1]);
+    await sub.cancel();
+  });
+
+  test('600 ms RTT sustains capture cadence with bounded credits', () async {
+    final due = <int, Duration>{};
+    var steadySent = 0;
+    var peak = 0;
+    for (var tick = 0; tick < 180; tick++) {
+      now = Duration(microseconds: tick * 33334);
+      for (final id in due.keys.toList()) {
+        if (due[id]! <= now) {
+          channel.server.add(reply(id));
+          due.remove(id);
+        }
+      }
+      await Future<void>.delayed(Duration.zero);
+      if (socket.sendFrame(nextFrame(age: 8))) {
+        due[socket.lastFrameId!] = now + const Duration(milliseconds: 600);
+        if (tick >= 60) steadySent++;
+      }
+      if (socket.framesInFlight > peak) peak = socket.framesInFlight;
+    }
+    // Two fixed credits allow at most 3.33 FPS at this RTT.
+    expect(steadySent / 4, greaterThanOrEqualTo(28));
+    expect(peak, lessThanOrEqualTo(20));
+    expect(socket.frameWindow, 20);
+    expect(socket.lastObservationAgeMs, closeTo(608, 1));
+  });
+
+  test(
+    'a dropped-frame acknowledgement retires older credits without replay',
+    () async {
+      socket.sendFrame(frame);
+      now = const Duration(milliseconds: 600);
+      channel.server.add(reply(0));
+      await pumpEventQueue();
+      for (var i = 0; i < 10; i++) {
+        expect(socket.sendFrame(nextFrame()), isTrue);
+      }
+      channel.server.add(reply(10));
+      await pumpEventQueue();
+      expect(socket.framesInFlight, 0);
+      expect(socket.sendFrame(nextFrame()), isTrue);
+    },
+  );
 
   test('goes offline when the server closes the connection', () async {
     log.clear();

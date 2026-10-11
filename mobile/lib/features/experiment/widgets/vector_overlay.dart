@@ -11,8 +11,7 @@ import '../../../models/vec2.dart';
 import 'overlay_frame.dart';
 import 'vector_overlay_painter.dart';
 
-/// The live vector overlay: give it the newest [state] and it eases the
-/// drawn arrows towards it on every screen refresh.
+/// Observed positions snap to the latest frame; vector lengths ease between updates.
 ///
 /// Sits on top of the camera preview (or a home screen preview) and must be
 /// given the same [fit], so frame pixels line up with what the user sees.
@@ -57,7 +56,6 @@ class VectorOverlay extends StatefulWidget {
 class _VectorOverlayState extends State<VectorOverlay>
     with SingleTickerProviderStateMixin {
   static const _trailLength = 10;
-  static const _trailSpacing = Duration(milliseconds: 90);
 
   final _frame = ValueNotifier<OverlayFrame>(OverlayFrame.empty);
   final _trail = ValueNotifier<List<TrailDot>>(const []);
@@ -66,7 +64,6 @@ class _VectorOverlayState extends State<VectorOverlay>
   late final Ticker _ticker = createTicker(_onTick);
   OverlayFrame _target = OverlayFrame.empty;
   Duration _lastTick = Duration.zero;
-  Duration _sinceTrailDot = Duration.zero;
 
   bool get _reduceMotion => MediaQuery.disableAnimationsOf(context);
 
@@ -75,6 +72,7 @@ class _VectorOverlayState extends State<VectorOverlay>
     super.initState();
     _target = OverlayFrame.fromState(widget.state);
     _frame.value = _target;
+    _addTrailPoint(force: true);
   }
 
   @override
@@ -85,13 +83,19 @@ class _VectorOverlayState extends State<VectorOverlay>
 
   void _retarget() {
     _target = OverlayFrame.fromState(widget.state);
-    if (_target.pixel == null) _clearTrail();
+    if (_target.pixel == null) {
+      _clearTrail();
+      _frame.value = OverlayFrame.empty;
+      _ticker.stop();
+      return;
+    }
+    _addTrailPoint();
 
     if (_reduceMotion) {
       _frame.value = _target;
-      _addTrailPoint(force: true);
       return;
     }
+    _frame.value = _frame.value.approach(_target, vectorT: 0, positionT: 1);
     if (!_ticker.isActive) {
       _lastTick = Duration.zero;
       _ticker.start();
@@ -109,15 +113,9 @@ class _VectorOverlayState extends State<VectorOverlay>
     final next = _frame.value.approach(
       _target,
       vectorT: rate(AppMotion.arrowSmoothing),
-      positionT: rate(AppMotion.markerSmoothing),
+      positionT: 1,
     );
     _frame.value = next;
-
-    _sinceTrailDot += dt;
-    if (_sinceTrailDot >= _trailSpacing) {
-      _sinceTrailDot = Duration.zero;
-      _addTrailPoint();
-    }
 
     if (next.settledOn(_target)) {
       _frame.value = _target;
@@ -127,8 +125,8 @@ class _VectorOverlayState extends State<VectorOverlay>
 
   void _addTrailPoint({bool force = false}) {
     if (!widget.showTrail) return;
-    final p = _frame.value.pixel;
-    if (p == null || _frame.value.visibility < 0.5) return;
+    final p = _target.pixel;
+    if (p == null) return;
     // A still object leaves one dot, not a pile of them.
     if (!force &&
         _trailPoints.isNotEmpty &&

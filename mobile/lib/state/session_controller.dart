@@ -116,6 +116,7 @@ class SessionController extends Notifier<SessionState> {
   final List<StreamSubscription<dynamic>> _subscriptions = [];
   Timer? _frameTimer;
   Timer? _statsTimer;
+  Timer? _observationTimer;
   bool _capturing = false;
   EncodedFrame? _selectionFrame;
 
@@ -459,7 +460,7 @@ class SessionController extends Notifier<SessionState> {
           '${frame.pose == null ? '' : ', with ARKit pose'}',
         );
       } else {
-        log.d('Frame dropped: the backend got busy while it was captured');
+        log.d('Frame skipped: duplicate capture or no transport credit');
       }
     } catch (e, stack) {
       _failedCaptures++;
@@ -473,11 +474,43 @@ class SessionController extends Notifier<SessionState> {
 
   void _onState(PhysicsState physics) {
     if (!ref.mounted || state.phase != SessionPhase.running) return;
+    _observationTimer?.cancel();
     telemetry.add(physics);
     state = state.copyWith(
       latest: physics,
       telemetryVersion: state.telemetryVersion + 1,
     );
+    if (!physics.tracked) return;
+    final remainingMs =
+        AppConfig.observationExpiry.inMilliseconds -
+        (_socket?.lastObservationAgeMs ?? 0);
+    void expire() {
+      if (!ref.mounted ||
+          state.phase != SessionPhase.running ||
+          !identical(state.latest, physics)) {
+        return;
+      }
+      state = state.copyWith(
+        latest: PhysicsState(
+          frameId: physics.frameId,
+          t: physics.t,
+          tracked: false,
+          trackingStatus: 'stale',
+        ),
+      );
+      log.w(
+        'Observation ${physics.frameId} expired; waiting for a fresh camera frame',
+      );
+    }
+
+    if (remainingMs <= 0) {
+      expire();
+    } else {
+      _observationTimer = Timer(
+        Duration(milliseconds: remainingMs.ceil()),
+        expire,
+      );
+    }
   }
 
   void _onServerError(ErrorMessage error) {
@@ -553,6 +586,13 @@ class SessionController extends Notifier<SessionState> {
     if (s.trackingDebug.isNotEmpty) {
       log.d('Tracking decision: ${jsonEncode(s.trackingDebug)}');
     }
+    log.d(
+      'Frame ${s.frameId} timing: observation age '
+      '${_socket?.lastObservationAgeMs?.toStringAsFixed(1) ?? "?"} ms, '
+      'CV/physics ${s.processMs?.toStringAsFixed(1) ?? "?"} ms, '
+      'queue ${s.queueMs?.toStringAsFixed(1) ?? "?"} ms; '
+      'physics quality ${jsonEncode(s.physicsQuality)}',
+    );
     log.d(
       'Frame ${s.frameId} state${_rtt(rttMs)}: '
       '${s.tracked ? 'tracked' : 'not tracked'}, '
@@ -637,6 +677,8 @@ class SessionController extends Notifier<SessionState> {
       text.length <= 300 ? text : '${text.substring(0, 300)}...';
 
   void _stopSocket() {
+    _observationTimer?.cancel();
+    _observationTimer = null;
     _frameTimer?.cancel();
     _frameTimer = null;
     for (final s in _subscriptions) {

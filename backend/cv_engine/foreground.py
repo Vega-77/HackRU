@@ -121,8 +121,14 @@ class RoundReference:
         for quadrant in range(4):
             inner = interior & (quadrants == quadrant)
             outer = exterior & (quadrants == quadrant)
-            if inner.any() and outer.any() and evidence[inner].mean() - evidence[outer].mean() >= .1:
-                support += 1
+            if inner.any() and outer.any():
+                contrast = evidence[inner].mean() - evidence[outer].mean()
+                # An occluded edge can lack support. Reversed contrast instead
+                # places the foreground outside the supposed ball (e.g. a shirt fold).
+                if contrast < -.05:
+                    return None
+                if contrast >= .1:
+                    support += 1
         if support < 3:
             return None
         mask = np.uint8((evidence > .5) & (expected_mask > 0))
