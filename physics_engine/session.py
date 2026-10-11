@@ -18,8 +18,9 @@ FORGET_AFTER_S = 0.5
 # Free fall bounds its history by time (0.35 s), not by count. Seven samples
 # at 30 fps span only 0.2 s, too short for the acceleration uncertainty gate
 # once the tracker jitters by a pixel or two, so most of a drop would show no
-# acceleration. Twelve covers the time window at 30 fps.
-FREE_FALL_MAX_SAMPLES = 12
+# acceleration. Twenty-four also covers that same time window at 60 fps;
+# the 0.35 s cutoff still excludes older positions.
+FREE_FALL_MAX_SAMPLES = 24
 
 
 class PhysicsSession:

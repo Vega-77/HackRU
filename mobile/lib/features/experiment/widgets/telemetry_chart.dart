@@ -36,11 +36,13 @@ class TelemetryChart extends StatelessWidget {
     super.key,
     required this.samples,
     required this.quantity,
+    this.recorded = false,
   });
 
   /// Oldest first.
   final List<TelemetrySample> samples;
   final ChartQuantity quantity;
+  final bool recorded;
 
   static double get _window => AppConfig.telemetryWindow.inMilliseconds / 1000;
 
@@ -74,15 +76,21 @@ class TelemetryChart extends StatelessWidget {
     final xs = <FlSpot>[];
     final ys = <FlSpot>[];
     double? previousT;
+    var interrupted = false;
     var lo = double.infinity, hi = -double.infinity;
     for (final s in samples) {
       final v = quantity.of(s);
-      if (v == null) continue;
-      if (previousT != null && s.t - previousT > _gapS) {
+      interrupted = interrupted || s.breakBefore;
+      if (v == null) {
+        interrupted = true;
+        continue;
+      }
+      if (previousT != null && (interrupted || s.t - previousT > _gapS)) {
         xs.add(FlSpot.nullSpot);
         ys.add(FlSpot.nullSpot);
       }
       previousT = s.t;
+      interrupted = false;
       final t = s.t - now;
       xs.add(FlSpot(t, v.x));
       ys.add(FlSpot(t, v.y));
@@ -104,7 +112,8 @@ class TelemetryChart extends StatelessWidget {
         );
 
     return Semantics(
-      label: '${quantity.label} over the last ${_window.round()} seconds',
+      label:
+          '${quantity.label} over ${recorded ? "recorded capture time" : "the last ${_window.round()} seconds"}',
       child: ExcludeSemantics(
         child: LineChart(
           duration: Duration.zero,
@@ -155,7 +164,9 @@ class TelemetryChart extends StatelessWidget {
                   getTitlesWidget: (value, meta) => SideTitleWidget(
                     meta: meta,
                     child: Text(
-                      value == 0 ? 'now' : '${value.round()} s',
+                      value == 0
+                          ? (recorded ? 'end' : 'now')
+                          : '${value.round()} s',
                       style: tickStyle,
                     ),
                   ),

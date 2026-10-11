@@ -12,8 +12,32 @@ backend against it. Open questions are listed at the end.
 ## Connection
 
 - Endpoint: `ws://<host>:8000/ws/frames`. Health check: `GET /health`.
-- One WebSocket per phone. The server keeps one tracking session per socket.
+- One WebSocket per live session. The server keeps one tracking session per socket.
 - The client sends a `config` message first, then streams frames.
+
+### Saved-frame analysis
+
+Free Fall can capture a bounded local sequence before sending it. Analysis uses
+a separate socket with the same config, selected-image initialization, frame
+metadata/JPEG, and state messages. It sends one saved image per acknowledgement,
+so the live latest-frame slot cannot overwrite pending recorded samples. Every
+image retains its original capture timestamp; upload and reply times do not
+supply physics time. A connection failure starts a new initialized analysis on
+retry, rather than continuing partial history across sessions.
+
+### Optional timing diagnostics
+
+`state`/`frame` replies may include `timing_ms`, with nonnegative durations for
+`decode`, `preprocess`, `tracking`, and `physics`. These measure local backend
+operations, alongside existing `queue_ms` and `process_ms`; they do not compare
+client and server clocks. Older backends may omit them.
+
+Client diagnostic logs distinguish JPEG encoding, frame age at send, application
+RTT, queue waiting, and backend stages. RTT minus queue/processing is labeled
+transport/response: it includes serialization and client scheduling as well as
+transit, so it must not be described as pure network ping. Browser-local boxes
+are labeled estimates and never substitute for server positions or physics
+measurements in this protocol.
 
 ## Units and coordinate systems
 

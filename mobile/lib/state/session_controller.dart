@@ -8,6 +8,7 @@ import '../core/logging/debug_log.dart';
 import '../models/calibration.dart';
 import '../models/camera_pose.dart';
 import '../models/experiment_mode.dart';
+import '../services/network/recorded_analysis.dart';
 import '../models/physics_state.dart';
 import '../models/session_config.dart';
 import '../services/camera/frame_source_factory.dart';
@@ -31,6 +32,10 @@ class SessionState {
     this.latencyMs,
     this.sendFps = 0,
     this.telemetryVersion = 0,
+    this.recordingPhase = RecordingPhase.idle,
+    this.recordingProgress = 0,
+    this.recordingMessage,
+    this.recordedLatest,
   });
 
   final SessionPhase phase;
@@ -57,6 +62,13 @@ class SessionState {
 
   /// Increments whenever [SessionController.telemetry] changes.
   final int telemetryVersion;
+  final RecordingPhase recordingPhase;
+  final double recordingProgress;
+  final String? recordingMessage;
+  final PhysicsState? recordedLatest;
+  bool get recordingBusy =>
+      recordingPhase == RecordingPhase.recording ||
+      recordingPhase == RecordingPhase.analyzing;
 
   bool get isActive =>
       phase == SessionPhase.running || phase == SessionPhase.paused;
@@ -73,6 +85,10 @@ class SessionState {
     double? sendFps,
     int? telemetryVersion,
     bool clearErrors = false,
+    RecordingPhase? recordingPhase,
+    double? recordingProgress,
+    String? recordingMessage,
+    PhysicsState? recordedLatest,
   }) => SessionState(
     phase: phase ?? this.phase,
     connection: connection ?? this.connection,
@@ -86,6 +102,10 @@ class SessionState {
     latencyMs: latencyMs ?? this.latencyMs,
     sendFps: sendFps ?? this.sendFps,
     telemetryVersion: telemetryVersion ?? this.telemetryVersion,
+    recordingPhase: recordingPhase ?? this.recordingPhase,
+    recordingProgress: recordingProgress ?? this.recordingProgress,
+    recordingMessage: recordingMessage ?? this.recordingMessage,
+    recordedLatest: recordedLatest ?? this.recordedLatest,
   );
 }
 
@@ -120,6 +140,11 @@ class SessionController extends Notifier<SessionState> {
   Timer? _observationTimer;
   bool _capturing = false;
   EncodedFrame? _selectionFrame;
+  final RecordedAnalyzer _recordedAnalyzer = RecordedAnalyzer();
+  RecordedSequence? _recordedSequence;
+  EncodedFrame? _recordedSelection;
+  SessionConfig? _recordedConfig;
+  int _recordingEpoch = 0;
 
   /// The second collision object's picture, sent after [_selectionFrame]:
   /// initializing the first object makes the backend forget the second.
@@ -160,10 +185,11 @@ class SessionController extends Notifier<SessionState> {
   bool _foundOnce = false;
   String? _notSendingBecause;
 
-  FrameSource get _camera => ref.read(frameSourceProvider);
+  late FrameSource _camera;
 
   @override
   SessionState build() {
+    _camera = ref.read(frameSourceProvider);
     ref.onDispose(_teardown);
     log.context = _logContext;
     ref.onDispose(() {
@@ -178,6 +204,7 @@ class SessionController extends Notifier<SessionState> {
       } else if (previous.mode != next.mode ||
           previous.massKg != next.massKg ||
           previous.slidingBody != next.slidingBody) {
+        _cancelRecording();
         telemetry.clear();
         _sendConfig('mode, mass or ramp body changed');
       }
@@ -269,6 +296,7 @@ class SessionController extends Notifier<SessionState> {
       frameSize: frameSize ?? fallbackFrameSize,
     );
     _startSocket(ref.read(experimentSettingsProvider).backendUrl);
+    _setLocalEstimates(true);
     _statsTimer = Timer.periodic(
       const Duration(seconds: 1),
       (_) => _tickStats(),
@@ -280,13 +308,175 @@ class SessionController extends Notifier<SessionState> {
     if (state.phase == SessionPhase.running) {
       log.i('Paused');
       state = state.copyWith(phase: SessionPhase.paused);
+      _setLocalEstimates(false);
     }
   }
 
   void resume() {
+    if (state.recordingBusy) return;
     if (state.phase == SessionPhase.paused) {
+      if (state.recordingPhase != RecordingPhase.idle) {
+        telemetry.clear();
+        state = state.copyWith(
+          recordingPhase: RecordingPhase.idle,
+          telemetryVersion: state.telemetryVersion + 1,
+        );
+      }
       log.i('Resumed');
       state = state.copyWith(phase: SessionPhase.running);
+      _setLocalEstimates(true);
+    }
+  }
+
+  void _setLocalEstimates(bool enabled) {
+    if (_camera case final LocalVisualSource source) {
+      source.enableLocalEstimates(enabled);
+    }
+  }
+
+  Future<void> recordFreeFall() async {
+    if (state.recordingBusy ||
+        !state.isActive ||
+        ref.read(experimentSettingsProvider).mode != ExperimentMode.freeFall) {
+      return;
+    }
+    final calibration = ref.read(calibrationProvider);
+    final selection = calibration.selectionFrame;
+    if (selection == null || calibration.pxPerM == null) {
+      state = state.copyWith(
+        recordingPhase: RecordingPhase.failed,
+        recordingMessage:
+            'Calibrate the ruler and confirm an object selection first.',
+      );
+      return;
+    }
+    final epoch = ++_recordingEpoch;
+    pause();
+    _observationTimer?.cancel();
+    _recordedSelection = selection;
+    _recordedConfig = _config();
+    _recordedSequence = null;
+    state = state.copyWith(
+      recordingPhase: RecordingPhase.recording,
+      recordingProgress: 0,
+      latest: const PhysicsState(
+        frameId: -1,
+        t: 0,
+        tracked: false,
+        trackingStatus: 'recording',
+      ),
+      recordingMessage:
+          'Hold briefly, then release. Keep the full fall in view.',
+    );
+    try {
+      _recordedSequence = await SequenceRecorder().collect(
+        _camera,
+        cancelled: () => !ref.mounted || epoch != _recordingEpoch,
+        progress: (p) {
+          if (ref.mounted && epoch == _recordingEpoch) {
+            state = state.copyWith(recordingProgress: p.clamp(0, 1));
+          }
+        },
+      );
+      if (!ref.mounted || epoch != _recordingEpoch) return;
+      log.i(
+        'Recorded ${_recordedSequence!.frames.length} fresh frames, '
+        '${_recordedSequence!.fps.toStringAsFixed(1)} FPS, '
+        'maximum gap ${_recordedSequence!.maxGapMs.toStringAsFixed(1)} ms',
+      );
+      await retryRecordedAnalysis();
+    } catch (error) {
+      if (ref.mounted && epoch == _recordingEpoch) {
+        state = state.copyWith(
+          recordingPhase: RecordingPhase.failed,
+          recordingMessage: '$error',
+        );
+      }
+    }
+  }
+
+  Future<void> retryRecordedAnalysis() async {
+    final sequence = _recordedSequence;
+    final selection = _recordedSelection;
+    final config = _recordedConfig;
+    if (sequence == null ||
+        selection == null ||
+        config == null ||
+        state.recordingPhase == RecordingPhase.analyzing) {
+      return;
+    }
+    final epoch = _recordingEpoch;
+    state = state.copyWith(
+      recordingPhase: RecordingPhase.analyzing,
+      recordingProgress: 0,
+      recordingMessage: 'Analyzing saved frames. Capture times are preserved.',
+    );
+    try {
+      final states = await _recordedAnalyzer.analyze(
+        url: ref.read(experimentSettingsProvider).backendUrl,
+        config: config,
+        selection: selection,
+        sequence: sequence,
+        progress: (p) {
+          if (ref.mounted && epoch == _recordingEpoch) {
+            state = state.copyWith(recordingProgress: p);
+          }
+        },
+      );
+      if (!ref.mounted || epoch != _recordingEpoch) return;
+      telemetry.clear();
+      for (final observation in states) {
+        telemetry.add(observation);
+        log.d(
+          'Recorded frame ${observation.frameId}, t=${observation.t}, '
+          'pixel=${observation.pixel}, quality=${jsonEncode(observation.physicsQuality)}',
+        );
+      }
+      final located = states
+          .where((s) => s.tracked && s.position != null)
+          .length;
+      final acceleration = states.where((s) => s.acceleration != null).length;
+      state = state.copyWith(
+        recordingPhase: RecordingPhase.complete,
+        recordedLatest: states.lastWhere(
+          (s) => s.tracked && s.position != null,
+          orElse: () => const PhysicsState(frameId: -1, t: 0, tracked: false),
+        ),
+        telemetryVersion: state.telemetryVersion + 1,
+        recordingMessage:
+            '$located/${states.length} measured positions at '
+            '${sequence.fps.toStringAsFixed(1)} capture FPS. '
+            '$acceleration acceleration estimates passed quality checks. '
+            'Charts show the saved recording.',
+      );
+    } catch (error) {
+      if (ref.mounted && epoch == _recordingEpoch) {
+        state = state.copyWith(
+          recordingPhase: RecordingPhase.failed,
+          recordingMessage: '$error. Saved frames remain available for retry.',
+        );
+      }
+    }
+  }
+
+  bool get canRetryRecordedAnalysis => _recordedSequence != null;
+
+  void cancelRecording() {
+    _cancelRecording();
+    state = state.copyWith(
+      recordingMessage:
+          'Recording cancelled. Resume live tracking or record again.',
+    );
+  }
+
+  void _cancelRecording() {
+    _recordingEpoch++;
+    _recordedAnalyzer.cancel();
+    _recordedSequence = null;
+    _recordedSelection = null;
+    _recordedConfig = null;
+    if (ref.mounted) {
+      state = state.copyWith(recordingPhase: RecordingPhase.idle);
     }
   }
 
@@ -303,6 +493,10 @@ class SessionController extends Notifier<SessionState> {
       latencyMs: state.latencyMs,
       sendFps: state.sendFps,
       telemetryVersion: state.telemetryVersion,
+      recordingPhase: state.recordingPhase,
+      recordingProgress: state.recordingProgress,
+      recordingMessage: state.recordingMessage,
+      recordedLatest: state.recordedLatest,
     );
   }
 
@@ -467,6 +661,8 @@ class SessionController extends Notifier<SessionState> {
           'Frame ${socket.lastFrameId} sent: '
           '${(frame.jpeg.length / 1024).toStringAsFixed(1)} KB, ${frame.size}, '
           'captured in ${capturing.elapsedMilliseconds} ms, '
+          'JPEG encode ${frame.encodeMs.toStringAsFixed(2)} ms, '
+          'age at send ${frame.ageAtEncodingMs.toStringAsFixed(2)} ms, '
           '${socket.framesInFlight} in flight'
           '${frame.pose == null ? '' : ', with ARKit pose'}',
         );
@@ -485,6 +681,9 @@ class SessionController extends Notifier<SessionState> {
 
   void _onState(PhysicsState physics) {
     if (!ref.mounted || state.phase != SessionPhase.running) return;
+    if (_camera case final LocalVisualSource source) {
+      source.validateLocalEstimate(physics);
+    }
     _observationTimer?.cancel();
     telemetry.add(physics);
     state = state.copyWith(
@@ -554,6 +753,12 @@ class SessionController extends Notifier<SessionState> {
       'ticks for replies and $_encodingTicks for the encoder, '
       '${state.phase.name}, ${state.connection.name}',
     );
+    if (_camera case final LocalVisualSource source
+        when source.supportsLocalEstimates) {
+      log.d(
+        'Browser capture/local timings: ${jsonEncode(source.localVisualStats)}',
+      );
+    }
     _framesSentThisSecond = 0;
     _waitingTicks = 0;
     _encodingTicks = 0;
@@ -647,6 +852,8 @@ class SessionController extends Notifier<SessionState> {
       '${_socket?.lastObservationAgeMs?.toStringAsFixed(1) ?? "?"} ms, '
       'CV/physics ${s.processMs?.toStringAsFixed(1) ?? "?"} ms, '
       'queue ${s.queueMs?.toStringAsFixed(1) ?? "?"} ms; '
+      'stages ${jsonEncode(s.timingMs)}, '
+      'transport/response ${rttMs == null || s.processMs == null || s.queueMs == null ? "?" : (rttMs - s.processMs! - s.queueMs!).clamp(0, double.infinity).toStringAsFixed(1)} ms; '
       'physics quality ${jsonEncode(s.physicsQuality)}',
     );
     log.d(
@@ -747,6 +954,9 @@ class SessionController extends Notifier<SessionState> {
   }
 
   void _teardown() {
+    _recordingEpoch++;
+    _recordedAnalyzer.cancel();
+    _setLocalEstimates(false);
     _stopSocket();
     _statsTimer?.cancel();
     _statsTimer = null;

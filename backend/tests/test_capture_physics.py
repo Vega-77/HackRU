@@ -49,7 +49,8 @@ def test_window_excludes_held_ball_once_sufficient_fall_is_observed():
     assert state['acceleration']['y'] == pytest.approx(-9.81, abs=1e-6)
 
 
-def test_30fps_drop_with_pixel_jitter_still_measures_gravity():
+@pytest.mark.parametrize('fps', [30, 60])
+def test_high_rate_drop_with_pixel_jitter_still_measures_gravity(fps):
     # A 1 m drop at 220 px/m, tracked at 30 fps with 2 px of jitter. A
     # seven-sample window spans 0.2 s, and the uncertainty gate then withheld
     # acceleration on most of the fall.
@@ -57,8 +58,8 @@ def test_30fps_drop_with_pixel_jitter_still_measures_gravity():
     session = PhysicsSession()
     noise = 2 / 220
     measured = []
-    for index in range(30):
-        t = index / 30
+    for index in range(fps):
+        t = index / fps
         fall = max(0.0, t - .3)
         y = 1 - 4.905 * fall**2 + rng.normal(0, noise)
         state = session.process_frame(
@@ -68,6 +69,7 @@ def test_30fps_drop_with_pixel_jitter_still_measures_gravity():
             {'mode': 'free_fall'})
         if fall >= .35 and y > 0:
             measured.append(state.get('acceleration', {}).get('y'))
+            assert state['physics_quality']['span_s'] <= .35
     assert measured and all(a is not None for a in measured)
     assert np.median(measured) == pytest.approx(-9.81, abs=2)
 
@@ -137,6 +139,9 @@ def test_slow_processor_drops_pending_frames_and_preserves_capture_time(monkeypa
         assert latest['timestamp_source'] == 'capture'
         assert latest['stats']['dropped'] == 4
         assert latest['queue_ms'] >= 0 and latest['process_ms'] >= 0
+        assert set(latest['timing_ms']) == {'decode', 'preprocess', 'tracking', 'physics'}
+        assert all(v >= 0 for v in latest['timing_ms'].values())
+        assert sum(latest['timing_ms'].values()) <= latest['process_ms'] + .1
         ws.send_json({'frame_id': 6, 'timestamp': 10.1})
         ws.send_bytes(jpeg)
         assert 'strictly increase' in ws.receive_json()['message']

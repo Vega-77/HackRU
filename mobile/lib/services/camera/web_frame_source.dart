@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:typed_data';
 import 'dart:js_interop';
 import 'dart:js_interop_unsafe';
 import 'dart:ui_web' as ui_web;
@@ -10,7 +11,9 @@ import 'package:web/web.dart' as web;
 import '../../core/config/app_config.dart';
 import '../../core/logging/debug_log.dart';
 import '../../models/session_config.dart';
+import '../../models/physics_state.dart';
 import 'frame_source.dart';
+import 'local_visual_tracker.dart';
 
 /// Browser camera for development in Chrome.
 ///
@@ -23,11 +26,11 @@ import 'frame_source.dart';
 /// the experiment route, and handing one element to two platform views moves
 /// it in the DOM, which pauses it and freezes both the picture and the frames
 /// sent to the backend.
-class WebFrameSource implements FrameSource {
+class WebFrameSource implements FrameSource, LocalVisualSource {
   @override
   String get name => 'browser camera';
 
-  WebFrameSource() {
+  WebFrameSource({this.openStream}) {
     ui_web.platformViewRegistry.registerViewFactory(_viewType, (int _) {
       final preview = _newVideo();
       preview.style
@@ -42,11 +45,24 @@ class WebFrameSource implements FrameSource {
   }
 
   static int _nextViewId = 0;
+  final Future<web.MediaStream> Function()? openStream;
 
   final String _viewType = 'hands-on-camera-${_nextViewId++}';
   final web.HTMLVideoElement _captureVideo = _newVideo();
   final Set<web.HTMLVideoElement> _previews = {};
   final web.HTMLCanvasElement _canvas = web.HTMLCanvasElement();
+  final web.HTMLCanvasElement _localCanvas = web.HTMLCanvasElement();
+  final LocalVisualTracker _localTracker = LocalVisualTracker();
+  final List<GrayFrame> _history = [];
+  final Map<double, VisualEstimate> _estimates = {};
+  final _visualEstimate = ValueNotifier<VisualEstimate?>(null);
+  bool _localEnabled = false;
+  double _validatedAt = 0;
+  double _lastLocalAt = double.negativeInfinity;
+  Timer? _estimateExpiry;
+  int _localFrames = 0;
+  int _localMatches = 0;
+  double _localTotalMs = 0;
   web.MediaStream? _stream;
   Future<void>? _starting;
   int? _frameCallback;
@@ -95,7 +111,9 @@ class WebFrameSource implements FrameSource {
 
     log.i('Asking the browser for the camera');
     try {
-      _stream = await devices.getUserMedia(constraints).toDart;
+      _stream =
+          await (openStream?.call() ??
+              devices.getUserMedia(constraints).toDart);
     } catch (error, stack) {
       log.w('getUserMedia failed', error, stack);
       if (!await _hasCamera()) {
@@ -155,6 +173,7 @@ class WebFrameSource implements FrameSource {
 
   @override
   Future<void> stop() async {
+    enableLocalEstimates(false);
     final stream = _stream;
     _stream = null;
     _cancelFrameCallback();
@@ -189,6 +208,7 @@ class WebFrameSource implements FrameSource {
       _drawCurrentFrame();
       _frameAvailableAt = web.window.performance.now();
       _frameTime = _frameAvailableAt / 1000;
+      _updateLocal(_frameTime!);
     }
     final timestamp = _frameTime;
     if (timestamp == null) return null;
@@ -209,6 +229,7 @@ class WebFrameSource implements FrameSource {
     }
 
     // toDataURL is synchronous and fast at 320 px wide.
+    final encoding = Stopwatch()..start();
     final dataUrl = canvas.toDataURL('image/jpeg', AppConfig.jpegQuality.toJS);
     final jpeg = base64Decode(dataUrl.substring(dataUrl.indexOf(',') + 1));
 
@@ -217,6 +238,7 @@ class WebFrameSource implements FrameSource {
       size: size,
       captureTime: timestamp,
       ageAtEncodingMs: web.window.performance.now() - _frameAvailableAt,
+      encodeMs: encoding.elapsedMicroseconds / 1000,
     );
   }
 
@@ -236,6 +258,7 @@ class WebFrameSource implements FrameSource {
           _drawCurrentFrame();
           _frameTime = time;
           _frameAvailableAt = availableAt;
+          _updateLocal(time);
         }
         _watchFrames();
       }).toJS,
@@ -260,6 +283,124 @@ class WebFrameSource implements FrameSource {
     final callback = _frameCallback;
     if (callback != null) _captureVideo.cancelVideoFrameCallback(callback);
     _frameCallback = null;
+  }
+
+  @override
+  bool get supportsLocalEstimates => true;
+  @override
+  ValueNotifier<VisualEstimate?> get visualEstimate => _visualEstimate;
+
+  @override
+  void enableLocalEstimates(bool enabled) {
+    _localEnabled = enabled;
+    _estimateExpiry?.cancel();
+    _localFrames = _localMatches = 0;
+    _localTracker.clear();
+    _history.clear();
+    _estimates.clear();
+    _visualEstimate.value = null;
+    _lastLocalAt = double.negativeInfinity;
+  }
+
+  void _updateLocal(double timestamp) {
+    if (!_localEnabled || timestamp <= _lastLocalAt) return;
+    final clock = Stopwatch()..start();
+    _lastLocalAt = timestamp;
+    _localFrames++;
+    final height = (_canvas.height / 2).round();
+    _localCanvas
+      ..width = 160
+      ..height = height;
+    final context =
+        _localCanvas.getContext('2d') as web.CanvasRenderingContext2D;
+    context.drawImage(_canvas, 0, 0, 160, height);
+    final rgba = context.getImageData(0, 0, 160, height).data.toDart;
+    final gray = Uint8List(160 * height);
+    for (var i = 0; i < gray.length; i++) {
+      gray[i] =
+          (rgba[i * 4] * 77 + rgba[i * 4 + 1] * 150 + rgba[i * 4 + 2] * 29) >>
+          8;
+    }
+    final frame = GrayFrame(gray, 160, height, timestamp);
+    _history.add(frame);
+    while (_history.length > 120) {
+      _estimates.remove(_history.removeAt(0).t);
+    }
+    // A disconnected server cannot indefinitely validate a local identity.
+    if (web.window.performance.now() - _validatedAt > 1000) {
+      _localTracker.lose();
+      _visualEstimate.value = null;
+      return;
+    }
+    final estimate = _localTracker.update(frame);
+    if (estimate != null) _localMatches++;
+    _localTotalMs = clock.elapsedMicroseconds / 1000;
+    _publish(estimate);
+  }
+
+  void _publish(VisualEstimate? estimate) {
+    _estimateExpiry?.cancel();
+    if (estimate == null) {
+      _visualEstimate.value = null;
+      return;
+    }
+    _estimates[estimate.t] = estimate;
+    final box = estimate.box;
+    _visualEstimate.value = VisualEstimate(
+      PixelRect(box.x * 2, box.y * 2, box.w * 2, box.h * 2),
+      estimate.t,
+      estimate.score,
+      estimate.computeMs,
+    );
+    _estimateExpiry = Timer(const Duration(milliseconds: 150), () {
+      _visualEstimate.value = null;
+    });
+  }
+
+  @override
+  Map<String, num> get localVisualStats => {
+    'camera_frames': _localFrames,
+    'local_matches': _localMatches,
+    'local_total_ms': _localTotalMs,
+    if (_visualEstimate.value case final estimate?)
+      'local_frame_age_ms': (web.window.performance.now() - estimate.t * 1000)
+          .clamp(0, double.infinity),
+  };
+
+  @override
+  void validateLocalEstimate(PhysicsState observation) {
+    if (!_localEnabled) return;
+    final box = observation.bbox;
+    if (!observation.tracked || box == null) {
+      _localTracker.lose();
+      _visualEstimate.value = null;
+      return;
+    }
+    final index = _history.indexWhere(
+      (f) => (f.t - observation.t).abs() < .000001,
+    );
+    if (index < 0) return; // Never put an old box on different image pixels.
+    _validatedAt = web.window.performance.now();
+    final smallBox = PixelRect(box.x / 2, box.y / 2, box.w / 2, box.h / 2);
+    final previous = _estimates[observation.t];
+    if (previous != null &&
+        _visualEstimate.value != null &&
+        (previous.box.centre - smallBox.centre).length < smallBox.w * .3) {
+      return;
+    }
+    if (!_localTracker.anchor(_history[index], smallBox)) {
+      _localTracker.lose();
+      _visualEstimate.value = null;
+      return;
+    }
+    _estimates.removeWhere((t, _) => t >= observation.t);
+    VisualEstimate? current;
+    for (final frame in _history.skip(index + 1)) {
+      current = _localTracker.update(frame);
+      if (current == null) break;
+      _estimates[frame.t] = current;
+    }
+    _publish(current);
   }
 
   @override

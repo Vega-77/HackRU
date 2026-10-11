@@ -112,6 +112,7 @@ class EncodedFrame {
     required this.captureTime,
     this.pose,
     this.ageAtEncodingMs = 0,
+    this.encodeMs = 0,
   });
 
   final Uint8List jpeg;
@@ -123,6 +124,7 @@ class EncodedFrame {
   /// Time already spent waiting for capture/encoding on the client. When
   /// exposure time is unavailable, this starts at frame availability.
   final double ageAtEncodingMs;
+  final double encodeMs;
 
   /// The camera that took this frame, when ARKit is running.
   final CameraPose? pose;

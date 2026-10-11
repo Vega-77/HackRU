@@ -12,6 +12,7 @@ class TelemetrySample {
     this.velocity,
     this.acceleration,
     this.energy,
+    this.breakBefore = false,
   });
 
   final double t;
@@ -19,6 +20,7 @@ class TelemetrySample {
   final Vec2? velocity;
   final Vec2? acceleration;
   final EnergyState? energy;
+  final bool breakBefore;
 }
 
 /// A rolling window of recent tracked states, oldest first.
@@ -31,6 +33,7 @@ class TelemetryBuffer {
 
   final Duration window;
   final ListQueue<TelemetrySample> _samples = ListQueue();
+  bool _gap = false;
 
   /// Samples in time order. Do not hold on to this across frames.
   Iterable<TelemetrySample> get samples => _samples;
@@ -43,7 +46,10 @@ class TelemetryBuffer {
   /// rather than a jump to zero.
   void add(PhysicsState state) {
     final position = state.position;
-    if (!state.tracked || position == null) return;
+    if (!state.tracked || position == null) {
+      _gap = true;
+      return;
+    }
 
     // Time went backwards: the backend restarted. Start a fresh history.
     if (_samples.isNotEmpty && state.t < _samples.last.t) _samples.clear();
@@ -55,8 +61,10 @@ class TelemetryBuffer {
         velocity: state.velocity,
         acceleration: state.acceleration,
         energy: state.energy,
+        breakBefore: _gap,
       ),
     );
+    _gap = false;
 
     final cutoff = state.t - window.inMicroseconds / 1e6;
     while (_samples.isNotEmpty && _samples.first.t < cutoff) {
@@ -64,5 +72,8 @@ class TelemetryBuffer {
     }
   }
 
-  void clear() => _samples.clear();
+  void clear() {
+    _samples.clear();
+    _gap = false;
+  }
 }

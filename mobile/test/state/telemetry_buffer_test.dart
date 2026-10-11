@@ -26,6 +26,7 @@ void main() {
       ..add(_at(0.1, tracked: false))
       ..add(_at(0.2));
     expect(buffer.length, 2);
+    expect(buffer.latest!.breakBefore, isTrue);
   });
 
   test('clears when time goes backwards', () {
