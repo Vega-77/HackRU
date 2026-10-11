@@ -60,3 +60,18 @@ def test_invalid_image_initialization_acknowledges_failure():
         ack = ws.receive_json()
         assert ack['type'] == 'initialization' and ack['status'] == 'failed'
         assert ack['selection_id'] == 'bad-image' and not ack['tracked']
+
+
+def test_initialization_requires_a_newer_capture_before_confirmation():
+    with TestClient(app).websocket_connect('/ws/frames') as ws:
+        ws.send_json({'type': 'config', 'target_px': {'x': 80, 'y': 90},
+                      'initialization_required': True})
+        send_image(ws, 'initialize', 0, scene(), timestamp=5)
+        assert ws.receive_json()['status'] == 'initialized'
+        send_image(ws, 'frame', 1, scene(), timestamp=5)
+        assert 'strictly increase' in ws.receive_json()['message']
+        send_image(ws, 'frame', 2, scene(center=(100, 90)), timestamp=5.1)
+        result = ws.receive_json()
+        assert result['tracked']
+        target = next(o for o in result['objects'] if o['target'])
+        assert target['pixel']['x'] == pytest.approx(100, abs=1)

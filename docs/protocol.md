@@ -102,16 +102,17 @@ WebSocket session.
 
 ### Flow control
 
-The client keeps **at most 4 frames in flight**: it sends a new frame only when
-fewer than 4 are awaiting a reply. Four keep a 30 fps stream going over a round
-trip of up to about 130 ms. The server keeps only the newest frame and drops
-older ones while busy, so a reply to frame N tells the client that every frame
-up to N is settled, and more frames in flight do not add lag. A frame with no
-reply after 1 s is forgotten.
+The client starts with **2 frames in flight**, then keeps enough in flight to
+cover one measured round trip at 30 fps: 1 + RTT x 30 / 1000 frames, at most
+32. It sends a new frame only when fewer than that are awaiting a reply. The
+server keeps only the newest frame and drops older ones while busy, so a reply
+to frame N tells the client that every frame up to N is settled, and more
+frames in flight do not add lag. A frame with no reply after 1 s, or three
+round trips if that is longer, is forgotten.
 
 So the server must reply to **every frame it processes**, even when nothing is
-tracked (`"tracked": false`). Otherwise the client sends at most 4 frames per
-second.
+tracked (`"tracked": false`). Otherwise only the timeout frees a frame, and the
+stream drops to a few frames per second.
 
 ## Server to client
 
@@ -238,7 +239,32 @@ Replaces `frame` once the kinematics stage is in. This is what the app draws.
 | `energy` | joules; any key may be omitted |
 | `extras` | mode-specific values the app shows as readouts by mode. Ramp: `angle_deg`, and `mu` with `sliding_body`. Pendulum: `theta_deg`, `length_m`. Collision: `momentum_x`, `momentum_y` of the target, and after an impact `restitution`, `momentum_before`, `momentum_after`, `momentum_delta`, `kinetic_before`, `kinetic_after` |
 
-Extra fields (`process_ms`, `stats`, ...) are allowed and ignored.
+Additional diagnostic fields are optional and backward compatible:
+
+- `timestamp_source`: `capture` when the client supplied its frame timestamp,
+  otherwise `server_receive`. The latter allows pixel tracking but withholds
+  motion derivatives. Live capture timestamps must strictly increase.
+- `process_ms`: backend CV and physics duration. `queue_ms`: wait before that
+  processing starts. `latency_ms`: backend receive-to-result duration, not
+  network RTT. All three use the server's monotonic clock.
+- `physics_quality`: fit sample count, `span_s`, `position_residual_m`,
+  `acceleration_std_mps2`, derivative validity flags and `reason`.
+  Missing/uncertain acceleration is omitted, never replaced with gravity.
+  Reasons include `insufficient_samples`, `insufficient_time_span`,
+  `acceleration_uncertain`, and `capture_timestamp_missing`.
+- `stats`: cumulative received, processed, dropped, and error counters.
+
+The client logs observation age as local capture/encoding age plus frame RTT;
+it does not subtract clocks on different machines. Where the camera API only
+supplies frame presentation/availability time, that age excludes unknown
+sensor delay. A live marker older than one second is cleared with local status
+`stale`, without adding a fabricated sample to telemetry.
+
+Transport starts with two frame credits and expands to cover one measured live
+RTT at the requested capture cadence, capped at 32. Initialization duration
+does not size this window. Regular frames still use the backend's latest-frame
+slot; a response retires all older outstanding IDs. Duplicate captures and
+out-of-order state IDs/timestamps are discarded by the client.
 
 ### `error` (text, JSON)
 

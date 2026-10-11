@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../../features/calibration/calibration_screen.dart';
 import '../../features/experiment/experiment_screen.dart';
 import '../../features/home/home_screen.dart';
+import '../../features/learn/learn_screen.dart';
 import '../../features/settings/settings_screen.dart';
 import '../logging/debug_log.dart';
 
@@ -13,10 +14,15 @@ abstract final class Routes {
   static const calibrate = '/calibrate';
   static const experiment = '/experiment';
   static const settings = '/settings';
+  static const learn = '/learn/:lesson';
+
+  /// The learn page for one lesson, by its id.
+  static String lesson(String id) => '/learn/$id';
 }
 
 /// Flow: home (pick an experiment) → calibrate → experiment.
 /// Settings is reachable from home and from the experiment's banners.
+/// Learn pages open from home and lead into setup.
 final appRouter = buildAppRouter();
 
 /// A fresh router; tests build their own so each starts at [initialLocation].
@@ -34,6 +40,11 @@ GoRouter buildAppRouter({String initialLocation = Routes.home}) => GoRouter(
       builder: (_, _) => const ExperimentScreen(),
     ),
     GoRoute(path: Routes.settings, builder: (_, _) => const SettingsScreen()),
+    GoRoute(
+      path: Routes.learn,
+      builder: (_, state) =>
+          LearnScreen(lessonId: state.pathParameters['lesson']!),
+    ),
   ],
 );
 

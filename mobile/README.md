@@ -231,8 +231,9 @@ app from the bottom up.
 1. `SessionController.start()` opens the camera, builds a `SessionConfig`
    from the settings and calibration, and opens a `PhysicsSocket`.
 2. It sends the newest camera frame up to 30 times a second (the camera
-   itself runs at 60), keeping at most 4 frames waiting for an answer. The
-   backend works on the newest frame only, so the picture never lags behind.
+   itself runs at 60). It keeps enough frames waiting for an answer to cover
+   one round trip (2 at first, at most 32). The backend works on the newest
+   frame only, so the picture never lags behind.
 3. Each `state` message from the backend lands in `SessionState.latest` and
    in the `TelemetryBuffer`.
 4. `ExperimentStage` maps the backend's frame pixels to screen pixels

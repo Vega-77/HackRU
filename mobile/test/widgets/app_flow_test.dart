@@ -7,6 +7,7 @@ import 'package:hands_on_physics/app.dart';
 import 'package:hands_on_physics/core/config/app_config.dart';
 import 'package:hands_on_physics/core/logging/debug_log.dart';
 import 'package:hands_on_physics/core/routing/router.dart';
+import 'package:hands_on_physics/features/learn/learn_screen.dart';
 import 'package:hands_on_physics/features/settings/backend_url.dart';
 import 'package:hands_on_physics/models/camera_pose.dart';
 import 'package:hands_on_physics/models/experiment_mode.dart';
@@ -227,6 +228,75 @@ void main() {
     expect(container.read(sessionProvider).phase, SessionPhase.running);
     expect(camera.starts, 1, reason: 'the experiment reuses the setup camera');
 
+    await unmount(tester);
+  });
+
+  /// The learn page's own scroll view, not the home screen's under it.
+  final learnScroll = find
+      .descendant(
+        of: find.byType(LearnScreen),
+        matching: find.byType(Scrollable),
+      )
+      .first;
+
+  testWidgets('learn page explains the experiment and leads into setup', (
+    tester,
+  ) async {
+    final container = await pumpApp(tester);
+    final learn = find.text('Learn the physics of inclined ramp');
+    await tester.ensureVisible(learn);
+    await tester.pump();
+    await tester.tap(learn);
+    await tester.pump(const Duration(milliseconds: 600));
+
+    expect(find.text('Inclined ramp'), findsWidgets);
+    expect(find.text('Why we do it'), findsOneWidget);
+    await tester.tap(find.text('Force vectors'));
+    await tester.pump();
+    await tester.scrollUntilVisible(
+      find.text('Normal force'),
+      300,
+      scrollable: learnScroll,
+    );
+    expect(camera.starts, 0, reason: 'learning needs no camera');
+
+    // Switching lessons picks the experiment that setup will run.
+    await tester.scrollUntilVisible(
+      find.text('Next: pendulum'),
+      300,
+      scrollable: learnScroll,
+    );
+    await tester.tap(find.text('Next: pendulum'));
+    await tester.pump(const Duration(milliseconds: 600));
+    expect(find.text('Pendulum'), findsWidgets);
+    await tester.scrollUntilVisible(
+      find.text('Set up pendulum'),
+      300,
+      scrollable: learnScroll,
+    );
+    await tester.tap(find.text('Set up pendulum'));
+    await tester.pump(const Duration(milliseconds: 600));
+
+    expect(container.read(experimentSettingsProvider).mode.label, 'Pendulum');
+    expect(find.text('Set the scale'), findsOneWidget);
+    await unmount(tester);
+  });
+
+  testWidgets('basics lesson opens from home', (tester) async {
+    await pumpApp(tester);
+    final basics = find.text('New to vectors? Start with the basics');
+    await tester.ensureVisible(basics);
+    await tester.pump();
+    await tester.tap(basics);
+    await tester.pump(const Duration(milliseconds: 600));
+
+    expect(find.text('Vectors and forces'), findsWidgets);
+    await tester.scrollUntilVisible(
+      find.text('Next: free fall'),
+      400,
+      scrollable: learnScroll,
+    );
+    expect(find.textContaining('Set up'), findsNothing);
     await unmount(tester);
   });
 

@@ -48,6 +48,9 @@ class WebFrameSource implements FrameSource {
   final web.HTMLCanvasElement _canvas = web.HTMLCanvasElement();
   web.MediaStream? _stream;
   Future<void>? _starting;
+  int? _frameCallback;
+  double? _frameTime;
+  double _frameAvailableAt = 0;
 
   @override
   bool get isRunning => _stream != null;
@@ -101,10 +104,11 @@ class WebFrameSource implements FrameSource {
       ..removeWhere((preview) => !preview.isConnected)
       ..forEach(_attach);
     _attach(_captureVideo);
+    _watchFrames();
     // videoWidth is 0 until the first frame's metadata arrives. A camera
     // another app holds can open and never deliver one.
     final waiting = Stopwatch()..start();
-    while (_captureVideo.videoWidth == 0) {
+    while (_frameTime == null) {
       if (_stream == null) return; // Stopped meanwhile.
       if (waiting.elapsed > AppConfig.cameraFirstFrameTimeout) {
         log.w('The browser camera opened but sent no frame');
@@ -126,6 +130,10 @@ class WebFrameSource implements FrameSource {
   Future<void> stop() async {
     final stream = _stream;
     _stream = null;
+    final callback = _frameCallback;
+    if (callback != null) _captureVideo.cancelVideoFrameCallback(callback);
+    _frameCallback = null;
+    _frameTime = null;
     if (stream == null) return;
     log.i('Stopping the browser camera');
     // srcObject goes first, so the pause listener does not restart them.
@@ -141,23 +149,57 @@ class WebFrameSource implements FrameSource {
 
   @override
   Future<EncodedFrame?> capture({int width = AppConfig.frameWidth}) async {
-    if (!isRunning || _captureVideo.videoWidth == 0) return null;
+    final timestamp = _frameTime;
+    if (!isRunning || timestamp == null) return null;
 
     final size = _sizeForWidth(width);
-    _canvas
-      ..width = size.width
-      ..height = size.height;
-    final context = _canvas.getContext('2d') as web.CanvasRenderingContext2D;
-    context.drawImage(_captureVideo, 0, 0, size.width, size.height);
+    var canvas = _canvas;
+    if (width != _canvas.width) {
+      canvas = web.HTMLCanvasElement()
+        ..width = size.width
+        ..height = size.height;
+      (canvas.getContext('2d') as web.CanvasRenderingContext2D).drawImage(
+        _canvas,
+        0,
+        0,
+        size.width,
+        size.height,
+      );
+    }
 
     // toDataURL is synchronous and fast at 320 px wide.
-    final dataUrl = _canvas.toDataURL('image/jpeg', AppConfig.jpegQuality.toJS);
+    final dataUrl = canvas.toDataURL('image/jpeg', AppConfig.jpegQuality.toJS);
     final jpeg = base64Decode(dataUrl.substring(dataUrl.indexOf(',') + 1));
 
     return EncodedFrame(
       jpeg: jpeg,
       size: size,
-      captureTime: web.window.performance.now() / 1000,
+      captureTime: timestamp,
+      ageAtEncodingMs: web.window.performance.now() - _frameAvailableAt,
+    );
+  }
+
+  void _watchFrames() {
+    _frameCallback = _captureVideo.requestVideoFrameCallback(
+      ((double now, _VideoFrameTiming metadata) {
+        if (!isRunning) return;
+        final size = _sizeForWidth(AppConfig.frameWidth);
+        _canvas
+          ..width = size.width
+          ..height = size.height;
+        (_canvas.getContext('2d') as web.CanvasRenderingContext2D).drawImage(
+          _captureVideo,
+          0,
+          0,
+          size.width,
+          size.height,
+        );
+        // Copy pixels in the callback for this exact presentation timestamp.
+        // Encoding and network scheduling must not change motion time.
+        _frameTime = metadata.mediaTime;
+        _frameAvailableAt = metadata.captureTime ?? metadata.presentationTime;
+        _watchFrames();
+      }).toJS,
     );
   }
 
@@ -217,3 +259,9 @@ class WebFrameSource implements FrameSource {
 }
 
 FrameSource createPlatformFrameSource() => WebFrameSource();
+
+extension type _VideoFrameTiming._(JSObject _) implements JSObject {
+  external double get mediaTime;
+  external double get presentationTime;
+  external double? get captureTime;
+}

@@ -63,8 +63,9 @@ final class ArObjectFollower {
   private var reference = simd_float3.zero
   private var radiusFactor: Float = 1
 
-  /// Up to four frames can await a reply (`AppConfig.maxFramesInFlight`),
-  /// but on Wi-Fi a reply is back within a frame or two, so three cover it.
+  /// More frames can await a reply on a slow connection (the window grows
+  /// with the round trip), but on Wi-Fi a reply is back within a frame or
+  /// two, so three cover it.
   /// Keeping more of ARKit's buffers risks it stopping delivering frames.
   /// A reply for an older frame starts the tracker on the next live frame.
   private static let keepSent = 3

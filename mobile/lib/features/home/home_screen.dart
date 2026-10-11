@@ -6,6 +6,8 @@ import '../../core/routing/router.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/theme/tokens.dart';
 import '../../state/experiment_settings.dart';
+import '../../core/theme/app_icons.dart';
+import '../learn/lesson.dart';
 import 'widgets/investigation.dart';
 import 'widgets/investigation_index.dart';
 import 'widgets/laboratory_exhibit.dart';
@@ -115,11 +117,27 @@ class HomeScreen extends ConsumerWidget {
                         .read(experimentSettingsProvider.notifier)
                         .setMode(mode),
                   ),
+                  const SizedBox(height: 12),
+                  TextButton.icon(
+                    style: TextButton.styleFrom(
+                      minimumSize: const Size(48, 48),
+                      foregroundColor: AppColors.instrumentAccentDark,
+                      padding: EdgeInsets.zero,
+                      textStyle: AppType.label,
+                    ),
+                    onPressed: () =>
+                        context.push(Routes.lesson(Lesson.basicsId)),
+                    icon: const Icon(AppIcons.arrowRight, size: 18),
+                    label: const Text('New to vectors? Start with the basics'),
+                  ),
                 ],
               );
               final exhibit = LaboratoryExhibit(
                 mode: settings.mode,
                 onStart: () => context.push(Routes.calibrate),
+                onLearn: () => context.push(
+                  Routes.lesson(Lesson.forMode(settings.mode).id),
+                ),
               );
               return SingleChildScrollView(
                 child: Center(

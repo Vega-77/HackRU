@@ -13,9 +13,11 @@ class LaboratoryExhibit extends StatefulWidget {
     super.key,
     required this.mode,
     required this.onStart,
+    required this.onLearn,
   });
   final ExperimentMode mode;
   final VoidCallback onStart;
+  final VoidCallback onLearn;
   @override
   State<LaboratoryExhibit> createState() => _LaboratoryExhibitState();
 }
@@ -324,6 +326,25 @@ class _LaboratoryExhibitState extends State<LaboratoryExhibit>
         Text(
           'Next: select your object and calibrate the camera.',
           style: AppType.caption.copyWith(color: AppColors.inkMutedDark),
+        ),
+        const SizedBox(height: AppSpace.lg),
+        SizedBox(
+          width: double.infinity,
+          child: OutlinedButton(
+            style: OutlinedButton.styleFrom(
+              foregroundColor: AppColors.vellum,
+              side: const BorderSide(color: AppColors.ruleDark),
+              padding: const EdgeInsets.symmetric(vertical: AppSpace.lg),
+              textStyle: AppType.bodyStrong,
+              shape: const RoundedRectangleBorder(
+                borderRadius: AppRadii.controlAll,
+              ),
+            ),
+            onPressed: widget.onLearn,
+            child: Text(
+              'Learn the physics of ${widget.mode.label.toLowerCase()}',
+            ),
+          ),
         ),
       ],
     );

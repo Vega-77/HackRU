@@ -71,3 +71,45 @@ def test_blurred_release_never_switches_to_face_wrist_or_ceiling():
             detections.append(timestamp)
     assert 45 in detections and 65 in detections
     assert 68.7 in detections
+
+
+def test_oct11_confirmed_selection_release_absence_and_reacquisition():
+    fixture = FIXTURE.parent / 'gray_ball_oct11'
+    manifest = json.loads((fixture / 'manifest.json').read_text())
+    cv2.setRNGSeed(0)
+    pipe = TrackingPipeline()
+    pipe.apply_config({**manifest['config'], 'debug_tracking': True})
+    confirmed = []
+    try:
+        for item in manifest['frames']:
+            frame = preprocess_frame(cv2.imread(str(fixture / item['file'])),
+                                     item['frame_id'], item['timestamp'])
+            if item['frame_id'] == 0:
+                ack = pipe.initialize(frame)
+                assert ack['status'] == 'initialized' and not ack['tracked']
+                assert pipe._manual.round_reference is not None
+                # The selected gray sphere, excluding the nearby fingers.
+                mask = pipe._manual.foreground
+                x, y, _, _ = pipe._manual.bbox
+                yy, xx = np.nonzero(mask)
+                assert (xx.mean() + x, yy.mean() + y) == pytest.approx((212, 45), abs=6)
+                original = pipe._manual.original.copy()
+                continue
+            result = pipe(frame)
+            target = next((o for o in result['objects'] if o['target']), None)
+            truth = item.get('truth')
+            if truth is None:
+                continue  # Partial ball at frame edge has no center annotation.
+            if not truth.get('visible', True):
+                assert target is None, item['file']
+            elif target is not None:
+                assert target['pixel'] == pytest.approx(
+                    {'x': truth['x'], 'y': truth['y']}, abs=truth['diameter'] / 4), item['file']
+                confirmed.append(item['file'])
+                box = target['bbox']
+                assert .5 * truth['diameter'] <= box['w'] <= 2 * truth['diameter']
+            np.testing.assert_array_equal(pipe._manual.original, original)
+        assert len(confirmed) >= 12
+        assert {'30.6.png', '35.4.png', '39.83.png'} <= set(confirmed)
+    finally:
+        pipe.close()
