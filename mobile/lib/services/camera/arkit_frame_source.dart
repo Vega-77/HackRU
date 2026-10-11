@@ -153,6 +153,16 @@ class ArKitFrameSource implements FrameSource, SurfaceFinder, ArVectorDisplay {
   }
 
   @override
+  Future<List<ArSurface>> allSurfaces() async {
+    if (!canFindSurfaces) return const [];
+    final planes = await _channel.invokeListMethod<Object?>('surfaces');
+    return [
+      for (final plane in planes ?? const <Object?>[])
+        if (plane is Map) ArSurface.fromMap(plane),
+    ];
+  }
+
+  @override
   Future<void> showArVectors(ArVectorScene? scene) async {
     if (!canShowArVectors) return;
     if (scene == null && !_vectorsShown) return;

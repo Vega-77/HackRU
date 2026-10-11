@@ -114,6 +114,26 @@ void main() {
       expect(state.energy, isNull);
     });
 
+    test('a contact force keeps its out-of-plane part', () {
+      final message = ServerMessage.parse(
+        jsonEncode({
+          'type': 'state',
+          'tracked': true,
+          'forces': [
+            {'name': 'normal', 'x': 0, 'y': 0, 'z': 0.98},
+            {'name': 'normal_contact', 'x': -0.2, 'y': 0},
+          ],
+        }),
+      );
+      final forces = (message as StateMessage).state.forces;
+      expect(forces.first.z, 0.98);
+      expect(forces.first.isNormal, isTrue);
+      expect(forces.last.z, 0);
+      expect(forces.last.isNormal, isTrue);
+      expect(forces.first.toJson()['z'], 0.98);
+      expect(forces.last.toJson().containsKey('z'), isFalse);
+    });
+
     test('malformed fields are dropped instead of throwing', () {
       final message = ServerMessage.parse(
         '{"type":"state","frame_id":1,"timestamp":0,"tracked":true,'
@@ -268,6 +288,35 @@ void main() {
       );
       expect(sliding.toJson()['sliding_body'], isTrue);
       expect(pendulum.toJson().containsKey('sliding_body'), isFalse);
+    });
+
+    test('sends the planes ARKit found, with the AR surface only', () {
+      const floor = ArSurface(
+        point: [0, -0.5, -1],
+        normal: [0, 1, 0],
+        id: 'floor',
+      );
+      const board = ArSurface(point: [0, 0, -1], normal: [0, 0, 1]);
+      final json = const SessionConfig(
+        mode: ExperimentMode.ramp,
+        massKg: 0.1,
+        frameSize: FrameSize(320, 240),
+        surface: board,
+        arSurfaces: [floor],
+      ).toJson();
+      expect(json['ar_surfaces'], [
+        {
+          'id': 'floor',
+          'point': [0, -0.5, -1],
+          'normal': [0, 1, 0],
+        },
+      ]);
+      const none = SessionConfig(
+        mode: ExperimentMode.ramp,
+        massKg: 0.1,
+        frameSize: FrameSize(320, 240),
+      );
+      expect(none.toJson().containsKey('ar_surfaces'), isFalse);
     });
 
     test('uncalibrated fields are sent as null', () {

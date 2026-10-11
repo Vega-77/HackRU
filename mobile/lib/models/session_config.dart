@@ -43,6 +43,7 @@ class SessionConfig {
     this.initializationRequired = false,
     this.surface,
     this.slidingBody = false,
+    this.arSurfaces = const [],
   });
 
   final ExperimentMode mode;
@@ -71,6 +72,10 @@ class SessionConfig {
   /// friction and thermal energy.
   final bool slidingBody;
 
+  /// Every plane ARKit has found, iOS only: what the object can rest
+  /// against, for normal forces.
+  final List<ArSurface> arSurfaces;
+
   Map<String, dynamic> toJson() => {
     'type': 'config',
     'mode': mode.wireName,
@@ -90,6 +95,8 @@ class SessionConfig {
     'frame_size': frameSize.toJson(),
     'ar_plane': surface?.toJson(),
     if (mode == ExperimentMode.ramp) 'sliding_body': slidingBody,
+    if (arSurfaces.isNotEmpty)
+      'ar_surfaces': [for (final s in arSurfaces) s.toSurfaceJson()],
     if (debugTracking) 'debug_tracking': true,
     if (initializationRequired) 'initialization_required': true,
   };

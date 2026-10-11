@@ -92,6 +92,11 @@ class KinematicsEngine:
 
         self._samples.clear()
 
+    def recent_positions(self) -> list[tuple[float, float]]:
+        """The positions in the current window, oldest first."""
+
+        return [(sample.x, sample.y) for sample in self._samples]
+
     def trajectory_angle_deg(self, min_horizontal_m: float = 0.03) -> Optional[float]:
         """Estimate the slope of a straight track, independent of travel direction."""
 

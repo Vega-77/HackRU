@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/config/app_config.dart';
 import '../core/logging/debug_log.dart';
 import '../models/calibration.dart';
+import '../models/camera_pose.dart';
 import '../models/experiment_mode.dart';
 import '../models/physics_state.dart';
 import '../models/session_config.dart';
@@ -123,6 +124,14 @@ class SessionController extends Notifier<SessionState> {
   /// initializing the first object makes the backend forget the second.
   EncodedFrame? _secondSelectionFrame;
   Future<void>? _stopInProgress;
+
+  /// Every plane ARKit has found, re-read while the session runs, so the
+  /// backend can tell what the object rests against (normal forces).
+  List<ArSurface> _arSurfaces = const [];
+  bool _readingSurfaces = false;
+
+  /// The backend accepts this many planes; ARKit rarely finds more.
+  static const _maxArSurfaces = 32;
   int _sessionEpoch = 0;
 
   int get sessionEpoch => _sessionEpoch;
@@ -500,6 +509,7 @@ class SessionController extends Notifier<SessionState> {
 
   void _tickStats() {
     if (!ref.mounted) return;
+    unawaited(_refreshSurfaces());
     state = state.copyWith(
       sendFps: _framesSentThisSecond.toDouble(),
       latencyMs: _socket?.latencyMs,
@@ -514,6 +524,48 @@ class SessionController extends Notifier<SessionState> {
     _framesSentThisSecond = 0;
     _waitingTicks = 0;
     _encodingTicks = 0;
+  }
+
+  Future<void> _refreshSurfaces() async {
+    final finder = switch (_camera) {
+      final SurfaceFinder f when f.canFindSurfaces => f,
+      _ => null,
+    };
+    if (_readingSurfaces ||
+        finder == null ||
+        ref.read(calibrationProvider).surface == null) {
+      return;
+    }
+    _readingSurfaces = true;
+    try {
+      final found = (await finder.allSurfaces()).take(_maxArSurfaces).toList();
+      if (!ref.mounted || _socket == null) return;
+      if (_sameSurfaces(found, _arSurfaces)) return;
+      _arSurfaces = found;
+      _sendConfig('AR surfaces changed, ${found.length} found');
+    } catch (e, st) {
+      log.w('Could not read the AR surfaces', e, st);
+    } finally {
+      _readingSurfaces = false;
+    }
+  }
+
+  /// ARKit keeps refining planes as it sees more of them. Small changes
+  /// don't move where the object touches them, so they aren't resent.
+  static bool _sameSurfaces(List<ArSurface> a, List<ArSurface> b) {
+    if (a.length != b.length) return false;
+    final byId = {for (final s in b) s.id: s};
+    for (final s in a) {
+      final old = byId[s.id];
+      if (old == null) return false;
+      var moved = 0.0, turned = 0.0;
+      for (var i = 0; i < 3; i++) {
+        moved += (s.point[i] - old.point[i]) * (s.point[i] - old.point[i]);
+        turned += s.normal[i] * old.normal[i];
+      }
+      if (moved > 0.05 * 0.05 || turned < 0.995) return false;
+    }
+    return true;
   }
 
   void _sendConfig(String why) {
@@ -548,6 +600,7 @@ class SessionController extends Notifier<SessionState> {
       initializationRequired: calibration.selectionFrame != null,
       surface: calibration.surface,
       slidingBody: settings.slidingBody,
+      arSurfaces: calibration.surface == null ? const [] : _arSurfaces,
     );
   }
 
@@ -602,6 +655,7 @@ class SessionController extends Notifier<SessionState> {
   }
 
   void _resetCounters() {
+    _arSurfaces = const [];
     _sessionClock
       ..reset()
       ..start();

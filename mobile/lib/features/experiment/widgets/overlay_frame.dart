@@ -17,6 +17,7 @@ class OverlayFrame {
     this.velocity = Vec2.zero,
     this.acceleration = Vec2.zero,
     this.forces = const {},
+    this.support = 0,
     this.visibility = 0,
     this.axes,
   });
@@ -33,6 +34,11 @@ class OverlayFrame {
 
   /// Force name → newtons, world space. Keeps the backend's order.
   final Map<String, Vec2> forces;
+
+  /// Newtons pushing out of the screen: the surface the object sits on when
+  /// the camera looks straight at it. No arrow can show this, so the overlay
+  /// draws a dot-in-circle symbol instead.
+  final double support;
 
   /// 1 while tracked, fading to 0 when the object is lost.
   final double visibility;
@@ -53,6 +59,9 @@ class OverlayFrame {
       velocity: state.velocity ?? Vec2.zero,
       acceleration: state.acceleration ?? Vec2.zero,
       forces: {for (final f in state.forces) f.name: f.vector},
+      support: state.forces
+          .where((f) => f.isNormal)
+          .fold(0.0, (sum, f) => sum + f.z),
       visibility: 1,
       axes: state.screenAxes,
     );
@@ -65,6 +74,7 @@ class OverlayFrame {
     velocity: velocity,
     acceleration: acceleration,
     forces: forces,
+    support: support,
     visibility: visibility,
     axes: axes,
   );
@@ -114,6 +124,7 @@ class OverlayFrame {
       velocity: Vec2.lerp(velocity, target.velocity, vectorT),
       acceleration: Vec2.lerp(acceleration, target.acceleration, vectorT),
       forces: nextForces,
+      support: _lerp(support, target.support, vectorT),
       visibility: _lerp(visibility, target.visibility, vectorT),
       // Axes change with the camera, not the object, so they snap.
       axes: target.axes ?? axes,
@@ -124,6 +135,7 @@ class OverlayFrame {
   /// the overlay can stop animating.
   bool settledOn(OverlayFrame other) {
     if ((visibility - other.visibility).abs() > 0.01) return false;
+    if ((support - other.support).abs() > 1e-3) return false;
     if (_far(velocity, other.velocity) ||
         _far(acceleration, other.acceleration)) {
       return false;

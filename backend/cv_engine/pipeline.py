@@ -17,6 +17,7 @@ from cv_engine.acquisition import propose_region
 from cv_engine.detect import DEFAULT_COLORS, ColorDetector, Detection, MediaPipeDetector, MotionDetector
 from cv_engine.preprocess import PreprocessedFrame
 from cv_engine.spatial import SpatialMapper
+from cv_engine.surfaces import ar_surfaces, edge_surface, tapped_surfaces
 from cv_engine.tracker import CentroidTracker, Track
 from cv_engine.universal import ManualTracker, box_from_tap
 
@@ -34,10 +35,16 @@ EXPERIMENT_MODES = ("free_fall", "ramp", "pendulum", "collision")
 # object moves on: {"point": [x, y, z], "normal": [x, y, z], "offset_m": 0.0} in world metres.
 # In collision mode the app can also select the other object (second_target_px and
 # second_target_bbox), which is then followed the same way as the first.
+# For normal forces: ARKit clients send the planes ARKit found (ar_surfaces: [{id,
+# point, normal}] in world metres), any client may send surface edges the user tapped
+# (surface_px: [{a: {x, y}, b: {x, y}}] in frame pixels), and view ("side" or "top")
+# says whether the camera looks at a board side-on or down at a table.
 SESSION_DEFAULTS = {"mode": None, "mass_kg": 0.1, "px_per_m": None, "target_px": None, "target_bbox": None,
                     "second_target_px": None, "second_target_bbox": None, "frame_size": None}
 # Labels of the selected objects' detections, so the tracker never swaps their IDs.
 FIRST_LABEL, SECOND_LABEL = "selected", "selected_2"
+VIEWS = ("side", "top")
+MAX_SURFACES = 32
 
 
 @dataclass
@@ -94,6 +101,21 @@ def validated_session(current: dict, changes: dict) -> dict:
         raise ValueError("collision_masses_kg must contain two positive masses")
     if s.get("ar_plane") is not None:
         ArPlane.from_request(s["ar_plane"])  # raises ValueError if malformed
+    if s.get("view") is not None and s["view"] not in VIEWS:
+        raise ValueError(f"view must be one of {VIEWS} or null")
+    lines = s.get("surface_px")
+    if lines is not None and (
+        not isinstance(lines, list) or len(lines) > MAX_SURFACES
+        or any(not isinstance(line, dict) or not all(_is_point(line.get(k)) for k in ("a", "b")) for line in lines)
+    ):
+        raise ValueError(f"surface_px must be a list of up to {MAX_SURFACES} {{a: {{x, y}}, b: {{x, y}}}} lines")
+    planes = s.get("ar_surfaces")
+    if planes is not None and (
+        not isinstance(planes, list) or len(planes) > MAX_SURFACES
+        or any(not isinstance(p, dict) or not _is_vector3(p.get("point")) or not _is_vector3(p.get("normal"))
+               for p in planes)
+    ):
+        raise ValueError(f"ar_surfaces must be a list of up to {MAX_SURFACES} {{id, point: [3], normal: [3]}}")
     for key, fields in (("target_px", ("x", "y")), ("target_bbox", ("x", "y", "w", "h")),
                         ("second_target_px", ("x", "y")), ("second_target_bbox", ("x", "y", "w", "h")),
                         ("frame_size", ("w", "h"))):
@@ -106,6 +128,14 @@ def validated_session(current: dict, changes: dict) -> dict:
     if s["frame_size"] is not None and (s["frame_size"]["w"] <= 0 or s["frame_size"]["h"] <= 0):
         raise ValueError("frame_size must have positive width and height")
     return s
+
+
+def _is_point(v) -> bool:
+    return isinstance(v, dict) and all(isinstance(v.get(k), (int, float)) and math.isfinite(v[k]) for k in ("x", "y"))
+
+
+def _is_vector3(v) -> bool:
+    return isinstance(v, list) and len(v) == 3 and all(isinstance(c, (int, float)) and math.isfinite(c) for c in v)
 
 
 class TrackingPipeline:
@@ -245,10 +275,13 @@ class TrackingPipeline:
         tracks = self.tracker.update(detections)
         target = self._pick_target(tracks, frame)
         objects = [track_to_json(t, frame, self.spatial) for t in tracks]
+        edges = self._finds_edges()
         for o in objects:
             o["target"] = o["id"] == self._target_id
             o["timestamp"] = frame.timestamp
             o["tracking_status"] = "low_confidence" if o["score"] < 0.6 else "detected"
+            if edges and (o["target"] or o["label"] == SECOND_LABEL):
+                o["surfaces"] = edge_surface(frame, o, self.spatial)
         if target is not None:
             tracking_status = "low_confidence" if target.score < 0.6 else "detected"
         elif self._target_id is not None:
@@ -261,6 +294,8 @@ class TrackingPipeline:
             "target_id": self._target_id,
             "objects": objects,
             "calibration": self.spatial.status(),
+            "surfaces": ar_surfaces(self.spatial.ar_plane, self.session.get("ar_surfaces"))
+            + tapped_surfaces(self.spatial, frame, self.session.get("surface_px")),
         }
         if self.session.get("debug_tracking"):
             result["tracking_debug"] = {"frame_id": frame.frame_id, "timestamp": frame.timestamp,
@@ -268,6 +303,16 @@ class TrackingPipeline:
             if second_tap is not None:
                 result["tracking_debug"]["second"] = dict(self._second.debug)
         return result
+
+    def _finds_edges(self) -> bool:
+        """Look for edges the object rests on only where they can hold it up: a board seen
+        side-on, not a table seen from above, and not for a pendulum, which hangs."""
+        if self.spatial.mapping is None or self.session["mode"] == "pendulum":
+            return False
+        if self.session.get("view") == "top":
+            return False
+        plane = self.spatial.ar_plane
+        return plane is None or not plane.has_basis or plane.describe()["facing"] == "vertical"
 
     def initialize(self, frame: PreprocessedFrame, which: str = "first") -> dict:
         """Retry acquisition on this exact image; initialization is never a detection.
@@ -379,7 +424,7 @@ def track_to_json(t: Track, frame: PreprocessedFrame, spatial: SpatialMapper | N
     w, h = frame.size
     x, y, bw, bh = t.bbox
     cx, cy = t.centroid
-    position = width_m = position_3d = axes = None
+    position = width_m = height_m = position_3d = axes = None
     if spatial is not None and spatial.mapping is not None:
         wx, wy = spatial.to_world((cx / s, cy / s), (cx / w, cy / h))
         position = {"x": wx, "y": wy}
@@ -390,6 +435,9 @@ def track_to_json(t: Track, frame: PreprocessedFrame, spatial: SpatialMapper | N
         left = spatial.to_world((x / s, cy / s), (x / w, cy / h))
         right = spatial.to_world(((x + bw) / s, cy / s), ((x + bw) / w, cy / h))
         width_m = round(float(np.hypot(right[0] - left[0], right[1] - left[1])), 4)
+        top = spatial.to_world((cx / s, y / s), (cx / w, y / h))
+        bottom = spatial.to_world((cx / s, (y + bh) / s), (cx / w, (y + bh) / h))
+        height_m = round(float(np.hypot(bottom[0] - top[0], bottom[1] - top[1])), 4)
     return {
         "id": t.id,
         "label": t.label,
@@ -406,4 +454,5 @@ def track_to_json(t: Track, frame: PreprocessedFrame, spatial: SpatialMapper | N
         "position_3d": position_3d,
         "screen_axes": axes,
         "width_m": width_m,
+        "height_m": height_m,
     }
