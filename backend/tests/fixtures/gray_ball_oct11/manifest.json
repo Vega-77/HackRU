@@ -1,0 +1,283 @@
+{
+  "source_sha256": "8c263bd9f82221d45499d524ea76e98166891e4b591aa8ed2ff202ab6ee53510",
+  "config": {
+    "target_px": {
+      "x": 221.5,
+      "y": 46
+    },
+    "target_bbox": {
+      "x": 198,
+      "y": 25,
+      "w": 47,
+      "h": 42
+    },
+    "frame_size": {
+      "w": 320,
+      "h": 180
+    }
+  },
+  "frames": [
+    {
+      "file": "13.28.png",
+      "frame_id": 0,
+      "timestamp": 13.433333333333334,
+      "requested_time": 13.28
+    },
+    {
+      "file": "17.7.png",
+      "frame_id": 1,
+      "timestamp": 17.900000000000002,
+      "requested_time": 17.7,
+      "truth": {
+        "x": 212,
+        "y": 54,
+        "diameter": 36
+      }
+    },
+    {
+      "file": "22.13.png",
+      "frame_id": 2,
+      "timestamp": 22.083333333333336,
+      "requested_time": 22.13,
+      "truth": {
+        "x": 207,
+        "y": 63,
+        "diameter": 36
+      }
+    },
+    {
+      "file": "26.55.png",
+      "frame_id": 3,
+      "timestamp": 26.71666666666667,
+      "requested_time": 26.55,
+      "truth": {
+        "x": 218,
+        "y": 69,
+        "diameter": 36
+      }
+    },
+    {
+      "file": "30.png",
+      "frame_id": 4,
+      "timestamp": 30.033333333333335,
+      "requested_time": 30,
+      "truth": {
+        "x": 215,
+        "y": 60,
+        "diameter": 36
+      }
+    },
+    {
+      "file": "30.1.png",
+      "frame_id": 5,
+      "timestamp": 30.150000000000002,
+      "requested_time": 30.1,
+      "truth": {
+        "x": 214,
+        "y": 56,
+        "diameter": 36
+      }
+    },
+    {
+      "file": "30.2.png",
+      "frame_id": 6,
+      "timestamp": 30.26666666666667,
+      "requested_time": 30.2,
+      "truth": {
+        "x": 213,
+        "y": 54,
+        "diameter": 36
+      }
+    },
+    {
+      "file": "30.3.png",
+      "frame_id": 7,
+      "timestamp": 30.400000000000002,
+      "requested_time": 30.3,
+      "truth": {
+        "x": 213,
+        "y": 50,
+        "diameter": 36
+      }
+    },
+    {
+      "file": "30.4.png",
+      "frame_id": 8,
+      "timestamp": 30.483333333333334,
+      "requested_time": 30.4,
+      "truth": {
+        "x": 212,
+        "y": 47,
+        "diameter": 36
+      }
+    },
+    {
+      "file": "30.5.png",
+      "frame_id": 9,
+      "timestamp": 30.583333333333336,
+      "requested_time": 30.5,
+      "truth": {
+        "x": 217,
+        "y": 50,
+        "diameter": 36
+      }
+    },
+    {
+      "file": "30.6.png",
+      "frame_id": 10,
+      "timestamp": 30.683333333333334,
+      "requested_time": 30.6,
+      "truth": {
+        "x": 220,
+        "y": 112,
+        "diameter": 40
+      }
+    },
+    {
+      "file": "30.7.png",
+      "frame_id": 11,
+      "timestamp": 30.833333333333336,
+      "requested_time": 30.7,
+      "annotation": "Partial ball at frame edge; center not labeled"
+    },
+    {
+      "file": "30.8.png",
+      "frame_id": 12,
+      "timestamp": 30.933333333333334,
+      "requested_time": 30.8,
+      "annotation": "Partial ball at frame edge; center not labeled"
+    },
+    {
+      "file": "30.9.png",
+      "frame_id": 13,
+      "timestamp": 31.033333333333335,
+      "requested_time": 30.9,
+      "annotation": "Partial ball at frame edge; center not labeled"
+    },
+    {
+      "file": "31.1.png",
+      "frame_id": 14,
+      "timestamp": 31.1,
+      "requested_time": 31.1,
+      "truth": {
+        "visible": false
+      }
+    },
+    {
+      "file": "31.2.png",
+      "frame_id": 15,
+      "timestamp": 31.21666666666667,
+      "requested_time": 31.2,
+      "truth": {
+        "visible": false
+      }
+    },
+    {
+      "file": "31.3.png",
+      "frame_id": 16,
+      "timestamp": 31.3,
+      "requested_time": 31.3,
+      "truth": {
+        "visible": false
+      }
+    },
+    {
+      "file": "31.4.png",
+      "frame_id": 17,
+      "timestamp": 31.416666666666668,
+      "requested_time": 31.4,
+      "truth": {
+        "visible": false
+      }
+    },
+    {
+      "file": "35.4.png",
+      "frame_id": 18,
+      "timestamp": 35.88333333333333,
+      "requested_time": 35.4,
+      "truth": {
+        "x": 247,
+        "y": 55,
+        "diameter": 36
+      }
+    },
+    {
+      "file": "39.83.png",
+      "frame_id": 19,
+      "timestamp": 39.766666666666666,
+      "requested_time": 39.83,
+      "truth": {
+        "x": 216,
+        "y": 46,
+        "diameter": 36
+      }
+    },
+    {
+      "file": "44.26.png",
+      "frame_id": 20,
+      "timestamp": 44.400000000000006,
+      "requested_time": 44.26,
+      "truth": {
+        "x": 267,
+        "y": 76,
+        "diameter": 36
+      }
+    },
+    {
+      "file": "45.png",
+      "frame_id": 21,
+      "timestamp": 45.43333333333334,
+      "requested_time": 45,
+      "truth": {
+        "x": 199,
+        "y": 68,
+        "diameter": 36
+      }
+    },
+    {
+      "file": "46.png",
+      "frame_id": 22,
+      "timestamp": 46.56666666666667,
+      "requested_time": 46,
+      "truth": {
+        "visible": false
+      }
+    },
+    {
+      "file": "47.png",
+      "frame_id": 23,
+      "timestamp": 47.11666666666667,
+      "requested_time": 47,
+      "truth": {
+        "visible": false
+      }
+    },
+    {
+      "file": "48.png",
+      "frame_id": 24,
+      "timestamp": 48.03333333333334,
+      "requested_time": 48,
+      "truth": {
+        "visible": false
+      }
+    },
+    {
+      "file": "49.png",
+      "frame_id": 25,
+      "timestamp": 49.03333333333334,
+      "requested_time": 49,
+      "truth": {
+        "visible": false
+      }
+    },
+    {
+      "file": "50.png",
+      "frame_id": 26,
+      "timestamp": 49.93333333333334,
+      "requested_time": 50,
+      "truth": {
+        "visible": false
+      }
+    }
+  ]
+}

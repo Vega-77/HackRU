@@ -57,7 +57,7 @@ import time
 import traceback
 from uuid import uuid4
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 import cv2
 import numpy as np
@@ -114,6 +114,7 @@ class IncomingFrame:
     data: bytes
     meta: dict
     received_at: float
+    received_monotonic: float = field(default_factory=time.perf_counter)
 
 
 app = FastAPI(title="HandsOn Physics CV engine")
@@ -156,6 +157,7 @@ async def frames_ws(ws: WebSocket) -> None:
     # Selections initialized on their own image: "first", and "second" for the other
     # object in a collision when the app selected it too.
     initialized: set[str] = set()
+    last_live_timestamp: float | None = None
 
     def ready() -> bool:
         return not initialization_required or initialized >= ({"first", "second"} if pipeline.follows_second else {"first"})
@@ -165,7 +167,7 @@ async def frames_ws(ws: WebSocket) -> None:
             await ws.send_json(payload)
 
     async def receive_loop() -> None:
-        nonlocal next_id
+        nonlocal next_id, last_live_timestamp
         pending_meta: dict = {}
         try:
             while True:
@@ -225,6 +227,12 @@ async def frames_ws(ws: WebSocket) -> None:
                         await send({"type": "error", "frame_id": frame_id,
                                     "message": "Initialize the selected image before sending live frames"})
                     else:
+                        if timestamp is not None:
+                            if last_live_timestamp is not None and timestamp <= last_live_timestamp:
+                                await send({"type": "error", "frame_id": frame_id,
+                                            "message": "capture timestamp must strictly increase"})
+                                continue
+                            last_live_timestamp = timestamp
                         slot.put(incoming)
         finally:
             slot.close()
@@ -251,7 +259,7 @@ async def frames_ws(ws: WebSocket) -> None:
             await send({"type": "error", "message": f"bad config: {e}"})
 
     async def selection_image(frame: IncomingFrame) -> None:
-        nonlocal initialization_required
+        nonlocal initialization_required, last_live_timestamp
         kind = frame.meta["type"]
         which = frame.meta.get("target", "first")
         reply = {"type": "acquisition" if kind == "acquire" else "initialization",
@@ -274,6 +282,8 @@ async def frames_ws(ws: WebSocket) -> None:
                     initialization_required = True
                     if which == "first":
                         initialized.clear()
+                        physics.reset()
+                        last_live_timestamp = None
                     initialized.discard(which)
                     slot.discard()
                     pf = preprocess_frame(image, frame.meta["frame_id"], frame.meta.get("timestamp"), WORKING_WIDTH)
@@ -281,6 +291,10 @@ async def frames_ws(ws: WebSocket) -> None:
                 await send({**reply, **result})
                 if kind == "initialize" and result["status"] == "initialized":
                     initialized.add(which)
+                    selected_time = frame.meta.get("timestamp")
+                    if selected_time is not None:
+                        last_live_timestamp = (selected_time if last_live_timestamp is None
+                                               else max(last_live_timestamp, selected_time))
         except (ValueError, TypeError, cv2.error) as error:
             await send({**reply, "status": "failed", "reason": str(error), "bbox": None})
 
@@ -295,11 +309,11 @@ async def frames_ws(ws: WebSocket) -> None:
 
     async def process_loop() -> None:
         while (frame := await slot.get()) is not None:
-            t0 = time.perf_counter()
             try:
                 async with pipeline_lock:
                     if not ready():
                         continue
+                    t0 = time.perf_counter()
                     result, image = await asyncio.to_thread(_process_with_physics, frame, pipeline, physics)
             except FrameDecodeError as e:
                 stats["decode_errors"] += 1
@@ -315,7 +329,8 @@ async def frames_ws(ws: WebSocket) -> None:
                 continue
             stats["processed"] += 1
             result["process_ms"] = round((time.perf_counter() - t0) * 1000, 2)
-            result["latency_ms"] = round((time.time() - frame.received_at) * 1000, 2)
+            result["queue_ms"] = round((t0 - frame.received_monotonic) * 1000, 2)
+            result["latency_ms"] = round((time.perf_counter() - frame.received_monotonic) * 1000, 2)
             result["stats"] = {"received": slot.received, "dropped": slot.dropped, **stats}
             ws.app.state.debug[conn_id] = DebugSnapshot(image, result, dict(trails.update(result["objects"])))
             await send(result)
@@ -351,6 +366,7 @@ def _process(frame: IncomingFrame, analyzer: FrameAnalyzer) -> tuple[dict, np.nd
         "type": "frame",
         "frame_id": pf.frame_id,
         "timestamp": pf.timestamp,
+        "timestamp_source": "capture" if frame.meta.get("timestamp") is not None else "server_receive",
         "size": list(pf.size),
         "source_size": list(pf.source_size),
         "scale": round(pf.scale, 5),
