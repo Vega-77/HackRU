@@ -26,16 +26,21 @@ class ColorModel:
         return np.minimum.reduce(costs)
 
 
-def selected_foreground(image, seed):
+def selected_foreground(image, seed, selection_bounds=None):
     height, width = image.shape[:2]
     px, py = seed
     if min(width, height) < 12:
         return None
     labels = np.full((height, width), cv2.GC_PR_FGD, np.uint8)
+    selected_width, selected_height = width, height
+    if selection_bounds is not None:
+        x, y, selected_width, selected_height = selection_bounds
+        labels[:] = cv2.GC_PR_BGD
+        labels[y:y + selected_height, x:x + selected_width] = cv2.GC_PR_FGD
     labels[:2] = labels[-2:] = cv2.GC_BGD
     labels[:, :2] = labels[:, -2:] = cv2.GC_BGD
     # A single foreground pixel can isolate a logo instead of the object.
-    radius = max(1, min(round(min(width, height) * .25), px - 1, py - 1,
+    radius = max(1, min(round(min(selected_width, selected_height) * .25), px - 1, py - 1,
                         width - px - 2, height - py - 2))
     cv2.circle(labels, (px, py), radius, cv2.GC_FGD, -1)
     try:
@@ -54,7 +59,7 @@ def selected_foreground(image, seed):
     x, y, w, h = cv2.boundingRect(contour)
     area = cv2.contourArea(contour)
     # Reject tiny seed islands and selections with no separable background.
-    if (area < max(40, width * height * .12, np.pi * radius * radius * 1.15)
+    if (area < max(40, selected_width * selected_height * .12, np.pi * radius * radius * 1.15)
             or area > width * height * .9 or min(w, h) < 8):
         return None
     cv2.drawContours(mask, [contour], -1, 1, -1)
@@ -81,6 +86,8 @@ class RoundReference:
         lab = cv2.cvtColor(image, cv2.COLOR_BGR2LAB).astype(np.float32)
         interior = cv2.erode(mask, np.ones((3, 3), np.uint8)) > 0
         instance.chroma = np.median(lab[interior, 1:], axis=0)
+        instance.chroma_spread = np.maximum(
+            np.median(np.abs(lab[interior, 1:] - instance.chroma), axis=0) * 1.4826, 2.0)
         instance.lightness = float(np.median(lab[interior, 0]))
         instance.spread = float(np.diff(np.percentile(lab[interior, 0], [25, 75]))[0])
         instance.median_color = np.median(image[interior], axis=0)
@@ -88,8 +95,8 @@ class RoundReference:
         instance.foreground_model = ColorModel(image[mask > 0])
         return instance
 
-    def verify(self, image, expected_mask):
-        if not self.appearance_matches(image, expected_mask):
+    def verify(self, image, expected_mask, lightness_shift=0.0):
+        if not self.appearance_matches(image, expected_mask, lightness_shift):
             return None
         median_color = np.median(image[expected_mask > 0], axis=0)
         corrected = np.clip(image.astype(np.float32) + np.clip(self.median_color - median_color, -40, 40),
@@ -122,11 +129,16 @@ class RoundReference:
         mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, np.ones((3, 3), np.uint8))
         return mask, inside, outside
 
-    def appearance_matches(self, image, mask):
+    def appearance_matches(self, image, mask, lightness_shift=0.0):
         interior = cv2.erode(mask, np.ones((3, 3), np.uint8)) > 0
         if not interior.any():
             return False
         lab = cv2.cvtColor(image, cv2.COLOR_BGR2LAB).astype(np.float32)
-        return (np.linalg.norm(np.median(lab[interior, 1:], axis=0) - self.chroma) <= 12
-                and abs(float(np.median(lab[interior, 0])) - self.lightness) <= 45
+        chroma_delta = np.median(lab[interior, 1:], axis=0) - self.chroma
+        return (np.linalg.norm(chroma_delta) <= 12
+                and np.linalg.norm(chroma_delta / self.chroma_spread) <= 3
+                # Exposure can shift the whole scene. A dark lookalike in an
+                # unchanged scene must not get the same allowance.
+                and abs(float(np.median(lab[interior, 0])) - self.lightness)
+                <= max(30, min(45, 0.75 * self.spread)) + abs(lightness_shift)
                 and float(np.diff(np.percentile(lab[interior, 0], [25, 75]))[0]) <= self.spread + 15)
