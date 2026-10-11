@@ -35,12 +35,21 @@ from cv_engine.preprocess import PreprocessedFrame
 HIST_CHANNELS = [0, 1]
 HIST_BINS = [18, 16]  # hue, saturation
 HIST_RANGES = [0, 180, 0, 256]
+# Red sits on both sides of OpenCV's hue wrap (0 and 179), and a blurred or relit red ball
+# flickers across it from frame to frame. For a red object hue is turned by half a bin
+# before binning, so reds from 175 to 4 share one bin instead of being split between the
+# first and the last.
+RED_HUE_SHIFT = 5
 COLOR_FLOOR = 0.01
 MIN_SATURATION = 50  # of 255: below this an object is neutral and gets no colour model
 # Template scales tried near the prediction and across the whole frame.
 LOCAL_SCALES = (0.85, 1.0, 1.15)
 GLOBAL_SCALES = (0.55, 0.7, 0.85, 1.0, 1.2, 1.4)
 ROUND_GLOBAL_SCORE = 0.7  # far from the prediction, for a round object checked by its outline
+REFERENCE_FPS = 15.0  # the search margin is sized for frames this far apart
+UNKNOWN_SPEED = 400.0  # px/s at 320 px wide: how fast an object of unknown speed may go
+MAX_GAP_S = 0.34  # about 3 fps: the slowest stream the search margin still widens for
+RECENT_FIX_S = 0.5  # a recovery this soon after the last fix still tells the speed
 
 
 def weighted_scores(search, references, weights):
@@ -95,6 +104,7 @@ class ManualTracker:
         self.template: np.ndarray | None = None
         self.original: np.ndarray | None = None
         self.color_model: np.ndarray | None = None
+        self.hue_shift = 0  # added to hue before the colour model's bins (see RED_HUE_SHIFT)
         self.foreground: np.ndarray | None = None  # the object's pixels in the user's box
         self.round_reference: RoundReference | None = None
         self.silhouette: np.ndarray | None = None
@@ -107,6 +117,7 @@ class ManualTracker:
         self._center = (0.0, 0.0)
         self._size = (0.0, 0.0)
         self._velocity = (0.0, 0.0)  # working px per second
+        self._velocity_known = False
         self._time = 0.0
         self._image: np.ndarray | None = None  # this frame in the matched channel
 
@@ -139,7 +150,7 @@ class ManualTracker:
         else:
             mask = None
             tx, ty, tw, th = x, y, w, h
-        color_model = _color_model(frame, tx, ty, tw, th, mask)
+        color_model, hue_shift = _color_model(frame, tx, ty, tw, th, mask)
         patch = frame.gray[ty:ty + th, tx:tx + tw]
         if float(patch.std()) < 3:
             # Different colours can have the same brightness: match the Lab channel that
@@ -157,6 +168,7 @@ class ManualTracker:
         self.original = patch.copy()
         self.template = patch.astype(np.float32)
         self.color_model = color_model
+        self.hue_shift = hue_shift
         if mask is None:
             self._mask = _ellipse_mask(tw, th)
         else:
@@ -197,7 +209,16 @@ class ManualTracker:
         py = self._center[1] + self._velocity[1] * dt
         speed = math.hypot(*self._velocity) * dt
         w, h = self._size
-        reach = max(w, h) / 2 + 24 + 0.75 * speed + 12 * min(self.missed, 6)
+        # How far the object may be from the prediction grows with the time between frames,
+        # which is longer on a slow connection. Until a speed is known (just selected, or
+        # found again after a long gap) it may also be moving at any speed a hand or a ramp
+        # gives it. Only for frames that follow on from each other: after a longer gap the
+        # object could be anywhere, and the whole-frame search with its stricter checks
+        # finds it.
+        gap = dt if dt <= MAX_GAP_S else 0.0
+        per_frame = max(1.0, gap * REFERENCE_FPS)
+        unknown = 0.0 if self._velocity_known else UNKNOWN_SPEED * fw / 320 * gap
+        reach = max(w, h) / 2 + 24 * per_frame + 0.75 * speed + unknown + 12 * min(self.missed, 6)
         bounds = (max(0, int(px - reach - w / 2)), max(0, int(py - reach - h / 2)),
                   min(fw, int(px + reach + w / 2) + 1), min(fh, int(py + reach + h / 2) + 1))
 
@@ -227,7 +248,7 @@ class ManualTracker:
     def _search(self, frame: PreprocessedFrame, bounds, predicted, reach, global_search: bool):
         left, top, right, bottom = bounds
         has_color = self.color_model is not None
-        prob = _back_project(frame, self.color_model, bounds) if has_color else None
+        prob = _back_project(frame, self.color_model, bounds, self.hue_shift) if has_color else None
         candidates = self._template_candidates(bounds, prob, global_search)
         if has_color:
             candidates += self._color_candidates(frame, bounds, prob)
@@ -394,8 +415,16 @@ class ManualTracker:
             vx, vy = (cx - self._center[0]) / dt, (cy - self._center[1]) / dt
             # Follow changes in speed quickly (a falling ball), but not frame-to-frame jitter.
             self._velocity = (0.4 * self._velocity[0] + 0.6 * vx, 0.4 * self._velocity[1] + 0.6 * vy)
+            self._velocity_known = True
+        elif 0 < dt <= RECENT_FIX_S:
+            # Found again by the whole-frame search soon after the last fix: usually it simply
+            # moved further than the search reached. Where it went since then is its speed, so
+            # the next frame looks ahead of it instead of starting from rest again.
+            self._velocity = ((cx - self._center[0]) / dt, (cy - self._center[1]) / dt)
+            self._velocity_known = True
         else:
             self._velocity = (0.0, 0.0)
+            self._velocity_known = False
         oh, ow = self.original.shape
         blend = 1.0 if recovered else 0.3
         w = float(np.clip((1 - blend) * self._size[0] + blend * best.w, 0.5 * ow, 2.0 * ow))
@@ -416,11 +445,12 @@ class ManualTracker:
 
 
 def _color_model(frame: PreprocessedFrame, x: int, y: int, w: int, h: int,
-                 mask: np.ndarray | None = None) -> np.ndarray | None:
+                 mask: np.ndarray | None = None) -> tuple[np.ndarray | None, int]:
     """How likely each hue-saturation bin is to be the object rather than the rest of the
-    picture, or None when the object's colour does not set it apart (grey objects, or
-    colours that are all over the background). `mask` marks the object's pixels in the
-    box; without one, the middle of the box is taken to be the object."""
+    picture, and the hue shift it was binned with. The model is None when the object's
+    colour does not set it apart (grey objects, or colours that are all over the
+    background). `mask` marks the object's pixels in the box; without one, the middle of
+    the box is taken to be the object."""
     if mask is None:
         core = np.zeros((h, w), np.uint8)
         cv2.ellipse(core, (w // 2, h // 2), (max(1, w * 2 // 5), max(1, h * 2 // 5)), 0, 0, 360, 255, -1)
@@ -429,12 +459,15 @@ def _color_model(frame: PreprocessedFrame, x: int, y: int, w: int, h: int,
     # Hue means little on a grey, white or black object, and JPEG bleeds the colour of a
     # logo into the grey around it; such objects are followed by their picture and outline.
     if float(np.median(frame.hsv[y:y + h, x:x + w, 1][core > 0])) < MIN_SATURATION:
-        return None
+        return None, 0
+    hue = frame.hsv[y:y + h, x:x + w, 0][core > 0]
+    shift = RED_HUE_SHIFT if float(np.mean((hue < 10) | (hue >= 170))) >= 0.5 else 0
+    hsv = _model_hsv(frame, shift)
     # Everything but the object counts against it, including fingers beside it in the box.
-    outside = np.full(frame.hsv.shape[:2], 255, np.uint8)
+    outside = np.full(hsv.shape[:2], 255, np.uint8)
     outside[y:y + h, x:x + w][core > 0] = 0
-    obj = cv2.calcHist([frame.hsv[y:y + h, x:x + w]], HIST_CHANNELS, core, HIST_BINS, HIST_RANGES)
-    rest = cv2.calcHist([frame.hsv], HIST_CHANNELS, outside, HIST_BINS, HIST_RANGES)
+    obj = cv2.calcHist([hsv[y:y + h, x:x + w]], HIST_CHANNELS, core, HIST_BINS, HIST_RANGES)
+    rest = cv2.calcHist([hsv], HIST_CHANNELS, outside, HIST_BINS, HIST_RANGES)
     # Spread along saturation only, by about 50 of 255 each way: light and motion blur
     # change saturation (a ball selected mid-throw is washed out by its surroundings and
     # sharper once it slows down), but hue is what tells a red ball from a skin-coloured hand.
@@ -443,7 +476,7 @@ def _color_model(frame: PreprocessedFrame, x: int, y: int, w: int, h: int,
     # The floor stands in for colours not in this picture yet (a hand that reaches in
     # later): a colour the object barely has must not count as the object.
     model = (obj / (obj + rest + COLOR_FLOOR)).astype(np.float32)
-    prob = _back_project(frame, model, (0, 0) + frame.size)
+    prob = _back_project(frame, model, (0, 0) + frame.size, shift)
     # Most of the object has to be that colour: a grey ball with a coloured logo is grey,
     # and a model of the logo alone loses the ball as soon as it turns.
     inside = float(np.median(prob[y:y + h, x:x + w][core > 0]))
@@ -453,8 +486,8 @@ def _color_model(frame: PreprocessedFrame, x: int, y: int, w: int, h: int,
     ring[y:y + h, x:x + w] = 0
     around = float(prob[ring > 0].mean()) if ring.any() else 0.0
     if inside < 0.5 or inside - around < 0.3:
-        return None
-    return model
+        return None, 0
+    return model, shift
 
 
 def _ellipse_mask(w: int, h: int) -> np.ndarray:
@@ -465,9 +498,21 @@ def _ellipse_mask(w: int, h: int) -> np.ndarray:
     return mask
 
 
-def _back_project(frame: PreprocessedFrame, model: np.ndarray, bounds) -> np.ndarray:
+def _model_hsv(frame: PreprocessedFrame, shift: int) -> np.ndarray:
+    """frame.hsv with hue turned by `shift`, computed once per frame."""
+    if not shift:
+        return frame.hsv
+    if "_red_hsv" not in frame.__dict__:
+        hsv = frame.hsv.copy()
+        hue = hsv[:, :, 0].astype(np.uint16) + shift
+        hsv[:, :, 0] = np.where(hue >= 180, hue - 180, hue).astype(np.uint8)
+        frame.__dict__["_red_hsv"] = hsv
+    return frame.__dict__["_red_hsv"]
+
+
+def _back_project(frame: PreprocessedFrame, model: np.ndarray, bounds, shift: int = 0) -> np.ndarray:
     left, top, right, bottom = bounds
-    hsv = frame.hsv[top:bottom, left:right]
+    hsv = _model_hsv(frame, shift)[top:bottom, left:right]
     # The result has the image's depth (uint8), so scale the 0-1 model up and back down.
     return cv2.calcBackProject([hsv], HIST_CHANNELS, model, HIST_RANGES, scale=255).astype(np.float32) / 255
 

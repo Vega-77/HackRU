@@ -21,7 +21,7 @@ import motion_scenes  # noqa: E402
 CLIPS = {clip.name: clip for clip in motion_scenes.all_clips()}
 
 
-def follow(clip, *, box=True):
+def follow(clip, *, box=True, every=1):
     pipe = TrackingPipeline()
     config = {"type": "config", "target_px": clip.tap, "px_per_m": 400.0, "mode": "free_fall",
               "frame_size": {"w": motion_scenes.W, "h": motion_scenes.H}}
@@ -33,6 +33,8 @@ def follow(clip, *, box=True):
     ids = set()
     statuses = []
     for i, (jpeg, truth) in enumerate(zip(clip.frames, clip.truth)):
+        if i % every:
+            continue  # a slower stream: the app gets fewer frames through
         result = pipe(preprocess_frame(decode_jpeg(jpeg), i, clip.timestamps[i]))
         state = physics.process_frame({**result, "frame_id": i, "timestamp": clip.timestamps[i]}, pipe.session)
         statuses.append(result["tracking_status"])
@@ -63,6 +65,33 @@ def test_boxed_object_is_followed_through_the_clip(name):
     assert run["recall"] >= 0.9
     assert run["statuses"][0] == "initialized"
     assert len(run["ids"]) == 1  # one ID, so the physics history is never restarted
+
+
+@pytest.mark.parametrize("name", ["fast_red_roll", "ramp_roll", "toss"])
+@pytest.mark.parametrize("every", [2, 3])
+def test_fast_object_is_followed_at_a_low_frame_rate(name, every):
+    # 7.5 and 5 fps, as over a slow connection: the object moves two or three times as far
+    # between frames, and from rest it has no speed yet to predict where it went.
+    run = follow(CLIPS[name], every=every)
+    assert run["wrong"] == 0
+    assert run["recall"] >= 0.9
+    assert len(run["ids"]) == 1
+
+
+def test_other_detectors_pause_while_the_selected_object_is_followed():
+    clip = CLIPS["distractor_roll"]
+    pipe = TrackingPipeline()
+    pipe.apply_config({"type": "config", "target_px": clip.tap, "target_bbox": clip.box,
+                       "frame_size": {"w": 320, "h": 240}})
+    calls = []
+    detect = pipe.detect
+    pipe.detect = lambda frame: calls.append(frame.frame_id) or detect(frame)
+    for i in range(4):
+        pipe(preprocess_frame(decode_jpeg(clip.frames[i]), i, clip.timestamps[i]))
+    assert calls == [0]  # only the selection frame, before the object was picked out
+    pipe.apply_config({"type": "config", "mode": "collision"})  # needs the other objects too
+    pipe(preprocess_frame(decode_jpeg(clip.frames[4]), 4, clip.timestamps[4]))
+    assert calls == [0, 4]
 
 
 def test_velocity_is_reported_through_a_short_occlusion():

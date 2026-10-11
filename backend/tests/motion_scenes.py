@@ -252,5 +252,20 @@ def distractor_roll() -> Clip:
     return _clip("distractor_roll", 30, 19, pos, sprite, r, extra=other)
 
 
+def fast_red_roll() -> Clip:
+    """A red ball (its hue on both sides of OpenCV's wrap) rolled hard across a busy table,
+    with a red block on it: 27 px between frames at 15 fps, and blurred."""
+    r = 11
+
+    def pos(t):
+        return (30 + 400 * t, 120 + 25 * math.sin(2.5 * t))
+
+    def sprite(t):
+        return _ball_sprite(r, 400 * t / r, ((40, 40, 200), (230, 230, 230)))
+
+    return _clip("fast_red_roll", 11, 23, pos, sprite, r)
+
+
 def all_clips() -> list[Clip]:
-    return [ramp_roll(), pendulum(), toss(), grey_box_slide(), occluded_roll(), distractor_roll()]
+    return [ramp_roll(), pendulum(), toss(), grey_box_slide(), occluded_roll(), distractor_roll(),
+            fast_red_roll()]
