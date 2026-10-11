@@ -91,7 +91,7 @@ class LaboratoryDiagram extends CustomPainter {
       canvas.drawLine(top, p, pen);
       canvas.drawCircle(top, 4, Paint()..color = AppColors.vellum);
       canvas.drawLine(top, point(pivot + const Vec2(0, -.45)), faint);
-      final angle = state.extras['angle_deg']! * math.pi / 180;
+      final angle = state.extras['theta_deg']! * math.pi / 180;
       canvas.drawArc(
         Rect.fromCircle(center: top, radius: 44),
         math.pi / 2,
@@ -101,7 +101,7 @@ class LaboratoryDiagram extends CustomPainter {
       );
       _label(
         canvas,
-        'θ = ${state.extras['angle_deg']!.toStringAsFixed(1)}°',
+        'θ = ${state.extras['theta_deg']!.toStringAsFixed(1)}°',
         top + const Offset(48, 40),
         size,
       );

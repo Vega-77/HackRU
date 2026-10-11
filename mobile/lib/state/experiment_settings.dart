@@ -10,6 +10,7 @@ class ExperimentSettings {
   const ExperimentSettings({
     this.mode = ExperimentMode.ramp,
     this.massKg = AppConfig.defaultMassKg,
+    this.slidingBody = false,
     this.showVelocity = true,
     this.showAcceleration = true,
     this.showForces = true,
@@ -18,6 +19,10 @@ class ExperimentSettings {
 
   final ExperimentMode mode;
   final double massKg;
+
+  /// On the ramp: a block that slides (true) or a ball that rolls (false).
+  /// Only a sliding block has a friction coefficient and heat to report.
+  final bool slidingBody;
   final bool showVelocity;
   final bool showAcceleration;
   final bool showForces;
@@ -26,6 +31,7 @@ class ExperimentSettings {
   ExperimentSettings copyWith({
     ExperimentMode? mode,
     double? massKg,
+    bool? slidingBody,
     bool? showVelocity,
     bool? showAcceleration,
     bool? showForces,
@@ -33,6 +39,7 @@ class ExperimentSettings {
   }) => ExperimentSettings(
     mode: mode ?? this.mode,
     massKg: massKg ?? this.massKg,
+    slidingBody: slidingBody ?? this.slidingBody,
     showVelocity: showVelocity ?? this.showVelocity,
     showAcceleration: showAcceleration ?? this.showAcceleration,
     showForces: showForces ?? this.showForces,
@@ -53,6 +60,12 @@ class ExperimentSettingsController extends Notifier<ExperimentSettings> {
   void setMass(double kg) {
     state = state.copyWith(massKg: kg.clamp(0.001, 10.0));
     log.i('Mass set to ${state.massKg} kg');
+  }
+
+  void setSlidingBody(bool sliding) {
+    if (sliding == state.slidingBody) return;
+    state = state.copyWith(slidingBody: sliding);
+    log.i('Ramp body set to ${sliding ? 'sliding block' : 'rolling ball'}');
   }
 
   void toggleVelocity() {

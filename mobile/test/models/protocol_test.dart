@@ -249,7 +249,25 @@ void main() {
         'second_target_bbox': null,
         'frame_size': {'w': 320, 'h': 240},
         'ar_plane': null,
+        'sliding_body': false,
       });
+    });
+
+    test('says whether the ramp object slides, only on the ramp', () {
+      const sliding = SessionConfig(
+        mode: ExperimentMode.ramp,
+        massKg: 0.1,
+        frameSize: FrameSize(320, 240),
+        slidingBody: true,
+      );
+      const pendulum = SessionConfig(
+        mode: ExperimentMode.pendulum,
+        massKg: 0.1,
+        frameSize: FrameSize(320, 240),
+        slidingBody: true,
+      );
+      expect(sliding.toJson()['sliding_body'], isTrue);
+      expect(pendulum.toJson().containsKey('sliding_body'), isFalse);
     });
 
     test('uncalibrated fields are sent as null', () {

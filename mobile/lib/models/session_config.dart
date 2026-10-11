@@ -42,6 +42,7 @@ class SessionConfig {
     this.debugTracking = false,
     this.initializationRequired = false,
     this.surface,
+    this.slidingBody = false,
   });
 
   final ExperimentMode mode;
@@ -66,6 +67,10 @@ class SessionConfig {
   /// maps positions with the camera pose instead of [pxPerM].
   final ArSurface? surface;
 
+  /// Ramp only: the object slides rather than rolls, so the backend reports
+  /// friction and thermal energy.
+  final bool slidingBody;
+
   Map<String, dynamic> toJson() => {
     'type': 'config',
     'mode': mode.wireName,
@@ -84,6 +89,7 @@ class SessionConfig {
     'second_target_bbox': secondTargetBbox?.toJson(),
     'frame_size': frameSize.toJson(),
     'ar_plane': surface?.toJson(),
+    if (mode == ExperimentMode.ramp) 'sliding_body': slidingBody,
     if (debugTracking) 'debug_tracking': true,
     if (initializationRequired) 'initialization_required': true,
   };
