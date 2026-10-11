@@ -523,6 +523,7 @@ class _StageMessage extends ConsumerWidget {
       SessionPhase.running when hasState && !tracked => (
         AppIcons.crosshair,
         switch (trackingStatus) {
+          'stale' => 'Observation delayed. Waiting for a fresh camera frame.',
           'selection_required' ||
           'invalid_selection' => 'Return to setup and select an object region.',
           'insufficient_contrast' => 'The selection has too little contrast. Return to setup and include the object outline.',

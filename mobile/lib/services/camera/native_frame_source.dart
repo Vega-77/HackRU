@@ -157,6 +157,7 @@ class NativeFrameSource implements FrameSource {
       jpeg: jpeg,
       size: _sizeForWidth(image, width),
       captureTime: captureTime,
+      ageAtEncodingMs: (_clock.elapsedMicroseconds / 1e6 - captureTime) * 1000,
     );
   }
 

@@ -120,6 +120,8 @@ class ManualTracker:
         self._velocity_known = False
         self._time = 0.0
         self._image: np.ndarray | None = None  # this frame in the matched channel
+        self._scene_lightness = 0.0
+        self._lightness_shift = 0.0
 
     # Selection
 
@@ -138,6 +140,22 @@ class ManualTracker:
         colors = frame.bgr[y:bottom, x:right]
         seed = (min(w - 2, max(1, round(point[0] - x))), min(h - 2, max(1, round(point[1] - y))))
         foreground = selected_foreground(colors, seed)
+        round_reference = RoundReference.from_mask(colors, foreground)
+        if round_reference is None:
+            # A tight box can put the ball itself on GrabCut's hard background
+            # border. Retry with real surrounding pixels, keeping the same seed
+            # and probable foreground box. Accept only a separable round object.
+            pad = max(4, round(min(w, h) * 0.2))
+            ax, ay = max(0, x - pad), max(0, y - pad)
+            ar, ab = min(width, right + pad), min(height, bottom + pad)
+            context = frame.bgr[ay:ab, ax:ar]
+            bounds = (x - ax, y - ay, w, h)
+            expanded = selected_foreground(
+                context, (seed[0] + x - ax, seed[1] + y - ay), bounds)
+            rounded = RoundReference.from_mask(context, expanded)
+            if rounded is not None:
+                foreground, colors, round_reference = expanded, context, rounded
+                x, y, w, h = ax, ay, ar - ax, ab - ay
         if foreground is not None:
             # Follow the object alone, not the fingers or table the box also took in, with
             # a margin so its outline against the background is part of the picture.
@@ -164,7 +182,7 @@ class ManualTracker:
                 self.debug = {"reason": "insufficient_contrast"}
                 return
         self.foreground = foreground
-        self.round_reference = RoundReference.from_mask(colors, foreground)
+        self.round_reference = round_reference
         self.original = patch.copy()
         self.template = patch.astype(np.float32)
         self.color_model = color_model
@@ -186,6 +204,7 @@ class ManualTracker:
         self._center = (tx + tw / 2, ty + th / 2)
         self._size = (float(tw), float(th))
         self._time = frame.timestamp
+        self._scene_lightness = float(np.median(cv2.cvtColor(frame.bgr, cv2.COLOR_BGR2LAB)[:, :, 0]))
         self.debug = {"reason": "initialized", "bbox": list(self.bbox)}
 
     @property
@@ -199,6 +218,9 @@ class ManualTracker:
     def detect(self, frame: PreprocessedFrame) -> Detection | None:
         if self.original is None or self.bbox is None:
             return None
+        if self.round_reference is not None:
+            scene = float(np.median(cv2.cvtColor(frame.bgr, cv2.COLOR_BGR2LAB)[:, :, 0]))
+            self._lightness_shift = float(np.clip(scene - self._scene_lightness, -40, 40))
         if self.match_channel is None:
             self._image = frame.gray
         else:
@@ -320,7 +342,8 @@ class ManualTracker:
             return False
         # The box keeps a margin around the object, for the ring verify() compares it with.
         outline = cv2.resize((self._mask >= 1).astype(np.uint8), (tw, th), interpolation=cv2.INTER_NEAREST)
-        verified = self.round_reference.verify(frame.bgr[by:by + th, bx:bx + tw], outline)
+        verified = self.round_reference.verify(
+            frame.bgr[by:by + th, bx:bx + tw], outline, self._lightness_shift)
         if verified is None:
             return False
         _, inside, outside = verified

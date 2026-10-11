@@ -121,11 +121,17 @@ void main() {
           'reason': 'initialized',
         }),
       );
-      for (var i = 0; i < 50 && received.length < 6; i++) {
+      for (var i = 0; i < 50 && received.length < 5; i++) {
         await Future<void>.delayed(const Duration(milliseconds: 20));
       }
-      expect(received.length, greaterThanOrEqualTo(6));
+      expect(received, hasLength(5));
       expect(received[4], [4, 5, 6]);
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+      expect(
+        received,
+        hasLength(5),
+        reason: 'the same capture is never resent',
+      );
       await session().stop();
     },
   );
@@ -309,6 +315,42 @@ void main() {
     await session().stop();
 
     expect(camera.isRunning, isFalse);
+  });
+
+  test('a stalled stream expires the observed overlay without adding fake telemetry', () async {
+    final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+    addTearDown(() => server.close(force: true));
+    server.transform(WebSocketTransformer()).listen((ws) {
+      ws.add(
+        jsonEncode({
+          'type': 'state',
+          'frame_id': 1,
+          'timestamp': .1,
+          'tracked': true,
+          'pixel': {'x': 80, 'y': 90},
+        }),
+      );
+    });
+    container
+        .read(experimentSettingsProvider.notifier)
+        .setBackendUrl('ws://127.0.0.1:${server.port}/ws/frames');
+    await session().start();
+    for (
+      var i = 0;
+      i < 50 && container.read(sessionProvider).latest == null;
+      i++
+    ) {
+      await Future<void>.delayed(const Duration(milliseconds: 10));
+    }
+    expect(container.read(sessionProvider).latest!.tracked, isTrue);
+    final telemetryVersion = container.read(sessionProvider).telemetryVersion;
+    await Future<void>.delayed(const Duration(milliseconds: 1100));
+    final expired = container.read(sessionProvider);
+    expect(expired.latest!.trackingStatus, 'stale');
+    expect(expired.latest!.tracked, isFalse);
+    expect(expired.latest!.pixel, isNull);
+    expect(expired.telemetryVersion, telemetryVersion);
+    await session().stop();
   });
 
   test('counts the same backend error on frames in a row', () async {

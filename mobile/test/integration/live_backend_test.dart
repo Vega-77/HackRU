@@ -60,7 +60,7 @@ void main() {
 
       expect(located, isNotEmpty, reason: 'the red ball was never found');
       for (final state in located) {
-        final drawnAt = _ballCentre(state.frameId);
+        final drawnAt = _ballCentre(r.captureTimes[state.frameId]);
         expect(state.pixel!.x, closeTo(drawnAt.x, 12));
         expect(state.pixel!.y, closeTo(drawnAt.y, 12));
         // World y points up, measured from the bottom of the frame.
@@ -105,11 +105,17 @@ const _pxPerM = 900.0;
 /// Roughly a phone camera's frame rate.
 const _frameInterval = Duration(milliseconds: 33);
 
-/// Where frame [i]'s ball is drawn: moving right along the middle.
-Vec2 _ballCentre(int i) => Vec2(20.0 + i * 9, 120);
+/// Constant physical speed, even when backpressure changes the capture cadence.
+Vec2 _ballCentre(double timestamp) => Vec2(20.0 + timestamp * 120, 120);
 
 class _Run {
-  _Run(this.replies, this.sent, this.latencyMs, this.drawnSpeedPxPerS);
+  _Run(
+    this.replies,
+    this.sent,
+    this.latencyMs,
+    this.drawnSpeedPxPerS,
+    this.captureTimes,
+  );
 
   final List<ServerMessage> replies;
   final int sent;
@@ -117,6 +123,7 @@ class _Run {
 
   /// Pixels per second, from the capture times the frames were sent with.
   final double drawnSpeedPxPerS;
+  final List<double> captureTimes;
 }
 
 Future<_Run> _streamBall(String url, {required bool handshake}) async {
@@ -152,10 +159,9 @@ Future<_Run> _streamBall(String url, {required bool handshake}) async {
     final clock = Stopwatch()..start();
     while (captureTimes.length < _frames &&
         clock.elapsed < const Duration(seconds: 10)) {
-      final i = captureTimes.length;
       final t = clock.elapsedMicroseconds / 1e6;
       final frame = EncodedFrame(
-        jpeg: _ballFrame(i),
+        jpeg: _ballFrame(t),
         size: _size,
         captureTime: t,
       );
@@ -163,26 +169,28 @@ Future<_Run> _streamBall(String url, {required bool handshake}) async {
         captureTimes.add(t);
         await Future<void>.delayed(_frameInterval);
       } else {
-        // Two frames already in flight: wait for an answer.
+        // Wait for transport credit without advancing physical motion time.
         await Future<void>.delayed(const Duration(milliseconds: 5));
       }
     }
-    await Future<void>.delayed(const Duration(milliseconds: 500));
+    final waiting = Stopwatch()..start();
+    while (!replies.any((r) => r.frameId == captureTimes.length - 1) &&
+        waiting.elapsed < const Duration(seconds: 3)) {
+      await Future<void>.delayed(const Duration(milliseconds: 10));
+    }
 
     final sent = captureTimes.length;
-    final elapsed = sent > 1 ? captureTimes.last - captureTimes.first : 1;
-    final travelled = _ballCentre(sent - 1).x - _ballCentre(0).x;
-    return _Run(replies, sent, socket.latencyMs, travelled / elapsed);
+    return _Run(replies, sent, socket.latencyMs, 120, captureTimes);
   } finally {
     await sub.cancel();
     await socket.dispose();
   }
 }
 
-Uint8List _ballFrame(int i) {
+Uint8List _ballFrame(double timestamp) {
   final image = img.Image(width: _size.width, height: _size.height)
     ..clear(img.ColorRgb8(90, 90, 90));
-  final centre = _ballCentre(i);
+  final centre = _ballCentre(timestamp);
   img.fillCircle(
     image,
     x: centre.x.round(),
