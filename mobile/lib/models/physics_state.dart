@@ -23,6 +23,7 @@ class PhysicsState {
     this.energy,
     this.extras = const {},
     this.screenAxes,
+    this.pivotPixel,
     this.trackingDebug = const {},
     this.trackingStatus,
     this.position3d,
@@ -58,6 +59,9 @@ class PhysicsState {
   /// How world +x and +y look on screen at the object. Null without a
   /// metric calibration.
   final ScreenAxes? screenAxes;
+
+  /// Pendulum pivot in frame pixels, once the backend has found it.
+  final Vec2? pivotPixel;
   final Map<String, dynamic> trackingDebug;
   final String? trackingStatus;
   final Map<String, dynamic> physicsQuality;
@@ -150,6 +154,7 @@ class PhysicsState {
                 .toList()
           : const [],
       screenAxes: ScreenAxes.tryParse(json['screen_axes']),
+      pivotPixel: Vec2.tryParse(json['pivot_pixel']),
       trackingDebug: json['tracking_debug'] is Map<String, dynamic>
           ? json['tracking_debug'] as Map<String, dynamic>
           : const {},
@@ -171,6 +176,7 @@ class PhysicsState {
     if (energy != null) 'energy': energy!.toJson(),
     'extras': extras,
     if (screenAxes != null) 'screen_axes': screenAxes!.toJson(),
+    if (pivotPixel != null) 'pivot_pixel': pivotPixel!.toJson(),
     if (position3d != null) 'position_3d': position3d!.toJson(),
     if (velocity3d != null) 'velocity_3d': velocity3d!.toJson(),
     if (acceleration3d != null) 'acceleration_3d': acceleration3d!.toJson(),

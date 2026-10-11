@@ -60,6 +60,10 @@ class ExperimentStage extends ConsumerWidget {
             layers: arDisplay == null ? layers : OverlayLayers.none,
             // On the ball between replies, with the 3D arrows.
             liveBox: arDisplay?.followedBox,
+            // The string, with the tension arrow laid along it.
+            tether: settings.mode == ExperimentMode.pendulum
+                ? session.latest?.pivotPixel
+                : null,
           ),
           if (arDisplay != null)
             ArVectorLayer(

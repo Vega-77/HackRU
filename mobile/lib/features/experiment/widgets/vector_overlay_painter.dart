@@ -199,6 +199,13 @@ class VectorOverlayPainter extends CustomPainter {
           axes: f.axes,
           width: style.dashed ? 2.2 : 3,
           dashed: style.dashed,
+          direction: forceDirection(
+            name,
+            vector,
+            f.axes,
+            origin,
+            tether == null ? null : mapper.toScreen(tether),
+          ),
         );
         // Tiny components would only add clutter around the marker.
         if (showLabels && length > 18 * u) {
@@ -403,8 +410,27 @@ class VectorOverlayPainter extends CustomPainter {
     );
   }
 
+  /// Screen direction of force [name] drawn at [origin]. Tension always
+  /// runs along the string to [tether], even while the backend's vector
+  /// still trails the swing by a reply or two.
+  @visibleForTesting
+  static Offset forceDirection(
+    String name,
+    Vec2 world,
+    ScreenAxes? axes,
+    Offset origin,
+    Offset? tether,
+  ) {
+    if (name == 'tension' && tether != null) {
+      final span = tether - origin;
+      if (span.distance >= 1) return span / span.distance;
+    }
+    return CoordinateMapper.screenDirection(world, axes);
+  }
+
   /// Draws an arrow from [from] along world vector [world], [length] px
-  /// long, and returns the tip.
+  /// long, and returns the tip. A [direction] on screen overrides the
+  /// world vector's.
   Offset _arrow(
     Canvas canvas,
     Offset from,
@@ -415,8 +441,9 @@ class VectorOverlayPainter extends CustomPainter {
     required double width,
     ScreenAxes? axes,
     bool dashed = false,
+    Offset? direction,
   }) {
-    final d = CoordinateMapper.screenDirection(world, axes);
+    final d = direction ?? CoordinateMapper.screenDirection(world, axes);
     final tip = from + d * length;
     final w = width * unit.clamp(0.55, 1.1);
     final head = math.min(11 * unit.clamp(0.55, 1.1) + w, length * 0.45);

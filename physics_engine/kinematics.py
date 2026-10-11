@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from collections import deque
 from dataclasses import asdict, dataclass
-from math import atan, degrees, hypot, isfinite, sqrt
+from math import atan, atan2, cos, degrees, hypot, isfinite, pi, sin, sqrt
 from typing import Deque, Optional
 
 
@@ -153,6 +153,70 @@ class KinematicsEngine:
         if pivot.y <= self._samples[-1].y:
             return None
         return pivot
+
+    def pendulum_estimate(
+        self, pivot: Vector2D, gravity_mps2: float = 9.81
+    ) -> Optional[tuple[Vector2D, Vector2D]]:
+        """Velocity and acceleration of a bob swinging about ``pivot``.
+
+        The generic quadratic fit assumes constant acceleration across the
+        window, but a pendulum's acceleration turns through tens of degrees in
+        that time, so its arrow can point up to 90 degrees off. Here the string
+        angle is fitted with ``C + A cos(wt) + B sin(wt)``, using the small-swing
+        frequency ``w = sqrt(g / L)``, and the derivatives are taken at the
+        newest sample. The result is still fitted to the measured positions; the
+        model only supplies the shape of the curve. Returns ``None`` until the
+        window holds enough samples.
+        """
+
+        if len(self._samples) < 5:
+            return None
+        radii = [hypot(sample.x - pivot.x, sample.y - pivot.y) for sample in self._samples]
+        length = sum(radii) / len(radii)
+        if length <= 0.0:
+            return None
+        latest_time = self._samples[-1].timestamp
+        times = [sample.timestamp - latest_time for sample in self._samples]
+        # Angle from straight down, positive toward +X; unwrapped so a swing
+        # through the top does not jump by a full turn.
+        angles = []
+        for sample in self._samples:
+            angle = atan2(sample.x - pivot.x, pivot.y - sample.y)
+            if angles:
+                while angle - angles[-1] > pi:
+                    angle -= 2 * pi
+                while angle - angles[-1] < -pi:
+                    angle += 2 * pi
+            angles.append(angle)
+        omega = sqrt(gravity_mps2 / length)
+        basis = [(1.0, cos(omega * t), sin(omega * t)) for t in times]
+        matrix = [
+            [sum(row[i] * row[j] for row in basis) for j in range(3)]
+            + [sum(row[i] * angle for row, angle in zip(basis, angles))]
+            for i in range(3)
+        ]
+        try:
+            _, a, b = _solve_3x3(matrix)
+        except ValueError:
+            return None
+        # At t = 0: theta' = b * w, theta'' = -a * w^2.
+        angular_velocity = b * omega
+        angular_acceleration = -a * omega**2
+        latest = self._samples[-1]
+        radius = hypot(latest.x - pivot.x, latest.y - pivot.y)
+        if radius <= 0.0:
+            return None
+        inward = Vector2D((pivot.x - latest.x) / radius, (pivot.y - latest.y) / radius)
+        tangent = Vector2D(inward.y, -inward.x)  # direction of increasing angle
+        speed = length * angular_velocity
+        along = length * angular_acceleration
+        centripetal = length * angular_velocity**2
+        velocity = Vector2D(tangent.x * speed, tangent.y * speed)
+        acceleration = Vector2D(
+            tangent.x * along + inward.x * centripetal,
+            tangent.y * along + inward.y * centripetal,
+        )
+        return velocity, acceleration
 
     def add_sample(
         self,
