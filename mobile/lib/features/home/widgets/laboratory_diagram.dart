@@ -15,6 +15,17 @@ class LaboratoryDiagram extends CustomPainter {
   final PhysicsState state;
   final bool forces;
 
+  /// Pixels per unit for vectors on the widest layout. Arrows never draw
+  /// smaller than this, so a phone shows them as long as a desktop does.
+  static const minVectorScale = 460.0;
+
+  /// The vector scale for a diagram drawn at [sceneScale] pixels per metre.
+  ///
+  /// Arrow lengths are a display convention, not a distance in the scene, so
+  /// they can stay readable when the scene itself shrinks.
+  static double vectorScale(double sceneScale) =>
+      math.max(sceneScale, minVectorScale);
+
   @override
   void paint(Canvas canvas, Size size) {
     final collision = mode == ExperimentMode.collision;
@@ -140,7 +151,7 @@ class LaboratoryDiagram extends CustomPainter {
           _arrow(
             canvas,
             point(box.center),
-            Offset(velocity.x, -velocity.y) * (.1 * scale),
+            Offset(velocity.x, -velocity.y) * (.1 * vectorScale(scale)),
             AppColors.velocity,
           );
         }
@@ -171,7 +182,7 @@ class LaboratoryDiagram extends CustomPainter {
         Paint()..color = AppColors.graphiteDeep,
       );
     }
-    _physicalVectors(canvas, p, scale);
+    _physicalVectors(canvas, p, vectorScale(scale));
     final rulerStart = Offset(32, size.height - 20);
     final rulerEnd = rulerStart + Offset(.1 * scale, 0);
     canvas.drawLine(rulerStart, rulerEnd, pen);
