@@ -34,6 +34,7 @@ class PhysicsState {
     this.physicsQuality = const {},
     this.processMs,
     this.queueMs,
+    this.timingMs = const {},
   });
 
   /// Echo of the `frame_id` the client sent with the frame.
@@ -67,6 +68,7 @@ class PhysicsState {
   final Map<String, dynamic> physicsQuality;
   final double? processMs;
   final double? queueMs;
+  final Map<String, double> timingMs;
 
   /// The object's centre in ARKit world space (metres). Null without an
   /// `ar_plane`.
@@ -125,6 +127,12 @@ class PhysicsState {
           : const {},
       processMs: (json['process_ms'] as num?)?.toDouble(),
       queueMs: (json['queue_ms'] as num?)?.toDouble(),
+      timingMs: json['timing_ms'] is Map
+          ? {
+              for (final e in (json['timing_ms'] as Map).entries)
+                if (e.value is num) '${e.key}': (e.value as num).toDouble(),
+            }
+          : const {},
       trackingStatus: json['tracking_status'] as String?,
       pixel: Vec2.tryParse(json['pixel']),
       bbox: PixelRect.tryParse(json['bbox']),

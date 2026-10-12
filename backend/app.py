@@ -351,10 +351,12 @@ async def frames_ws(ws: WebSocket) -> None:
 
 
 def _process(frame: IncomingFrame, analyzer: FrameAnalyzer) -> tuple[dict, np.ndarray]:
+    started = time.perf_counter()
     try:
         img = decode_jpeg(frame.data)
     except ValueError as exc:
         raise FrameDecodeError(str(exc)) from exc
+    decoded = time.perf_counter()
     pf = preprocess_frame(
         img,
         frame_id=int(frame.meta["frame_id"]),
@@ -362,6 +364,9 @@ def _process(frame: IncomingFrame, analyzer: FrameAnalyzer) -> tuple[dict, np.nd
         working_width=WORKING_WIDTH,
         meta=frame.meta,
     )
+    preprocessed = time.perf_counter()
+    analyzed = analyzer(pf)
+    finished = time.perf_counter()
     return {
         "type": "frame",
         "frame_id": pf.frame_id,
@@ -370,7 +375,12 @@ def _process(frame: IncomingFrame, analyzer: FrameAnalyzer) -> tuple[dict, np.nd
         "size": list(pf.size),
         "source_size": list(pf.source_size),
         "scale": round(pf.scale, 5),
-        **analyzer(pf),
+        **analyzed,
+        "timing_ms": {
+            "decode": round((decoded - started) * 1000, 3),
+            "preprocess": round((preprocessed - decoded) * 1000, 3),
+            "tracking": round((finished - preprocessed) * 1000, 3),
+        },
     }, img
 
 
@@ -379,8 +389,10 @@ def _process_with_physics(
 ) -> tuple[dict, np.ndarray]:
     result, image = _process(frame, pipeline)
     session_settings = pipeline.session
+    started = time.perf_counter()
     if session_settings.get("mode") is not None:
         result = physics.process_frame(result, session_settings)
+    result["timing_ms"]["physics"] = round((time.perf_counter() - started) * 1000, 3)
     return result, image
 
 

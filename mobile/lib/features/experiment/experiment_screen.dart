@@ -8,6 +8,9 @@ import '../../core/theme/app_theme.dart';
 import '../../core/theme/tokens.dart';
 import '../../models/experiment_mode.dart';
 import '../../services/network/physics_socket.dart';
+import '../../services/network/recorded_analysis.dart';
+import '../../services/download/capture_download.dart';
+import '../../core/logging/debug_log.dart';
 import '../../state/experiment_settings.dart';
 import '../../state/session_controller.dart';
 import '../debug/copy_debug_log.dart';
@@ -196,6 +199,9 @@ class _TopBar extends ConsumerWidget {
     final phase = ref.watch(sessionProvider.select((s) => s.phase));
     final session = ref.read(sessionProvider.notifier);
     final paused = phase == SessionPhase.paused;
+    final recordingBusy = ref.watch(
+      sessionProvider.select((s) => s.recordingBusy),
+    );
 
     return Row(
       children: [
@@ -213,7 +219,9 @@ class _TopBar extends ConsumerWidget {
             children: [
               Flexible(
                 child: _GlassPill(
-                  onTap: () => _pickMode(context, ref, mode),
+                  onTap: recordingBusy
+                      ? null
+                      : () => _pickMode(context, ref, mode),
                   semanticsLabel:
                       'Experiment: ${mode.label}. Change experiment',
                   child: Row(
@@ -249,11 +257,13 @@ class _TopBar extends ConsumerWidget {
         _GlassIconButton(
           icon: paused ? AppIcons.play : AppIcons.pause,
           tooltip: paused ? 'Resume' : 'Pause',
-          onPressed: switch (phase) {
-            SessionPhase.running => session.pause,
-            SessionPhase.paused => session.resume,
-            _ => null,
-          },
+          onPressed: recordingBusy
+              ? null
+              : switch (phase) {
+                  SessionPhase.running => session.pause,
+                  SessionPhase.paused => session.resume,
+                  _ => null,
+                },
         ),
       ],
     );
@@ -383,6 +393,10 @@ class _Banners extends ConsumerWidget {
     );
 
     final banners = <Widget>[
+      if (ref.watch(experimentSettingsProvider).mode ==
+              ExperimentMode.freeFall &&
+          ref.watch(sessionProvider).isActive)
+        const _RecordingBanner(),
       if (connection == ConnectionStatus.offline)
         _Banner(
           icon: AppIcons.cellSignalSlash,
@@ -424,6 +438,64 @@ class _Banners extends ConsumerWidget {
             ),
         ],
       ),
+    );
+  }
+}
+
+class _RecordingBanner extends ConsumerWidget {
+  const _RecordingBanner();
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final state = ref.watch(sessionProvider);
+    final controller = ref.read(sessionProvider.notifier);
+    final downloader = ref.watch(captureDownloaderProvider);
+    final message = switch (state.recordingPhase) {
+      RecordingPhase.idle => 'For fast falls, record 3 seconds locally, then analyze every saved frame. The dashed outline is a local estimate; charts use server measurements.',
+      RecordingPhase.recording =>
+        'Recording ${(state.recordingProgress * 100).round()}%. Hold briefly, then release. Keep the camera still.',
+      RecordingPhase.analyzing =>
+        'Analyzing ${(state.recordingProgress * 100).round()}%. Network delay changes completion time, not sample times.',
+      _ => state.recordingMessage ?? 'Recording finished.',
+    };
+    return _Banner(
+      icon: AppIcons.circle,
+      message: message,
+      actions: state.recordingBusy
+          ? [('Cancel', controller.cancelRecording)]
+          : [
+              if (state.recordingPhase == RecordingPhase.failed &&
+                  controller.canRetryRecordedAnalysis)
+                ('Retry analysis', controller.retryRecordedAnalysis),
+              if (downloader != null && controller.canExportRecording)
+                (
+                  'Download capture',
+                  () {
+                    final messenger = ScaffoldMessenger.maybeOf(context);
+                    try {
+                      final file = controller.exportRecording();
+                      downloader(file);
+                      log.i('Capture download requested: ${file.filename}');
+                      messenger?.showSnackBar(
+                        const SnackBar(
+                          content: Text(
+                            'Download requested. Find the capture in your browser’s Downloads.',
+                          ),
+                        ),
+                      );
+                    } catch (error, stack) {
+                      log.e('Capture download failed', error, stack);
+                      messenger?.showSnackBar(
+                        const SnackBar(
+                          content: Text(
+                            'Could not download the capture. Try again.',
+                          ),
+                        ),
+                      );
+                    }
+                  },
+                ),
+              ('Record 3 s', controller.recordFreeFall),
+            ],
     );
   }
 }
@@ -475,7 +547,7 @@ class _Banner extends StatelessWidget {
                         children: _message(),
                       ),
                     ),
-                    Row(mainAxisSize: MainAxisSize.min, children: _buttons()),
+                    Wrap(alignment: WrapAlignment.end, children: _buttons()),
                   ],
                 ),
         ),
@@ -516,10 +588,22 @@ class _StageMessage extends ConsumerWidget {
     final trackingStatus = ref.watch(
       sessionProvider.select((s) => s.latest?.trackingStatus),
     );
+    final recording = ref.watch(
+      sessionProvider.select((s) => s.recordingPhase),
+    );
 
     final (IconData, String)? message = switch (phase) {
       SessionPhase.starting => (AppIcons.circle, 'Starting'),
-      SessionPhase.paused => (AppIcons.pause, 'Paused. Tap play to carry on.'),
+      SessionPhase.paused => (
+        AppIcons.pause,
+        switch (recording) {
+          RecordingPhase.recording => 'Recording the camera locally',
+          RecordingPhase.analyzing => 'Analyzing the saved recording',
+          RecordingPhase.complete =>
+            'Recorded charts. Resume for live measurements.',
+          _ => 'Paused. Tap play to carry on.',
+        },
+      ),
       SessionPhase.running when hasState && !tracked => (
         AppIcons.crosshair,
         switch (trackingStatus) {
@@ -551,11 +635,15 @@ class _StageMessage extends ConsumerWidget {
                       children: [
                         Icon(message.$1, size: 16, color: AppColors.vellum),
                         const SizedBox(width: AppSpace.sm),
-                        Text(
-                          message.$2,
-                          style: AppType.label.copyWith(
-                            fontSize: 14,
-                            color: AppColors.vellum,
+                        Flexible(
+                          child: Text(
+                            message.$2,
+                            maxLines: 2,
+                            textAlign: TextAlign.center,
+                            style: AppType.label.copyWith(
+                              fontSize: 14,
+                              color: AppColors.vellum,
+                            ),
                           ),
                         ),
                       ],

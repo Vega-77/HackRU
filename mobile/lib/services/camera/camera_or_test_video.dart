@@ -9,6 +9,7 @@ import '../../models/physics_state.dart';
 import '../../models/session_config.dart';
 import '../../models/vec2.dart';
 import 'frame_source.dart';
+import 'local_visual_tracker.dart';
 import 'test_video_frame_source.dart';
 
 /// The device camera, or the [TestVideoFrameSource] when the device has
@@ -20,7 +21,8 @@ import 'test_video_frame_source.dart';
 ///
 /// Surface finding and 3D arrows are passed through when the camera
 /// supports them (ARKit), so wrapping never hides them.
-class CameraOrTestVideo implements FrameSource, SurfaceFinder, ArVectorDisplay {
+class CameraOrTestVideo
+    implements FrameSource, SurfaceFinder, ArVectorDisplay, LocalVisualSource {
   CameraOrTestVideo(this._camera, {TestVideoFrameSource? testVideo})
     : _testVideo = testVideo ?? TestVideoFrameSource();
 
@@ -100,4 +102,35 @@ class CameraOrTestVideo implements FrameSource, SurfaceFinder, ArVectorDisplay {
   };
 
   static final _noBox = ValueNotifier<PixelRect?>(null);
+
+  @override
+  bool get supportsLocalEstimates => switch (_active) {
+    final LocalVisualSource source => source.supportsLocalEstimates,
+    _ => false,
+  };
+  @override
+  ValueListenable<VisualEstimate?> get visualEstimate => switch (_active) {
+    final LocalVisualSource source => source.visualEstimate,
+    _ => _noEstimate,
+  };
+  @override
+  void enableLocalEstimates(bool enabled) {
+    if (_active case final LocalVisualSource source) {
+      source.enableLocalEstimates(enabled);
+    }
+  }
+
+  @override
+  void validateLocalEstimate(PhysicsState observation) {
+    if (_active case final LocalVisualSource source) {
+      source.validateLocalEstimate(observation);
+    }
+  }
+
+  static final _noEstimate = ValueNotifier<VisualEstimate?>(null);
+  @override
+  Map<String, num> get localVisualStats => switch (_active) {
+    final LocalVisualSource source => source.localVisualStats,
+    _ => const {},
+  };
 }

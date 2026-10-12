@@ -1,0 +1,342 @@
+{
+  "config": {
+    "type": "config",
+    "mode": "free_fall",
+    "mass_kg": 0.1,
+    "px_per_m": 426.6666666666667,
+    "target_px": {
+      "x": 92.36399406934305,
+      "y": 49.37913435218979
+    },
+    "target_bbox": {
+      "x": 74.1558793339416,
+      "y": 33.71150775547446,
+      "w": 36.41622947080292,
+      "h": 31.33525319343066
+    },
+    "second_target_px": null,
+    "second_target_bbox": null,
+    "frame_size": {
+      "w": 320,
+      "h": 180
+    },
+    "ar_plane": null,
+    "debug_tracking": true,
+    "initialization_required": true
+  },
+  "frames": [
+    {
+      "frame_id": 0,
+      "timestamp": 246.5666,
+      "frame_size": {
+        "w": 320,
+        "h": 180
+      },
+      "encode_ms": 4.899,
+      "age_at_encoding_ms": 25.29999997615232,
+      "file": "selection.jpg",
+      "sha256": "3d6b8ae9f42d8f50e615d0525a908abdeb1e4075f89fc2309ec211602380e6fb"
+    },
+    {
+      "frame_id": 1,
+      "timestamp": 257.0643,
+      "frame_size": {
+        "w": 320,
+        "h": 180
+      },
+      "encode_ms": 1.2,
+      "age_at_encoding_ms": 48.70000000001164,
+      "file": "frame_0001.jpg",
+      "sha256": "67197c5cc4168573f4b65c1e0a4cd6af373f968823862cbe6e8d3d75da0b9fe7"
+    },
+    {
+      "frame_id": 2,
+      "timestamp": 257.1425,
+      "frame_size": {
+        "w": 320,
+        "h": 180
+      },
+      "encode_ms": 2.201,
+      "age_at_encoding_ms": 27.30000001192093,
+      "file": "frame_0002.jpg",
+      "sha256": "f93940c4dcd8556a1ba4fb88b7836742ce6f492fbd8933055a81f765c63d92d7"
+    },
+    {
+      "frame_id": 3,
+      "timestamp": 257.1829,
+      "frame_size": {
+        "w": 320,
+        "h": 180
+      },
+      "encode_ms": 6.5,
+      "age_at_encoding_ms": 12.60000000000582,
+      "file": "frame_0003.jpg",
+      "sha256": "ae4e3e38e228b7d5dc9183f2d593fc3fec4e2e0ac17fad9530f2eb2a19de369a"
+    },
+    {
+      "frame_id": 4,
+      "timestamp": 257.2005,
+      "frame_size": {
+        "w": 320,
+        "h": 180
+      },
+      "encode_ms": 2.301,
+      "age_at_encoding_ms": 15,
+      "file": "frame_0004.jpg",
+      "sha256": "8c8b7cb4c299a55e89a29d17a52e941836038cd321ec41e199b8dcf25c370d68"
+    },
+    {
+      "frame_id": 5,
+      "timestamp": 257.2812,
+      "frame_size": {
+        "w": 320,
+        "h": 180
+      },
+      "encode_ms": 1.901,
+      "age_at_encoding_ms": 19.600000011909287,
+      "file": "frame_0005.jpg",
+      "sha256": "b5951ec30b842678f02006fb908ce07913d21c0c3be071e62e334bf8a2c250b7"
+    },
+    {
+      "frame_id": 6,
+      "timestamp": 257.2907,
+      "frame_size": {
+        "w": 320,
+        "h": 180
+      },
+      "encode_ms": 2,
+      "age_at_encoding_ms": 29.39999996422557,
+      "file": "frame_0006.jpg",
+      "sha256": "68a5df082e0f6ab8ee857a31f1c12c2eb61051df939271e0081ec98f64f64913"
+    },
+    {
+      "frame_id": 7,
+      "timestamp": 257.3214,
+      "frame_size": {
+        "w": 320,
+        "h": 180
+      },
+      "encode_ms": 3.801,
+      "age_at_encoding_ms": 20.10000000000582,
+      "file": "frame_0007.jpg",
+      "sha256": "59701159e630ed7d2ce1c9b03e215e8598595fb92532b1cfe5e3bd96139f7d4e"
+    },
+    {
+      "frame_id": 8,
+      "timestamp": 257.36670000000004,
+      "frame_size": {
+        "w": 320,
+        "h": 180
+      },
+      "encode_ms": 2.3,
+      "age_at_encoding_ms": 14.6999999761465,
+      "file": "frame_0008.jpg",
+      "sha256": "97832bc7ec438b7d3eedbe7a56da4bb9e499170c5b2ab61cc44b28efb8142709"
+    },
+    {
+      "frame_id": 9,
+      "timestamp": 257.4327,
+      "frame_size": {
+        "w": 320,
+        "h": 180
+      },
+      "encode_ms": 3.1,
+      "age_at_encoding_ms": 7.4999999880674295,
+      "file": "frame_0009.jpg",
+      "sha256": "742648f4073554eee84749ad5c511dba60cfdba13ba17583bb04f81be3a1dfd0"
+    },
+    {
+      "frame_id": 10,
+      "timestamp": 257.4656,
+      "frame_size": {
+        "w": 320,
+        "h": 180
+      },
+      "encode_ms": 2.2,
+      "age_at_encoding_ms": 12.999999964231392,
+      "file": "frame_0010.jpg",
+      "sha256": "f61240b9421500ec1ef5bde6b63efbaf4cc28413bbb204ba2983ec6203e52a46"
+    },
+    {
+      "frame_id": 11,
+      "timestamp": 257.4991,
+      "frame_size": {
+        "w": 320,
+        "h": 180
+      },
+      "encode_ms": 1.901,
+      "age_at_encoding_ms": 19.89999999999418,
+      "file": "frame_0011.jpg",
+      "sha256": "57b7e29384f6194c69438d9313cdde8533c1704ca2f895fe5ea193822eeaa63e"
+    },
+    {
+      "frame_id": 12,
+      "timestamp": 257.5476,
+      "frame_size": {
+        "w": 320,
+        "h": 180
+      },
+      "encode_ms": 2.199,
+      "age_at_encoding_ms": 14.09999998807325,
+      "file": "frame_0012.jpg",
+      "sha256": "4df0d86412cd70c15059ee2a413600dc19840436d6ad338f7cf3c35f6249e0bc"
+    },
+    {
+      "frame_id": 13,
+      "timestamp": 257.5674,
+      "frame_size": {
+        "w": 320,
+        "h": 180
+      },
+      "encode_ms": 2.301,
+      "age_at_encoding_ms": 13.60000000000582,
+      "file": "frame_0013.jpg",
+      "sha256": "3a72a3066329efd05d7cfe8d6ebec11fb513a5ce66b2e92d8ac758ab36072570"
+    },
+    {
+      "frame_id": 14,
+      "timestamp": 257.6332,
+      "frame_size": {
+        "w": 320,
+        "h": 180
+      },
+      "encode_ms": 5.599,
+      "age_at_encoding_ms": 10.899999964225572,
+      "file": "frame_0014.jpg",
+      "sha256": "9c7d4d4f48dd1a45f5412a1501868c0205d5beddc2271d1c66cbb7ea97cba899"
+    },
+    {
+      "frame_id": 15,
+      "timestamp": 257.7005,
+      "frame_size": {
+        "w": 320,
+        "h": 180
+      },
+      "encode_ms": 2.101,
+      "age_at_encoding_ms": 21,
+      "file": "frame_0015.jpg",
+      "sha256": "24ea4381968d19b1e4e14d4a7f7e863ee8247bd0a096d95e31d3c9c7d4bae70e"
+    },
+    {
+      "frame_id": 16,
+      "timestamp": 257.7712,
+      "frame_size": {
+        "w": 320,
+        "h": 180
+      },
+      "encode_ms": 2.399,
+      "age_at_encoding_ms": 29.6999999761465,
+      "file": "frame_0016.jpg",
+      "sha256": "de1284ac9cea204d842868f34d378af5ec19c8e47b34b899c442037351a55975"
+    },
+    {
+      "frame_id": 17,
+      "timestamp": 257.8325,
+      "frame_size": {
+        "w": 320,
+        "h": 180
+      },
+      "encode_ms": 1,
+      "age_at_encoding_ms": 4.699999988079071,
+      "file": "frame_0017.jpg",
+      "sha256": "2987c8d480a38c0d36ec9e2a23c72f60f8bafcc4f87a32058f9912370caca34f"
+    },
+    {
+      "frame_id": 18,
+      "timestamp": 257.8707,
+      "frame_size": {
+        "w": 320,
+        "h": 180
+      },
+      "encode_ms": 1.3,
+      "age_at_encoding_ms": 25.1999999761465,
+      "file": "frame_0018.jpg",
+      "sha256": "9962690a2a9e4e9193171eb602534f072aa1d41e8ab273d97a3745ae61c52449"
+    },
+    {
+      "frame_id": 19,
+      "timestamp": 257.9,
+      "frame_size": {
+        "w": 320,
+        "h": 180
+      },
+      "encode_ms": 1,
+      "age_at_encoding_ms": 14.099999964237213,
+      "file": "frame_0019.jpg",
+      "sha256": "8baf9a5abf42c62268909159ae213c6b8e96ff963d63d5e45db8f56a4f05d297"
+    },
+    {
+      "frame_id": 20,
+      "timestamp": 257.9375,
+      "frame_size": {
+        "w": 320,
+        "h": 180
+      },
+      "encode_ms": 1.2,
+      "age_at_encoding_ms": 32.89999997615814,
+      "file": "frame_0020.jpg",
+      "sha256": "a1cd2194b3d5e7e5562c324f6740f5025f42caca8851ad0da4776846235730b0"
+    },
+    {
+      "frame_id": 30,
+      "timestamp": 258.3322,
+      "frame_size": {
+        "w": 320,
+        "h": 180
+      },
+      "encode_ms": 1.3,
+      "age_at_encoding_ms": 13.6999999761465,
+      "file": "frame_0030.jpg",
+      "sha256": "72335e69edd7812e6f3516ecef382759ba6aaf7fda3ffa371f0f00353fdc629c"
+    },
+    {
+      "frame_id": 40,
+      "timestamp": 258.7037,
+      "frame_size": {
+        "w": 320,
+        "h": 180
+      },
+      "encode_ms": 1.2,
+      "age_at_encoding_ms": 17.39999996422557,
+      "file": "frame_0040.jpg",
+      "sha256": "804db452a5d5599ed24c9122c36aec6a6ff67a60cb202a21b0df13903bf8fa3d"
+    },
+    {
+      "frame_id": 69,
+      "timestamp": 260.0316,
+      "frame_size": {
+        "w": 320,
+        "h": 180
+      },
+      "encode_ms": 1.5,
+      "age_at_encoding_ms": 9.89999999999418,
+      "file": "frame_0069.jpg",
+      "sha256": "f1ed1859b7d11ed42dadbf8a9892ecc03c9f71d877cd9008eb43ddf089f5f750"
+    }
+  ],
+  "source": "HandsOnPhysics-2026-10-11T23-02-11-324Z.hop.json",
+  "source_sha256": "ab20ba78a2cb9d6fe8f0f8df6344acafbc0df144ee41e5d77f0d7c2e298ca1cb",
+  "visual_annotations": {
+    "description": "Approximate image centers of vertically blurred ball; tolerance 8 px. These are visual bounds, not independently measured physical positions. Frames 17-18 touch the bottom; frame 19 is a return/bounce.",
+    "centers": {
+      "14": [
+        96,
+        58
+      ],
+      "15": [
+        98,
+        90
+      ]
+    },
+    "center_tolerance_px": 8,
+    "partial_frames": [
+      17,
+      18
+    ],
+    "absent_frames": [
+      30,
+      40,
+      69
+    ]
+  }
+}

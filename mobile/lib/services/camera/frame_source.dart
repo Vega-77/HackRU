@@ -7,6 +7,7 @@ import '../../models/camera_pose.dart';
 import '../../models/physics_state.dart';
 import '../../models/session_config.dart';
 import '../../models/vec2.dart';
+import 'local_visual_tracker.dart';
 
 /// A camera that can show a live preview and hand out JPEG frames on demand.
 ///
@@ -46,6 +47,14 @@ abstract class FrameSource {
   /// The live preview, filling its parent like `BoxFit.cover`. The overlay's
   /// coordinate mapper assumes exactly this fit.
   Widget buildPreview(BuildContext context);
+}
+
+abstract interface class LocalVisualSource {
+  bool get supportsLocalEstimates;
+  ValueListenable<VisualEstimate?> get visualEstimate;
+  Map<String, num> get localVisualStats;
+  void enableLocalEstimates(bool enabled);
+  void validateLocalEstimate(PhysicsState observation);
 }
 
 /// A frame source that knows where the camera is in 3D (ARKit) and can find

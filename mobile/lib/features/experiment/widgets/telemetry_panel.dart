@@ -12,6 +12,7 @@ import '../../../models/physics_state.dart';
 import '../../../state/experiment_settings.dart';
 import '../../../state/session_controller.dart';
 import '../../../state/theory_check.dart';
+import '../../../services/network/recorded_analysis.dart';
 import '../../debug/copy_debug_log.dart';
 import 'energy_bars.dart';
 import 'physics_symbol.dart';
@@ -67,7 +68,9 @@ class _TelemetryPanelState extends ConsumerState<TelemetryPanel> {
     final controller = ref.read(sessionProvider.notifier);
     final session = ref.read(sessionProvider);
     _shownVersion = session.telemetryVersion;
-    final latest = session.latest;
+    final latest = session.recordingPhase == RecordingPhase.complete
+        ? session.recordedLatest
+        : session.latest;
     final samples = controller.telemetry.samples.toList(growable: false);
 
     return ListView(
@@ -88,7 +91,9 @@ class _TelemetryPanelState extends ConsumerState<TelemetryPanel> {
           children: [
             Expanded(
               child: Text(
-                'Measurements',
+                session.recordingPhase == RecordingPhase.complete
+                    ? 'Recorded measurements'
+                    : 'Measurements',
                 style: Theme.of(context).textTheme.titleLarge,
               ),
             ),
@@ -171,7 +176,11 @@ class _TelemetryPanelState extends ConsumerState<TelemetryPanel> {
               ),
               SizedBox(
                 height: 168,
-                child: TelemetryChart(samples: samples, quantity: _quantity),
+                child: TelemetryChart(
+                  samples: samples,
+                  quantity: _quantity,
+                  recorded: session.recordingPhase == RecordingPhase.complete,
+                ),
               ),
               Padding(
                 padding: const EdgeInsets.fromLTRB(

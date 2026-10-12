@@ -1,0 +1,6082 @@
+{
+  "method": "Single process, OpenCV one thread and seed zero, two full replays per variant. Before disables only the added continuation; unchanged strict tracker and physics. Runs serial without other test/build jobs. No transport or sensor latency measured. Before then after order is not randomized.",
+  "captures": {
+    "HandsOnPhysics-2026-10-11T23-02-11-324Z.hop.json": {
+      "before": {
+        "frames": 69,
+        "tracked": 6,
+        "metric_positions": 6,
+        "worker_median_ms": 70.30387550000006,
+        "worker_p95_ms": 94.81487494999953,
+        "observations": [
+          {
+            "frame_id": 1,
+            "timestamp": 257.0643,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 2,
+            "timestamp": 257.1425,
+            "pixel": {
+              "x": 94.5,
+              "y": 48.5
+            },
+            "position": {
+              "x": 0.2215,
+              "y": 0.3082
+            },
+            "quality": {
+              "reason": "insufficient_time_span",
+              "samples": 1,
+              "span_s": 0.0,
+              "position_residual_m": 0.0,
+              "acceleration_std_mps2": null,
+              "velocity_valid": false,
+              "acceleration_valid": false
+            }
+          },
+          {
+            "frame_id": 3,
+            "timestamp": 257.1829,
+            "pixel": {
+              "x": 101.5,
+              "y": 47.5
+            },
+            "position": {
+              "x": 0.2379,
+              "y": 0.3105
+            },
+            "quality": {
+              "reason": "insufficient_time_span",
+              "samples": 2,
+              "span_s": 0.04040000000003374,
+              "position_residual_m": 0.0,
+              "acceleration_std_mps2": null,
+              "velocity_valid": true,
+              "acceleration_valid": false
+            }
+          },
+          {
+            "frame_id": 4,
+            "timestamp": 257.2005,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 5,
+            "timestamp": 257.2812,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 6,
+            "timestamp": 257.2907,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 7,
+            "timestamp": 257.3214,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 8,
+            "timestamp": 257.36670000000004,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 9,
+            "timestamp": 257.4327,
+            "pixel": {
+              "x": 94.5,
+              "y": 47.5
+            },
+            "position": {
+              "x": 0.2215,
+              "y": 0.3105
+            },
+            "quality": {
+              "reason": "insufficient_samples",
+              "samples": 3,
+              "span_s": 0.2902000000000271,
+              "position_residual_m": 3.128151060787743e-16,
+              "acceleration_std_mps2": 0.8715181809672132,
+              "velocity_valid": true,
+              "acceleration_valid": false
+            }
+          },
+          {
+            "frame_id": 10,
+            "timestamp": 257.4656,
+            "pixel": {
+              "x": 94.5,
+              "y": 47.5
+            },
+            "position": {
+              "x": 0.2215,
+              "y": 0.3105
+            },
+            "quality": {
+              "reason": null,
+              "samples": 4,
+              "span_s": 0.3231000000000108,
+              "position_residual_m": 0.0041755824680465075,
+              "acceleration_std_mps2": 1.636487602247122,
+              "velocity_valid": true,
+              "acceleration_valid": true
+            }
+          },
+          {
+            "frame_id": 11,
+            "timestamp": 257.4991,
+            "pixel": {
+              "x": 94.5,
+              "y": 47.5
+            },
+            "position": {
+              "x": 0.2215,
+              "y": 0.3105
+            },
+            "quality": {
+              "reason": null,
+              "samples": 4,
+              "span_s": 0.3161999999999807,
+              "position_residual_m": 9.273227192497579e-05,
+              "acceleration_std_mps2": 0.5110778080885444,
+              "velocity_valid": true,
+              "acceleration_valid": true
+            }
+          },
+          {
+            "frame_id": 12,
+            "timestamp": 257.5476,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 13,
+            "timestamp": 257.5674,
+            "pixel": {
+              "x": 93.5,
+              "y": 47.5
+            },
+            "position": {
+              "x": 0.2191,
+              "y": 0.3105
+            },
+            "quality": {
+              "reason": null,
+              "samples": 4,
+              "span_s": 0.13470000000000937,
+              "position_residual_m": 0.00011009184404103807,
+              "acceleration_std_mps2": 1.6576096537736635,
+              "velocity_valid": true,
+              "acceleration_valid": true
+            }
+          },
+          {
+            "frame_id": 14,
+            "timestamp": 257.6332,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 15,
+            "timestamp": 257.7005,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 16,
+            "timestamp": 257.7712,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 17,
+            "timestamp": 257.8325,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 18,
+            "timestamp": 257.8707,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 19,
+            "timestamp": 257.9,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 20,
+            "timestamp": 257.9375,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 21,
+            "timestamp": 257.9789,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 22,
+            "timestamp": 258.0014,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 23,
+            "timestamp": 258.0445,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 24,
+            "timestamp": 258.06870000000004,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 25,
+            "timestamp": 258.0996,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 26,
+            "timestamp": 258.13579999999996,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 27,
+            "timestamp": 258.1702,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 28,
+            "timestamp": 258.2344,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 29,
+            "timestamp": 258.3001,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 30,
+            "timestamp": 258.3322,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 31,
+            "timestamp": 258.3669,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 32,
+            "timestamp": 258.39820000000003,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 33,
+            "timestamp": 258.4326,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 34,
+            "timestamp": 258.4655,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 35,
+            "timestamp": 258.4996,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 36,
+            "timestamp": 258.5331,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 37,
+            "timestamp": 258.6091,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 38,
+            "timestamp": 258.6367,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 39,
+            "timestamp": 258.6812,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 40,
+            "timestamp": 258.7037,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 41,
+            "timestamp": 258.7345,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 42,
+            "timestamp": 258.7807,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 43,
+            "timestamp": 258.8018,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 44,
+            "timestamp": 258.8678,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 45,
+            "timestamp": 258.9414,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 46,
+            "timestamp": 258.9718,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 47,
+            "timestamp": 259.0018,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 48,
+            "timestamp": 259.0535,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 49,
+            "timestamp": 259.0763,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 50,
+            "timestamp": 259.1,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 51,
+            "timestamp": 259.1321,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 52,
+            "timestamp": 259.1988,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 53,
+            "timestamp": 259.2674,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 54,
+            "timestamp": 259.3018,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 55,
+            "timestamp": 259.3678,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 56,
+            "timestamp": 259.3714,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 57,
+            "timestamp": 259.43489999999997,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 58,
+            "timestamp": 259.4995,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 59,
+            "timestamp": 259.5387,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 60,
+            "timestamp": 259.6013,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 61,
+            "timestamp": 259.6033,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 62,
+            "timestamp": 259.6327,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 63,
+            "timestamp": 259.6986,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 64,
+            "timestamp": 259.7663,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 65,
+            "timestamp": 259.7989,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 66,
+            "timestamp": 259.8672,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 67,
+            "timestamp": 259.9347,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 68,
+            "timestamp": 259.974,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 69,
+            "timestamp": 260.0316,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          }
+        ]
+      },
+      "after": {
+        "frames": 69,
+        "tracked": 14,
+        "metric_positions": 6,
+        "worker_median_ms": 61.71112500000131,
+        "worker_p95_ms": 81.31383569999997,
+        "observations": [
+          {
+            "frame_id": 1,
+            "timestamp": 257.0643,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 2,
+            "timestamp": 257.1425,
+            "pixel": {
+              "x": 94.5,
+              "y": 48.5
+            },
+            "position": {
+              "x": 0.2215,
+              "y": 0.3082
+            },
+            "quality": {
+              "reason": "insufficient_time_span",
+              "samples": 1,
+              "span_s": 0.0,
+              "position_residual_m": 0.0,
+              "acceleration_std_mps2": null,
+              "velocity_valid": false,
+              "acceleration_valid": false
+            }
+          },
+          {
+            "frame_id": 3,
+            "timestamp": 257.1829,
+            "pixel": {
+              "x": 101.5,
+              "y": 47.5
+            },
+            "position": {
+              "x": 0.2379,
+              "y": 0.3105
+            },
+            "quality": {
+              "reason": "insufficient_time_span",
+              "samples": 2,
+              "span_s": 0.04040000000003374,
+              "position_residual_m": 0.0,
+              "acceleration_std_mps2": null,
+              "velocity_valid": true,
+              "acceleration_valid": false
+            }
+          },
+          {
+            "frame_id": 4,
+            "timestamp": 257.2005,
+            "pixel": {
+              "x": 96.04,
+              "y": 43.84
+            },
+            "position": null,
+            "quality": {
+              "reason": "localization_uncertain"
+            }
+          },
+          {
+            "frame_id": 5,
+            "timestamp": 257.2812,
+            "pixel": {
+              "x": 96.16,
+              "y": 43.58
+            },
+            "position": null,
+            "quality": {
+              "reason": "localization_uncertain"
+            }
+          },
+          {
+            "frame_id": 6,
+            "timestamp": 257.2907,
+            "pixel": {
+              "x": 96.19,
+              "y": 43.13
+            },
+            "position": null,
+            "quality": {
+              "reason": "localization_uncertain"
+            }
+          },
+          {
+            "frame_id": 7,
+            "timestamp": 257.3214,
+            "pixel": {
+              "x": 96.62,
+              "y": 43.38
+            },
+            "position": null,
+            "quality": {
+              "reason": "localization_uncertain"
+            }
+          },
+          {
+            "frame_id": 8,
+            "timestamp": 257.36670000000004,
+            "pixel": {
+              "x": 96.33,
+              "y": 43.4
+            },
+            "position": null,
+            "quality": {
+              "reason": "localization_uncertain"
+            }
+          },
+          {
+            "frame_id": 9,
+            "timestamp": 257.4327,
+            "pixel": {
+              "x": 94.5,
+              "y": 47.5
+            },
+            "position": {
+              "x": 0.2215,
+              "y": 0.3105
+            },
+            "quality": {
+              "reason": "insufficient_time_span",
+              "samples": 1,
+              "span_s": 0.0,
+              "position_residual_m": 0.0,
+              "acceleration_std_mps2": null,
+              "velocity_valid": false,
+              "acceleration_valid": false
+            }
+          },
+          {
+            "frame_id": 10,
+            "timestamp": 257.4656,
+            "pixel": {
+              "x": 94.5,
+              "y": 47.5
+            },
+            "position": {
+              "x": 0.2215,
+              "y": 0.3105
+            },
+            "quality": {
+              "reason": "insufficient_time_span",
+              "samples": 2,
+              "span_s": 0.03289999999998372,
+              "position_residual_m": 0.0,
+              "acceleration_std_mps2": null,
+              "velocity_valid": true,
+              "acceleration_valid": false
+            }
+          },
+          {
+            "frame_id": 11,
+            "timestamp": 257.4991,
+            "pixel": {
+              "x": 94.5,
+              "y": 47.5
+            },
+            "position": {
+              "x": 0.2215,
+              "y": 0.3105
+            },
+            "quality": {
+              "reason": "insufficient_time_span",
+              "samples": 3,
+              "span_s": 0.06639999999998736,
+              "position_residual_m": 1.57027351412249e-16,
+              "acceleration_std_mps2": 7.3665428646264335,
+              "velocity_valid": true,
+              "acceleration_valid": false
+            }
+          },
+          {
+            "frame_id": 12,
+            "timestamp": 257.5476,
+            "pixel": {
+              "x": 95.23,
+              "y": 42.98
+            },
+            "position": null,
+            "quality": {
+              "reason": "localization_uncertain"
+            }
+          },
+          {
+            "frame_id": 13,
+            "timestamp": 257.5674,
+            "pixel": {
+              "x": 93.5,
+              "y": 47.5
+            },
+            "position": {
+              "x": 0.2191,
+              "y": 0.3105
+            },
+            "quality": {
+              "reason": "insufficient_time_span",
+              "samples": 1,
+              "span_s": 0.0,
+              "position_residual_m": 0.0,
+              "acceleration_std_mps2": null,
+              "velocity_valid": false,
+              "acceleration_valid": false
+            }
+          },
+          {
+            "frame_id": 14,
+            "timestamp": 257.6332,
+            "pixel": {
+              "x": 95.69,
+              "y": 56.82
+            },
+            "position": null,
+            "quality": {
+              "reason": "localization_uncertain"
+            }
+          },
+          {
+            "frame_id": 15,
+            "timestamp": 257.7005,
+            "pixel": {
+              "x": 93.05,
+              "y": 94.3
+            },
+            "position": null,
+            "quality": {
+              "reason": "localization_uncertain"
+            }
+          },
+          {
+            "frame_id": 16,
+            "timestamp": 257.7712,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 17,
+            "timestamp": 257.8325,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 18,
+            "timestamp": 257.8707,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 19,
+            "timestamp": 257.9,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 20,
+            "timestamp": 257.9375,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 21,
+            "timestamp": 257.9789,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 22,
+            "timestamp": 258.0014,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 23,
+            "timestamp": 258.0445,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 24,
+            "timestamp": 258.06870000000004,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 25,
+            "timestamp": 258.0996,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 26,
+            "timestamp": 258.13579999999996,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 27,
+            "timestamp": 258.1702,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 28,
+            "timestamp": 258.2344,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 29,
+            "timestamp": 258.3001,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 30,
+            "timestamp": 258.3322,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 31,
+            "timestamp": 258.3669,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 32,
+            "timestamp": 258.39820000000003,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 33,
+            "timestamp": 258.4326,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 34,
+            "timestamp": 258.4655,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 35,
+            "timestamp": 258.4996,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 36,
+            "timestamp": 258.5331,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 37,
+            "timestamp": 258.6091,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 38,
+            "timestamp": 258.6367,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 39,
+            "timestamp": 258.6812,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 40,
+            "timestamp": 258.7037,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 41,
+            "timestamp": 258.7345,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 42,
+            "timestamp": 258.7807,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 43,
+            "timestamp": 258.8018,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 44,
+            "timestamp": 258.8678,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 45,
+            "timestamp": 258.9414,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 46,
+            "timestamp": 258.9718,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 47,
+            "timestamp": 259.0018,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 48,
+            "timestamp": 259.0535,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 49,
+            "timestamp": 259.0763,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 50,
+            "timestamp": 259.1,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 51,
+            "timestamp": 259.1321,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 52,
+            "timestamp": 259.1988,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 53,
+            "timestamp": 259.2674,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 54,
+            "timestamp": 259.3018,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 55,
+            "timestamp": 259.3678,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 56,
+            "timestamp": 259.3714,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 57,
+            "timestamp": 259.43489999999997,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 58,
+            "timestamp": 259.4995,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 59,
+            "timestamp": 259.5387,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 60,
+            "timestamp": 259.6013,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 61,
+            "timestamp": 259.6033,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 62,
+            "timestamp": 259.6327,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 63,
+            "timestamp": 259.6986,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 64,
+            "timestamp": 259.7663,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 65,
+            "timestamp": 259.7989,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 66,
+            "timestamp": 259.8672,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 67,
+            "timestamp": 259.9347,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 68,
+            "timestamp": 259.974,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 69,
+            "timestamp": 260.0316,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          }
+        ]
+      },
+      "source_sha256": "ab20ba78a2cb9d6fe8f0f8df6344acafbc0df144ee41e5d77f0d7c2e298ca1cb",
+      "capture": {
+        "frame_count": 69,
+        "duration_s": 2.967300000000023,
+        "fps": 22.91645603747497,
+        "max_gap_ms": 80.70000000003574
+      }
+    },
+    "HandsOnPhysics-2026-10-11T22-34-05-920Z.hop.json": {
+      "before": {
+        "frames": 91,
+        "tracked": 18,
+        "metric_positions": 18,
+        "worker_median_ms": 52.04964550000035,
+        "worker_p95_ms": 68.60288955000158,
+        "observations": [
+          {
+            "frame_id": 1,
+            "timestamp": 889.4559,
+            "pixel": {
+              "x": 209.0,
+              "y": 49.5
+            },
+            "position": {
+              "x": 0.4898,
+              "y": 0.3059
+            },
+            "quality": {
+              "reason": "insufficient_time_span",
+              "samples": 1,
+              "span_s": 0.0,
+              "position_residual_m": 0.0,
+              "acceleration_std_mps2": null,
+              "velocity_valid": false,
+              "acceleration_valid": false
+            }
+          },
+          {
+            "frame_id": 2,
+            "timestamp": 889.4891,
+            "pixel": {
+              "x": 209.0,
+              "y": 49.5
+            },
+            "position": {
+              "x": 0.4898,
+              "y": 0.3059
+            },
+            "quality": {
+              "reason": "insufficient_time_span",
+              "samples": 2,
+              "span_s": 0.03319999999996526,
+              "position_residual_m": 0.0,
+              "acceleration_std_mps2": null,
+              "velocity_valid": true,
+              "acceleration_valid": false
+            }
+          },
+          {
+            "frame_id": 3,
+            "timestamp": 889.5193,
+            "pixel": {
+              "x": 209.0,
+              "y": 49.5
+            },
+            "position": {
+              "x": 0.4898,
+              "y": 0.3059
+            },
+            "quality": {
+              "reason": "insufficient_time_span",
+              "samples": 3,
+              "span_s": 0.06340000000000146,
+              "position_residual_m": 6.599814069268727e-16,
+              "acceleration_std_mps2": 8.10056844671476,
+              "velocity_valid": true,
+              "acceleration_valid": false
+            }
+          },
+          {
+            "frame_id": 4,
+            "timestamp": 889.5536999999999,
+            "pixel": {
+              "x": 209.0,
+              "y": 49.5
+            },
+            "position": {
+              "x": 0.4898,
+              "y": 0.3059
+            },
+            "quality": {
+              "reason": "insufficient_time_span",
+              "samples": 4,
+              "span_s": 0.09779999999989286,
+              "position_residual_m": 4.502365318645033e-16,
+              "acceleration_std_mps2": 3.064806092051709,
+              "velocity_valid": true,
+              "acceleration_valid": false
+            }
+          },
+          {
+            "frame_id": 5,
+            "timestamp": 889.5795,
+            "pixel": {
+              "x": 209.0,
+              "y": 49.5
+            },
+            "position": {
+              "x": 0.4898,
+              "y": 0.3059
+            },
+            "quality": {
+              "reason": null,
+              "samples": 5,
+              "span_s": 0.12360000000001037,
+              "position_residual_m": 4.486355094669683e-16,
+              "acceleration_std_mps2": 1.8759971910757607,
+              "velocity_valid": true,
+              "acceleration_valid": true
+            }
+          },
+          {
+            "frame_id": 6,
+            "timestamp": 889.6113,
+            "pixel": {
+              "x": 209.0,
+              "y": 49.5
+            },
+            "position": {
+              "x": 0.4898,
+              "y": 0.3059
+            },
+            "quality": {
+              "reason": null,
+              "samples": 6,
+              "span_s": 0.155399999999986,
+              "position_residual_m": 7.794183973698907e-16,
+              "acceleration_std_mps2": 1.127180321583533,
+              "velocity_valid": true,
+              "acceleration_valid": true
+            }
+          },
+          {
+            "frame_id": 7,
+            "timestamp": 889.6509,
+            "pixel": {
+              "x": 209.0,
+              "y": 49.5
+            },
+            "position": {
+              "x": 0.4898,
+              "y": 0.3059
+            },
+            "quality": {
+              "reason": null,
+              "samples": 7,
+              "span_s": 0.19499999999993634,
+              "position_residual_m": 3.9300838453142327e-16,
+              "acceleration_std_mps2": 0.6763151652629799,
+              "velocity_valid": true,
+              "acceleration_valid": true
+            }
+          },
+          {
+            "frame_id": 8,
+            "timestamp": 889.6838,
+            "pixel": {
+              "x": 209.0,
+              "y": 49.5
+            },
+            "position": {
+              "x": 0.4898,
+              "y": 0.3059
+            },
+            "quality": {
+              "reason": null,
+              "samples": 8,
+              "span_s": 0.2278999999999769,
+              "position_residual_m": 6.920677516677987e-16,
+              "acceleration_std_mps2": 0.4761240377453969,
+              "velocity_valid": true,
+              "acceleration_valid": true
+            }
+          },
+          {
+            "frame_id": 9,
+            "timestamp": 889.7144000000001,
+            "pixel": {
+              "x": 209.0,
+              "y": 49.5
+            },
+            "position": {
+              "x": 0.4898,
+              "y": 0.3059
+            },
+            "quality": {
+              "reason": null,
+              "samples": 9,
+              "span_s": 0.2585000000000264,
+              "position_residual_m": 8.275761667986934e-16,
+              "acceleration_std_mps2": 0.3598177573731488,
+              "velocity_valid": true,
+              "acceleration_valid": true
+            }
+          },
+          {
+            "frame_id": 10,
+            "timestamp": 889.7494,
+            "pixel": {
+              "x": 209.0,
+              "y": 49.5
+            },
+            "position": {
+              "x": 0.4898,
+              "y": 0.3059
+            },
+            "quality": {
+              "reason": null,
+              "samples": 10,
+              "span_s": 0.29349999999999454,
+              "position_residual_m": 8.462948114254711e-16,
+              "acceleration_std_mps2": 0.2728353479738485,
+              "velocity_valid": true,
+              "acceleration_valid": true
+            }
+          },
+          {
+            "frame_id": 11,
+            "timestamp": 889.7871,
+            "pixel": {
+              "x": 209.0,
+              "y": 49.5
+            },
+            "position": {
+              "x": 0.4898,
+              "y": 0.3059
+            },
+            "quality": {
+              "reason": null,
+              "samples": 11,
+              "span_s": 0.3311999999999671,
+              "position_residual_m": 2.3485225361092806e-16,
+              "acceleration_std_mps2": 0.20811672414125462,
+              "velocity_valid": true,
+              "acceleration_valid": true
+            }
+          },
+          {
+            "frame_id": 12,
+            "timestamp": 889.8177,
+            "pixel": {
+              "x": 209.0,
+              "y": 49.5
+            },
+            "position": {
+              "x": 0.4898,
+              "y": 0.3059
+            },
+            "quality": {
+              "reason": null,
+              "samples": 11,
+              "span_s": 0.3285999999999376,
+              "position_residual_m": 3.24774212777371e-16,
+              "acceleration_std_mps2": 0.20929699645678984,
+              "velocity_valid": true,
+              "acceleration_valid": true
+            }
+          },
+          {
+            "frame_id": 13,
+            "timestamp": 889.8538000000001,
+            "pixel": {
+              "x": 209.0,
+              "y": 49.5
+            },
+            "position": {
+              "x": 0.4898,
+              "y": 0.3059
+            },
+            "quality": {
+              "reason": null,
+              "samples": 11,
+              "span_s": 0.3345000000000482,
+              "position_residual_m": 5.499995830229431e-16,
+              "acceleration_std_mps2": 0.20389975476398547,
+              "velocity_valid": true,
+              "acceleration_valid": true
+            }
+          },
+          {
+            "frame_id": 14,
+            "timestamp": 889.8885,
+            "pixel": {
+              "x": 209.0,
+              "y": 49.5
+            },
+            "position": {
+              "x": 0.4898,
+              "y": 0.3059
+            },
+            "quality": {
+              "reason": null,
+              "samples": 11,
+              "span_s": 0.3348000000000866,
+              "position_residual_m": 6.785941637192288e-16,
+              "acceleration_std_mps2": 0.19975271405171333,
+              "velocity_valid": true,
+              "acceleration_valid": true
+            }
+          },
+          {
+            "frame_id": 15,
+            "timestamp": 889.9205,
+            "pixel": {
+              "x": 209.0,
+              "y": 48.5
+            },
+            "position": {
+              "x": 0.4898,
+              "y": 0.3082
+            },
+            "quality": {
+              "reason": null,
+              "samples": 11,
+              "span_s": 0.3409999999998945,
+              "position_residual_m": 0.00045573963166762053,
+              "acceleration_std_mps2": 0.19321874061884078,
+              "velocity_valid": true,
+              "acceleration_valid": true
+            }
+          },
+          {
+            "frame_id": 16,
+            "timestamp": 889.9553000000001,
+            "pixel": {
+              "x": 210.0,
+              "y": 47.0
+            },
+            "position": {
+              "x": 0.4922,
+              "y": 0.3117
+            },
+            "quality": {
+              "reason": null,
+              "samples": 11,
+              "span_s": 0.34400000000005093,
+              "position_residual_m": 0.0009785806075651193,
+              "acceleration_std_mps2": 0.1930154438155129,
+              "velocity_valid": true,
+              "acceleration_valid": true
+            }
+          },
+          {
+            "frame_id": 17,
+            "timestamp": 889.9866999999999,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 18,
+            "timestamp": 890.0204,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 19,
+            "timestamp": 890.0535,
+            "pixel": {
+              "x": 204.5,
+              "y": 93.5
+            },
+            "position": {
+              "x": 0.4793,
+              "y": 0.2027
+            },
+            "quality": {
+              "reason": "insufficient_time_span",
+              "samples": 1,
+              "span_s": 0.0,
+              "position_residual_m": 0.0,
+              "acceleration_std_mps2": null,
+              "velocity_valid": false,
+              "acceleration_valid": false
+            }
+          },
+          {
+            "frame_id": 20,
+            "timestamp": 890.0866,
+            "pixel": {
+              "x": 202.5,
+              "y": 118.5
+            },
+            "position": {
+              "x": 0.4746,
+              "y": 0.1441
+            },
+            "quality": {
+              "reason": "insufficient_time_span",
+              "samples": 2,
+              "span_s": 0.03309999999999036,
+              "position_residual_m": 0.0,
+              "acceleration_std_mps2": null,
+              "velocity_valid": true,
+              "acceleration_valid": false
+            }
+          },
+          {
+            "frame_id": 21,
+            "timestamp": 890.1194,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 22,
+            "timestamp": 890.1521,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 23,
+            "timestamp": 890.1844,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 24,
+            "timestamp": 890.2194000000001,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 25,
+            "timestamp": 890.2518,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 26,
+            "timestamp": 890.2843,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 27,
+            "timestamp": 890.3185,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 28,
+            "timestamp": 890.3530999999999,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 29,
+            "timestamp": 890.3869,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 30,
+            "timestamp": 890.4194,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 31,
+            "timestamp": 890.4523,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 32,
+            "timestamp": 890.4858,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 33,
+            "timestamp": 890.5189,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 34,
+            "timestamp": 890.5477,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 35,
+            "timestamp": 890.5823,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 36,
+            "timestamp": 890.6128,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 37,
+            "timestamp": 890.6489,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 38,
+            "timestamp": 890.6833,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 39,
+            "timestamp": 890.713,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 40,
+            "timestamp": 890.7498,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 41,
+            "timestamp": 890.7783000000001,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 42,
+            "timestamp": 890.814,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 43,
+            "timestamp": 890.85,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 44,
+            "timestamp": 890.8837,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 45,
+            "timestamp": 890.9175,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 46,
+            "timestamp": 890.9534,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 47,
+            "timestamp": 890.9858,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 48,
+            "timestamp": 891.02,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 49,
+            "timestamp": 891.0536,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 50,
+            "timestamp": 891.0859,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 51,
+            "timestamp": 891.1201,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 52,
+            "timestamp": 891.1535,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 53,
+            "timestamp": 891.183,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 54,
+            "timestamp": 891.2178,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 55,
+            "timestamp": 891.2525,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 56,
+            "timestamp": 891.2845,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 57,
+            "timestamp": 891.3175,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 58,
+            "timestamp": 891.3529,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 59,
+            "timestamp": 891.3845,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 60,
+            "timestamp": 891.4174,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 61,
+            "timestamp": 891.4517,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 62,
+            "timestamp": 891.4854,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 63,
+            "timestamp": 891.5187,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 64,
+            "timestamp": 891.5535,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 65,
+            "timestamp": 891.5845,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 66,
+            "timestamp": 891.6135,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 67,
+            "timestamp": 891.6495,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 68,
+            "timestamp": 891.685,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 69,
+            "timestamp": 891.7181999999999,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 70,
+            "timestamp": 891.7523,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 71,
+            "timestamp": 891.783,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 72,
+            "timestamp": 891.8206,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 73,
+            "timestamp": 891.8531999999999,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 74,
+            "timestamp": 891.8860999999999,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 75,
+            "timestamp": 891.9182,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 76,
+            "timestamp": 891.9512,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 77,
+            "timestamp": 891.9835,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 78,
+            "timestamp": 892.0171,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 79,
+            "timestamp": 892.0511,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 80,
+            "timestamp": 892.0856,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 81,
+            "timestamp": 892.1183000000001,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 82,
+            "timestamp": 892.1535,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 83,
+            "timestamp": 892.186,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 84,
+            "timestamp": 892.2185,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 85,
+            "timestamp": 892.2525,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 86,
+            "timestamp": 892.2866,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 87,
+            "timestamp": 892.3190999999999,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 88,
+            "timestamp": 892.3525999999999,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 89,
+            "timestamp": 892.3824000000001,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 90,
+            "timestamp": 892.4113000000001,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 91,
+            "timestamp": 892.4439,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          }
+        ]
+      },
+      "after": {
+        "frames": 91,
+        "tracked": 21,
+        "metric_positions": 18,
+        "worker_median_ms": 49.450000000000216,
+        "worker_p95_ms": 66.05899854999801,
+        "observations": [
+          {
+            "frame_id": 1,
+            "timestamp": 889.4559,
+            "pixel": {
+              "x": 209.0,
+              "y": 49.5
+            },
+            "position": {
+              "x": 0.4898,
+              "y": 0.3059
+            },
+            "quality": {
+              "reason": "insufficient_time_span",
+              "samples": 1,
+              "span_s": 0.0,
+              "position_residual_m": 0.0,
+              "acceleration_std_mps2": null,
+              "velocity_valid": false,
+              "acceleration_valid": false
+            }
+          },
+          {
+            "frame_id": 2,
+            "timestamp": 889.4891,
+            "pixel": {
+              "x": 209.0,
+              "y": 49.5
+            },
+            "position": {
+              "x": 0.4898,
+              "y": 0.3059
+            },
+            "quality": {
+              "reason": "insufficient_time_span",
+              "samples": 2,
+              "span_s": 0.03319999999996526,
+              "position_residual_m": 0.0,
+              "acceleration_std_mps2": null,
+              "velocity_valid": true,
+              "acceleration_valid": false
+            }
+          },
+          {
+            "frame_id": 3,
+            "timestamp": 889.5193,
+            "pixel": {
+              "x": 209.0,
+              "y": 49.5
+            },
+            "position": {
+              "x": 0.4898,
+              "y": 0.3059
+            },
+            "quality": {
+              "reason": "insufficient_time_span",
+              "samples": 3,
+              "span_s": 0.06340000000000146,
+              "position_residual_m": 6.599814069268727e-16,
+              "acceleration_std_mps2": 8.10056844671476,
+              "velocity_valid": true,
+              "acceleration_valid": false
+            }
+          },
+          {
+            "frame_id": 4,
+            "timestamp": 889.5536999999999,
+            "pixel": {
+              "x": 209.0,
+              "y": 49.5
+            },
+            "position": {
+              "x": 0.4898,
+              "y": 0.3059
+            },
+            "quality": {
+              "reason": "insufficient_time_span",
+              "samples": 4,
+              "span_s": 0.09779999999989286,
+              "position_residual_m": 4.502365318645033e-16,
+              "acceleration_std_mps2": 3.064806092051709,
+              "velocity_valid": true,
+              "acceleration_valid": false
+            }
+          },
+          {
+            "frame_id": 5,
+            "timestamp": 889.5795,
+            "pixel": {
+              "x": 209.0,
+              "y": 49.5
+            },
+            "position": {
+              "x": 0.4898,
+              "y": 0.3059
+            },
+            "quality": {
+              "reason": null,
+              "samples": 5,
+              "span_s": 0.12360000000001037,
+              "position_residual_m": 4.486355094669683e-16,
+              "acceleration_std_mps2": 1.8759971910757607,
+              "velocity_valid": true,
+              "acceleration_valid": true
+            }
+          },
+          {
+            "frame_id": 6,
+            "timestamp": 889.6113,
+            "pixel": {
+              "x": 209.0,
+              "y": 49.5
+            },
+            "position": {
+              "x": 0.4898,
+              "y": 0.3059
+            },
+            "quality": {
+              "reason": null,
+              "samples": 6,
+              "span_s": 0.155399999999986,
+              "position_residual_m": 7.794183973698907e-16,
+              "acceleration_std_mps2": 1.127180321583533,
+              "velocity_valid": true,
+              "acceleration_valid": true
+            }
+          },
+          {
+            "frame_id": 7,
+            "timestamp": 889.6509,
+            "pixel": {
+              "x": 209.0,
+              "y": 49.5
+            },
+            "position": {
+              "x": 0.4898,
+              "y": 0.3059
+            },
+            "quality": {
+              "reason": null,
+              "samples": 7,
+              "span_s": 0.19499999999993634,
+              "position_residual_m": 3.9300838453142327e-16,
+              "acceleration_std_mps2": 0.6763151652629799,
+              "velocity_valid": true,
+              "acceleration_valid": true
+            }
+          },
+          {
+            "frame_id": 8,
+            "timestamp": 889.6838,
+            "pixel": {
+              "x": 209.0,
+              "y": 49.5
+            },
+            "position": {
+              "x": 0.4898,
+              "y": 0.3059
+            },
+            "quality": {
+              "reason": null,
+              "samples": 8,
+              "span_s": 0.2278999999999769,
+              "position_residual_m": 6.920677516677987e-16,
+              "acceleration_std_mps2": 0.4761240377453969,
+              "velocity_valid": true,
+              "acceleration_valid": true
+            }
+          },
+          {
+            "frame_id": 9,
+            "timestamp": 889.7144000000001,
+            "pixel": {
+              "x": 209.0,
+              "y": 49.5
+            },
+            "position": {
+              "x": 0.4898,
+              "y": 0.3059
+            },
+            "quality": {
+              "reason": null,
+              "samples": 9,
+              "span_s": 0.2585000000000264,
+              "position_residual_m": 8.275761667986934e-16,
+              "acceleration_std_mps2": 0.3598177573731488,
+              "velocity_valid": true,
+              "acceleration_valid": true
+            }
+          },
+          {
+            "frame_id": 10,
+            "timestamp": 889.7494,
+            "pixel": {
+              "x": 209.0,
+              "y": 49.5
+            },
+            "position": {
+              "x": 0.4898,
+              "y": 0.3059
+            },
+            "quality": {
+              "reason": null,
+              "samples": 10,
+              "span_s": 0.29349999999999454,
+              "position_residual_m": 8.462948114254711e-16,
+              "acceleration_std_mps2": 0.2728353479738485,
+              "velocity_valid": true,
+              "acceleration_valid": true
+            }
+          },
+          {
+            "frame_id": 11,
+            "timestamp": 889.7871,
+            "pixel": {
+              "x": 209.0,
+              "y": 49.5
+            },
+            "position": {
+              "x": 0.4898,
+              "y": 0.3059
+            },
+            "quality": {
+              "reason": null,
+              "samples": 11,
+              "span_s": 0.3311999999999671,
+              "position_residual_m": 2.3485225361092806e-16,
+              "acceleration_std_mps2": 0.20811672414125462,
+              "velocity_valid": true,
+              "acceleration_valid": true
+            }
+          },
+          {
+            "frame_id": 12,
+            "timestamp": 889.8177,
+            "pixel": {
+              "x": 209.0,
+              "y": 49.5
+            },
+            "position": {
+              "x": 0.4898,
+              "y": 0.3059
+            },
+            "quality": {
+              "reason": null,
+              "samples": 11,
+              "span_s": 0.3285999999999376,
+              "position_residual_m": 3.24774212777371e-16,
+              "acceleration_std_mps2": 0.20929699645678984,
+              "velocity_valid": true,
+              "acceleration_valid": true
+            }
+          },
+          {
+            "frame_id": 13,
+            "timestamp": 889.8538000000001,
+            "pixel": {
+              "x": 209.0,
+              "y": 49.5
+            },
+            "position": {
+              "x": 0.4898,
+              "y": 0.3059
+            },
+            "quality": {
+              "reason": null,
+              "samples": 11,
+              "span_s": 0.3345000000000482,
+              "position_residual_m": 5.499995830229431e-16,
+              "acceleration_std_mps2": 0.20389975476398547,
+              "velocity_valid": true,
+              "acceleration_valid": true
+            }
+          },
+          {
+            "frame_id": 14,
+            "timestamp": 889.8885,
+            "pixel": {
+              "x": 209.0,
+              "y": 49.5
+            },
+            "position": {
+              "x": 0.4898,
+              "y": 0.3059
+            },
+            "quality": {
+              "reason": null,
+              "samples": 11,
+              "span_s": 0.3348000000000866,
+              "position_residual_m": 6.785941637192288e-16,
+              "acceleration_std_mps2": 0.19975271405171333,
+              "velocity_valid": true,
+              "acceleration_valid": true
+            }
+          },
+          {
+            "frame_id": 15,
+            "timestamp": 889.9205,
+            "pixel": {
+              "x": 209.0,
+              "y": 48.5
+            },
+            "position": {
+              "x": 0.4898,
+              "y": 0.3082
+            },
+            "quality": {
+              "reason": null,
+              "samples": 11,
+              "span_s": 0.3409999999998945,
+              "position_residual_m": 0.00045573963166762053,
+              "acceleration_std_mps2": 0.19321874061884078,
+              "velocity_valid": true,
+              "acceleration_valid": true
+            }
+          },
+          {
+            "frame_id": 16,
+            "timestamp": 889.9553000000001,
+            "pixel": {
+              "x": 210.0,
+              "y": 47.0
+            },
+            "position": {
+              "x": 0.4922,
+              "y": 0.3117
+            },
+            "quality": {
+              "reason": null,
+              "samples": 11,
+              "span_s": 0.34400000000005093,
+              "position_residual_m": 0.0009785806075651193,
+              "acceleration_std_mps2": 0.1930154438155129,
+              "velocity_valid": true,
+              "acceleration_valid": true
+            }
+          },
+          {
+            "frame_id": 17,
+            "timestamp": 889.9866999999999,
+            "pixel": {
+              "x": 202.42,
+              "y": 57.99
+            },
+            "position": null,
+            "quality": {
+              "reason": "localization_uncertain"
+            }
+          },
+          {
+            "frame_id": 18,
+            "timestamp": 890.0204,
+            "pixel": {
+              "x": 199.48,
+              "y": 65.63
+            },
+            "position": null,
+            "quality": {
+              "reason": "localization_uncertain"
+            }
+          },
+          {
+            "frame_id": 19,
+            "timestamp": 890.0535,
+            "pixel": {
+              "x": 204.5,
+              "y": 93.5
+            },
+            "position": {
+              "x": 0.4793,
+              "y": 0.2027
+            },
+            "quality": {
+              "reason": "insufficient_time_span",
+              "samples": 1,
+              "span_s": 0.0,
+              "position_residual_m": 0.0,
+              "acceleration_std_mps2": null,
+              "velocity_valid": false,
+              "acceleration_valid": false
+            }
+          },
+          {
+            "frame_id": 20,
+            "timestamp": 890.0866,
+            "pixel": {
+              "x": 202.5,
+              "y": 118.5
+            },
+            "position": {
+              "x": 0.4746,
+              "y": 0.1441
+            },
+            "quality": {
+              "reason": "insufficient_time_span",
+              "samples": 2,
+              "span_s": 0.03309999999999036,
+              "position_residual_m": 0.0,
+              "acceleration_std_mps2": null,
+              "velocity_valid": true,
+              "acceleration_valid": false
+            }
+          },
+          {
+            "frame_id": 21,
+            "timestamp": 890.1194,
+            "pixel": {
+              "x": 195.62,
+              "y": 149.67
+            },
+            "position": null,
+            "quality": {
+              "reason": "localization_uncertain"
+            }
+          },
+          {
+            "frame_id": 22,
+            "timestamp": 890.1521,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 23,
+            "timestamp": 890.1844,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 24,
+            "timestamp": 890.2194000000001,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 25,
+            "timestamp": 890.2518,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 26,
+            "timestamp": 890.2843,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 27,
+            "timestamp": 890.3185,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 28,
+            "timestamp": 890.3530999999999,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 29,
+            "timestamp": 890.3869,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 30,
+            "timestamp": 890.4194,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 31,
+            "timestamp": 890.4523,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 32,
+            "timestamp": 890.4858,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 33,
+            "timestamp": 890.5189,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 34,
+            "timestamp": 890.5477,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 35,
+            "timestamp": 890.5823,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 36,
+            "timestamp": 890.6128,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 37,
+            "timestamp": 890.6489,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 38,
+            "timestamp": 890.6833,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 39,
+            "timestamp": 890.713,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 40,
+            "timestamp": 890.7498,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 41,
+            "timestamp": 890.7783000000001,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 42,
+            "timestamp": 890.814,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 43,
+            "timestamp": 890.85,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 44,
+            "timestamp": 890.8837,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 45,
+            "timestamp": 890.9175,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 46,
+            "timestamp": 890.9534,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 47,
+            "timestamp": 890.9858,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 48,
+            "timestamp": 891.02,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 49,
+            "timestamp": 891.0536,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 50,
+            "timestamp": 891.0859,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 51,
+            "timestamp": 891.1201,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 52,
+            "timestamp": 891.1535,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 53,
+            "timestamp": 891.183,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 54,
+            "timestamp": 891.2178,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 55,
+            "timestamp": 891.2525,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 56,
+            "timestamp": 891.2845,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 57,
+            "timestamp": 891.3175,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 58,
+            "timestamp": 891.3529,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 59,
+            "timestamp": 891.3845,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 60,
+            "timestamp": 891.4174,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 61,
+            "timestamp": 891.4517,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 62,
+            "timestamp": 891.4854,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 63,
+            "timestamp": 891.5187,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 64,
+            "timestamp": 891.5535,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 65,
+            "timestamp": 891.5845,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 66,
+            "timestamp": 891.6135,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 67,
+            "timestamp": 891.6495,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 68,
+            "timestamp": 891.685,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 69,
+            "timestamp": 891.7181999999999,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 70,
+            "timestamp": 891.7523,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 71,
+            "timestamp": 891.783,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 72,
+            "timestamp": 891.8206,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 73,
+            "timestamp": 891.8531999999999,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 74,
+            "timestamp": 891.8860999999999,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 75,
+            "timestamp": 891.9182,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 76,
+            "timestamp": 891.9512,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 77,
+            "timestamp": 891.9835,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 78,
+            "timestamp": 892.0171,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 79,
+            "timestamp": 892.0511,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 80,
+            "timestamp": 892.0856,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 81,
+            "timestamp": 892.1183000000001,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 82,
+            "timestamp": 892.1535,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 83,
+            "timestamp": 892.186,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 84,
+            "timestamp": 892.2185,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 85,
+            "timestamp": 892.2525,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 86,
+            "timestamp": 892.2866,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 87,
+            "timestamp": 892.3190999999999,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 88,
+            "timestamp": 892.3525999999999,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 89,
+            "timestamp": 892.3824000000001,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 90,
+            "timestamp": 892.4113000000001,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 91,
+            "timestamp": 892.4439,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          }
+        ]
+      },
+      "source_sha256": "712a47ac3ab0988f94d550c7998676ae8d0f8529ca41190bc266af6bfa4b36a4",
+      "capture": {
+        "frame_count": 91,
+        "duration_s": 2.9879999999999427,
+        "fps": 30.12048192771142,
+        "max_gap_ms": 39.59999999995034
+      }
+    },
+    "HandsOnPhysics-2026-10-11T22-34-36-849Z.hop.json": {
+      "before": {
+        "frames": 90,
+        "tracked": 63,
+        "metric_positions": 63,
+        "worker_median_ms": 12.768604499999725,
+        "worker_p95_ms": 57.57619405000119,
+        "observations": [
+          {
+            "frame_id": 1,
+            "timestamp": 920.3801,
+            "pixel": {
+              "x": 219.0,
+              "y": 52.0
+            },
+            "position": {
+              "x": 0.5133,
+              "y": 0.3
+            },
+            "quality": {
+              "reason": "insufficient_time_span",
+              "samples": 1,
+              "span_s": 0.0,
+              "position_residual_m": 0.0,
+              "acceleration_std_mps2": null,
+              "velocity_valid": false,
+              "acceleration_valid": false
+            }
+          },
+          {
+            "frame_id": 2,
+            "timestamp": 920.4127,
+            "pixel": {
+              "x": 219.0,
+              "y": 52.5
+            },
+            "position": {
+              "x": 0.5133,
+              "y": 0.2988
+            },
+            "quality": {
+              "reason": "insufficient_time_span",
+              "samples": 2,
+              "span_s": 0.03260000000000218,
+              "position_residual_m": 0.0,
+              "acceleration_std_mps2": null,
+              "velocity_valid": true,
+              "acceleration_valid": false
+            }
+          },
+          {
+            "frame_id": 3,
+            "timestamp": 920.4459,
+            "pixel": {
+              "x": 219.0,
+              "y": 51.5
+            },
+            "position": {
+              "x": 0.5133,
+              "y": 0.3012
+            },
+            "quality": {
+              "reason": "insufficient_time_span",
+              "samples": 3,
+              "span_s": 0.06580000000008113,
+              "position_residual_m": 3.1648381112225065e-16,
+              "acceleration_std_mps2": 7.5015127156070145,
+              "velocity_valid": true,
+              "acceleration_valid": false
+            }
+          },
+          {
+            "frame_id": 4,
+            "timestamp": 920.4771,
+            "pixel": {
+              "x": 219.0,
+              "y": 51.5
+            },
+            "position": {
+              "x": 0.5133,
+              "y": 0.3012
+            },
+            "quality": {
+              "reason": "insufficient_time_span",
+              "samples": 4,
+              "span_s": 0.09699999999997999,
+              "position_residual_m": 0.0006607544086119019,
+              "acceleration_std_mps2": 3.1925208668664746,
+              "velocity_valid": true,
+              "acceleration_valid": false
+            }
+          },
+          {
+            "frame_id": 5,
+            "timestamp": 920.5106,
+            "pixel": {
+              "x": 219.0,
+              "y": 51.5
+            },
+            "position": {
+              "x": 0.5133,
+              "y": 0.3012
+            },
+            "quality": {
+              "reason": null,
+              "samples": 5,
+              "span_s": 0.13049999999998363,
+              "position_residual_m": 0.0006779122560073008,
+              "acceleration_std_mps2": 1.658392725184565,
+              "velocity_valid": true,
+              "acceleration_valid": true
+            }
+          },
+          {
+            "frame_id": 6,
+            "timestamp": 920.5429,
+            "pixel": {
+              "x": 219.0,
+              "y": 51.5
+            },
+            "position": {
+              "x": 0.5133,
+              "y": 0.3012
+            },
+            "quality": {
+              "reason": null,
+              "samples": 6,
+              "span_s": 0.16280000000006112,
+              "position_residual_m": 0.0006311770794312874,
+              "acceleration_std_mps2": 1.0207518180227977,
+              "velocity_valid": true,
+              "acceleration_valid": true
+            }
+          },
+          {
+            "frame_id": 7,
+            "timestamp": 920.5783,
+            "pixel": {
+              "x": 219.0,
+              "y": 51.5
+            },
+            "position": {
+              "x": 0.5133,
+              "y": 0.3012
+            },
+            "quality": {
+              "reason": null,
+              "samples": 7,
+              "span_s": 0.19820000000004256,
+              "position_residual_m": 0.0005847046294048065,
+              "acceleration_std_mps2": 0.6607849191843633,
+              "velocity_valid": true,
+              "acceleration_valid": true
+            }
+          },
+          {
+            "frame_id": 8,
+            "timestamp": 920.6168,
+            "pixel": {
+              "x": 219.0,
+              "y": 51.5
+            },
+            "position": {
+              "x": 0.5133,
+              "y": 0.3012
+            },
+            "quality": {
+              "reason": null,
+              "samples": 8,
+              "span_s": 0.23670000000004165,
+              "position_residual_m": 0.0005485672035884985,
+              "acceleration_std_mps2": 0.44521603067927973,
+              "velocity_valid": true,
+              "acceleration_valid": true
+            }
+          },
+          {
+            "frame_id": 9,
+            "timestamp": 920.6494,
+            "pixel": {
+              "x": 219.0,
+              "y": 51.5
+            },
+            "position": {
+              "x": 0.5133,
+              "y": 0.3012
+            },
+            "quality": {
+              "reason": null,
+              "samples": 9,
+              "span_s": 0.26930000000004384,
+              "position_residual_m": 0.0005213874522914334,
+              "acceleration_std_mps2": 0.33123988777957314,
+              "velocity_valid": true,
+              "acceleration_valid": true
+            }
+          },
+          {
+            "frame_id": 10,
+            "timestamp": 920.6843,
+            "pixel": {
+              "x": 219.0,
+              "y": 51.5
+            },
+            "position": {
+              "x": 0.5133,
+              "y": 0.3012
+            },
+            "quality": {
+              "reason": null,
+              "samples": 10,
+              "span_s": 0.3042000000000371,
+              "position_residual_m": 0.0005017445872352846,
+              "acceleration_std_mps2": 0.25270644979185003,
+              "velocity_valid": true,
+              "acceleration_valid": true
+            }
+          },
+          {
+            "frame_id": 11,
+            "timestamp": 920.7171,
+            "pixel": {
+              "x": 219.0,
+              "y": 50.5
+            },
+            "position": {
+              "x": 0.5133,
+              "y": 0.3035
+            },
+            "quality": {
+              "reason": null,
+              "samples": 11,
+              "span_s": 0.3369999999999891,
+              "position_residual_m": 0.0007220249623066402,
+              "acceleration_std_mps2": 0.1996199782078871,
+              "velocity_valid": true,
+              "acceleration_valid": true
+            }
+          },
+          {
+            "frame_id": 12,
+            "timestamp": 920.7514,
+            "pixel": {
+              "x": 219.0,
+              "y": 53.0
+            },
+            "position": {
+              "x": 0.5133,
+              "y": 0.2977
+            },
+            "quality": {
+              "reason": null,
+              "samples": 11,
+              "span_s": 0.3387000000000171,
+              "position_residual_m": 0.0011858208580790444,
+              "acceleration_std_mps2": 0.19871227479473036,
+              "velocity_valid": true,
+              "acceleration_valid": true
+            }
+          },
+          {
+            "frame_id": 13,
+            "timestamp": 920.7855,
+            "pixel": {
+              "x": 219.0,
+              "y": 51.5
+            },
+            "position": {
+              "x": 0.5133,
+              "y": 0.3012
+            },
+            "quality": {
+              "reason": null,
+              "samples": 11,
+              "span_s": 0.33959999999990487,
+              "position_residual_m": 0.0012174669369712946,
+              "acceleration_std_mps2": 0.1967628073232874,
+              "velocity_valid": true,
+              "acceleration_valid": true
+            }
+          },
+          {
+            "frame_id": 14,
+            "timestamp": 920.8195,
+            "pixel": {
+              "x": 219.0,
+              "y": 51.5
+            },
+            "position": {
+              "x": 0.5133,
+              "y": 0.3012
+            },
+            "quality": {
+              "reason": null,
+              "samples": 11,
+              "span_s": 0.3423999999999978,
+              "position_residual_m": 0.0012418937849613587,
+              "acceleration_std_mps2": 0.19302884133290468,
+              "velocity_valid": true,
+              "acceleration_valid": true
+            }
+          },
+          {
+            "frame_id": 15,
+            "timestamp": 920.8525,
+            "pixel": {
+              "x": 219.0,
+              "y": 51.5
+            },
+            "position": {
+              "x": 0.5133,
+              "y": 0.3012
+            },
+            "quality": {
+              "reason": null,
+              "samples": 11,
+              "span_s": 0.34190000000000964,
+              "position_residual_m": 0.0012507366975903344,
+              "acceleration_std_mps2": 0.19228209540787883,
+              "velocity_valid": true,
+              "acceleration_valid": true
+            }
+          },
+          {
+            "frame_id": 16,
+            "timestamp": 920.8859,
+            "pixel": {
+              "x": 219.0,
+              "y": 51.5
+            },
+            "position": {
+              "x": 0.5133,
+              "y": 0.3012
+            },
+            "quality": {
+              "reason": null,
+              "samples": 11,
+              "span_s": 0.3429999999999609,
+              "position_residual_m": 0.0012512542369448462,
+              "acceleration_std_mps2": 0.19190200328835796,
+              "velocity_valid": true,
+              "acceleration_valid": true
+            }
+          },
+          {
+            "frame_id": 17,
+            "timestamp": 920.9153,
+            "pixel": {
+              "x": 219.0,
+              "y": 51.5
+            },
+            "position": {
+              "x": 0.5133,
+              "y": 0.3012
+            },
+            "quality": {
+              "reason": null,
+              "samples": 11,
+              "span_s": 0.3369999999999891,
+              "position_residual_m": 0.0012478653436159067,
+              "acceleration_std_mps2": 0.19945060852197274,
+              "velocity_valid": true,
+              "acceleration_valid": true
+            }
+          },
+          {
+            "frame_id": 18,
+            "timestamp": 920.9473,
+            "pixel": {
+              "x": 219.0,
+              "y": 51.5
+            },
+            "position": {
+              "x": 0.5133,
+              "y": 0.3012
+            },
+            "quality": {
+              "reason": null,
+              "samples": 11,
+              "span_s": 0.3305000000000291,
+              "position_residual_m": 0.0012436900170802528,
+              "acceleration_std_mps2": 0.20761052682361503,
+              "velocity_valid": true,
+              "acceleration_valid": true
+            }
+          },
+          {
+            "frame_id": 19,
+            "timestamp": 920.983,
+            "pixel": {
+              "x": 219.0,
+              "y": 51.5
+            },
+            "position": {
+              "x": 0.5133,
+              "y": 0.3012
+            },
+            "quality": {
+              "reason": null,
+              "samples": 11,
+              "span_s": 0.33359999999993306,
+              "position_residual_m": 0.001242561342799825,
+              "acceleration_std_mps2": 0.20481971817180092,
+              "velocity_valid": true,
+              "acceleration_valid": true
+            }
+          },
+          {
+            "frame_id": 20,
+            "timestamp": 921.0194,
+            "pixel": {
+              "x": 219.0,
+              "y": 51.5
+            },
+            "position": {
+              "x": 0.5133,
+              "y": 0.3012
+            },
+            "quality": {
+              "reason": null,
+              "samples": 11,
+              "span_s": 0.3351000000000113,
+              "position_residual_m": 0.0012444539324655138,
+              "acceleration_std_mps2": 0.20120232894907808,
+              "velocity_valid": true,
+              "acceleration_valid": true
+            }
+          },
+          {
+            "frame_id": 21,
+            "timestamp": 921.0532,
+            "pixel": {
+              "x": 219.0,
+              "y": 51.5
+            },
+            "position": {
+              "x": 0.5133,
+              "y": 0.3012
+            },
+            "quality": {
+              "reason": null,
+              "samples": 11,
+              "span_s": 0.33609999999998763,
+              "position_residual_m": 0.001248085310471088,
+              "acceleration_std_mps2": 0.19883310154541617,
+              "velocity_valid": true,
+              "acceleration_valid": true
+            }
+          },
+          {
+            "frame_id": 22,
+            "timestamp": 921.0871999999999,
+            "pixel": {
+              "x": 219.0,
+              "y": 51.5
+            },
+            "position": {
+              "x": 0.5133,
+              "y": 0.3012
+            },
+            "quality": {
+              "reason": null,
+              "samples": 11,
+              "span_s": 0.33579999999994925,
+              "position_residual_m": 0.0006795406256070127,
+              "acceleration_std_mps2": 0.19968708041001632,
+              "velocity_valid": true,
+              "acceleration_valid": true
+            }
+          },
+          {
+            "frame_id": 23,
+            "timestamp": 921.12,
+            "pixel": {
+              "x": 219.0,
+              "y": 51.5
+            },
+            "position": {
+              "x": 0.5133,
+              "y": 0.3012
+            },
+            "quality": {
+              "reason": null,
+              "samples": 11,
+              "span_s": 0.3345000000000482,
+              "position_residual_m": 7.6935879362872315e-16,
+              "acceleration_std_mps2": 0.20239761715029617,
+              "velocity_valid": true,
+              "acceleration_valid": true
+            }
+          },
+          {
+            "frame_id": 24,
+            "timestamp": 921.1532,
+            "pixel": {
+              "x": 219.0,
+              "y": 51.5
+            },
+            "position": {
+              "x": 0.5133,
+              "y": 0.3012
+            },
+            "quality": {
+              "reason": null,
+              "samples": 11,
+              "span_s": 0.33370000000002165,
+              "position_residual_m": 1.969245308016518e-16,
+              "acceleration_std_mps2": 0.2046239814918453,
+              "velocity_valid": true,
+              "acceleration_valid": true
+            }
+          },
+          {
+            "frame_id": 25,
+            "timestamp": 921.1848,
+            "pixel": {
+              "x": 219.0,
+              "y": 51.5
+            },
+            "position": {
+              "x": 0.5133,
+              "y": 0.3012
+            },
+            "quality": {
+              "reason": null,
+              "samples": 11,
+              "span_s": 0.332300000000032,
+              "position_residual_m": 5.511520865122042e-16,
+              "acceleration_std_mps2": 0.2063560826758935,
+              "velocity_valid": true,
+              "acceleration_valid": true
+            }
+          },
+          {
+            "frame_id": 26,
+            "timestamp": 921.2201,
+            "pixel": {
+              "x": 219.0,
+              "y": 51.5
+            },
+            "position": {
+              "x": 0.5133,
+              "y": 0.3012
+            },
+            "quality": {
+              "reason": null,
+              "samples": 11,
+              "span_s": 0.3342000000000098,
+              "position_residual_m": 4.867428684999258e-16,
+              "acceleration_std_mps2": 0.20268891247182058,
+              "velocity_valid": true,
+              "acceleration_valid": true
+            }
+          },
+          {
+            "frame_id": 27,
+            "timestamp": 921.2542,
+            "pixel": {
+              "x": 219.0,
+              "y": 51.5
+            },
+            "position": {
+              "x": 0.5133,
+              "y": 0.3012
+            },
+            "quality": {
+              "reason": null,
+              "samples": 11,
+              "span_s": 0.3388999999999669,
+              "position_residual_m": 8.240683898717718e-16,
+              "acceleration_std_mps2": 0.1960436275465472,
+              "velocity_valid": true,
+              "acceleration_valid": true
+            }
+          },
+          {
+            "frame_id": 28,
+            "timestamp": 921.2879,
+            "pixel": {
+              "x": 219.0,
+              "y": 51.5
+            },
+            "position": {
+              "x": 0.5133,
+              "y": 0.3012
+            },
+            "quality": {
+              "reason": null,
+              "samples": 11,
+              "span_s": 0.3405999999999949,
+              "position_residual_m": 1.1905894016338558e-15,
+              "acceleration_std_mps2": 0.19434246615436834,
+              "velocity_valid": true,
+              "acceleration_valid": true
+            }
+          },
+          {
+            "frame_id": 29,
+            "timestamp": 921.3207,
+            "pixel": {
+              "x": 219.0,
+              "y": 51.5
+            },
+            "position": {
+              "x": 0.5133,
+              "y": 0.3012
+            },
+            "quality": {
+              "reason": null,
+              "samples": 11,
+              "span_s": 0.33770000000004075,
+              "position_residual_m": 7.678824176014836e-16,
+              "acceleration_std_mps2": 0.19819428227535837,
+              "velocity_valid": true,
+              "acceleration_valid": true
+            }
+          },
+          {
+            "frame_id": 30,
+            "timestamp": 921.3554,
+            "pixel": {
+              "x": 219.0,
+              "y": 51.5
+            },
+            "position": {
+              "x": 0.5133,
+              "y": 0.3012
+            },
+            "quality": {
+              "reason": null,
+              "samples": 11,
+              "span_s": 0.33600000000001273,
+              "position_residual_m": 5.309318771005554e-16,
+              "acceleration_std_mps2": 0.20079461417032582,
+              "velocity_valid": true,
+              "acceleration_valid": true
+            }
+          },
+          {
+            "frame_id": 31,
+            "timestamp": 921.3881,
+            "pixel": {
+              "x": 219.0,
+              "y": 51.5
+            },
+            "position": {
+              "x": 0.5133,
+              "y": 0.3012
+            },
+            "quality": {
+              "reason": null,
+              "samples": 11,
+              "span_s": 0.3349000000000615,
+              "position_residual_m": 3.5305260705992863e-16,
+              "acceleration_std_mps2": 0.20211220496679888,
+              "velocity_valid": true,
+              "acceleration_valid": true
+            }
+          },
+          {
+            "frame_id": 32,
+            "timestamp": 921.4214000000001,
+            "pixel": {
+              "x": 219.0,
+              "y": 51.5
+            },
+            "position": {
+              "x": 0.5133,
+              "y": 0.3012
+            },
+            "quality": {
+              "reason": null,
+              "samples": 11,
+              "span_s": 0.3342000000001235,
+              "position_residual_m": 6.770834043587644e-16,
+              "acceleration_std_mps2": 0.20294268357882023,
+              "velocity_valid": true,
+              "acceleration_valid": true
+            }
+          },
+          {
+            "frame_id": 33,
+            "timestamp": 921.4555,
+            "pixel": {
+              "x": 219.0,
+              "y": 51.5
+            },
+            "position": {
+              "x": 0.5133,
+              "y": 0.3012
+            },
+            "quality": {
+              "reason": null,
+              "samples": 11,
+              "span_s": 0.33550000000002456,
+              "position_residual_m": 5.954724965355133e-16,
+              "acceleration_std_mps2": 0.20130442369205243,
+              "velocity_valid": true,
+              "acceleration_valid": true
+            }
+          },
+          {
+            "frame_id": 34,
+            "timestamp": 921.4883000000001,
+            "pixel": {
+              "x": 219.0,
+              "y": 51.5
+            },
+            "position": {
+              "x": 0.5133,
+              "y": 0.3012
+            },
+            "quality": {
+              "reason": null,
+              "samples": 11,
+              "span_s": 0.33510000000012496,
+              "position_residual_m": 7.794321822510612e-16,
+              "acceleration_std_mps2": 0.20068763800311995,
+              "velocity_valid": true,
+              "acceleration_valid": true
+            }
+          },
+          {
+            "frame_id": 35,
+            "timestamp": 921.521,
+            "pixel": {
+              "x": 219.0,
+              "y": 51.5
+            },
+            "position": {
+              "x": 0.5133,
+              "y": 0.3012
+            },
+            "quality": {
+              "reason": null,
+              "samples": 11,
+              "span_s": 0.33619999999996253,
+              "position_residual_m": 7.483010952109647e-16,
+              "acceleration_std_mps2": 0.20029281393675666,
+              "velocity_valid": true,
+              "acceleration_valid": true
+            }
+          },
+          {
+            "frame_id": 36,
+            "timestamp": 921.5548,
+            "pixel": {
+              "x": 219.0,
+              "y": 51.5
+            },
+            "position": {
+              "x": 0.5133,
+              "y": 0.3012
+            },
+            "quality": {
+              "reason": null,
+              "samples": 11,
+              "span_s": 0.334699999999998,
+              "position_residual_m": 1.0269446544545905e-15,
+              "acceleration_std_mps2": 0.2023624254505248,
+              "velocity_valid": true,
+              "acceleration_valid": true
+            }
+          },
+          {
+            "frame_id": 37,
+            "timestamp": 921.5869,
+            "pixel": {
+              "x": 219.0,
+              "y": 51.5
+            },
+            "position": {
+              "x": 0.5133,
+              "y": 0.3012
+            },
+            "quality": {
+              "reason": null,
+              "samples": 11,
+              "span_s": 0.3327000000000453,
+              "position_residual_m": 2.7352424780922813e-16,
+              "acceleration_std_mps2": 0.20430745811360035,
+              "velocity_valid": true,
+              "acceleration_valid": true
+            }
+          },
+          {
+            "frame_id": 38,
+            "timestamp": 921.6204,
+            "pixel": {
+              "x": 219.0,
+              "y": 51.5
+            },
+            "position": {
+              "x": 0.5133,
+              "y": 0.3012
+            },
+            "quality": {
+              "reason": null,
+              "samples": 11,
+              "span_s": 0.3324999999999818,
+              "position_residual_m": 2.796774825181194e-16,
+              "acceleration_std_mps2": 0.20466194091016152,
+              "velocity_valid": true,
+              "acceleration_valid": true
+            }
+          },
+          {
+            "frame_id": 39,
+            "timestamp": 921.6493,
+            "pixel": {
+              "x": 219.0,
+              "y": 51.5
+            },
+            "position": {
+              "x": 0.5133,
+              "y": 0.3012
+            },
+            "quality": {
+              "reason": null,
+              "samples": 11,
+              "span_s": 0.3286000000000513,
+              "position_residual_m": 1.202046884490225e-15,
+              "acceleration_std_mps2": 0.2091309685461381,
+              "velocity_valid": true,
+              "acceleration_valid": true
+            }
+          },
+          {
+            "frame_id": 40,
+            "timestamp": 921.6784,
+            "pixel": {
+              "x": 219.0,
+              "y": 51.5
+            },
+            "position": {
+              "x": 0.5133,
+              "y": 0.3012
+            },
+            "quality": {
+              "reason": null,
+              "samples": 11,
+              "span_s": 0.3229999999999791,
+              "position_residual_m": 4.992708422417701e-16,
+              "acceleration_std_mps2": 0.21668792412148055,
+              "velocity_valid": true,
+              "acceleration_valid": true
+            }
+          },
+          {
+            "frame_id": 41,
+            "timestamp": 921.7121,
+            "pixel": {
+              "x": 219.0,
+              "y": 51.5
+            },
+            "position": {
+              "x": 0.5133,
+              "y": 0.3012
+            },
+            "quality": {
+              "reason": null,
+              "samples": 11,
+              "span_s": 0.32399999999995543,
+              "position_residual_m": 5.351975890549616e-16,
+              "acceleration_std_mps2": 0.21702388304845746,
+              "velocity_valid": true,
+              "acceleration_valid": true
+            }
+          },
+          {
+            "frame_id": 42,
+            "timestamp": 921.749,
+            "pixel": {
+              "x": 219.0,
+              "y": 51.5
+            },
+            "position": {
+              "x": 0.5133,
+              "y": 0.3012
+            },
+            "quality": {
+              "reason": null,
+              "samples": 11,
+              "span_s": 0.32759999999996126,
+              "position_residual_m": 1.4503694845382562e-16,
+              "acceleration_std_mps2": 0.21197551678815407,
+              "velocity_valid": true,
+              "acceleration_valid": true
+            }
+          },
+          {
+            "frame_id": 43,
+            "timestamp": 921.7819000000001,
+            "pixel": {
+              "x": 219.0,
+              "y": 51.5
+            },
+            "position": {
+              "x": 0.5133,
+              "y": 0.3012
+            },
+            "quality": {
+              "reason": null,
+              "samples": 11,
+              "span_s": 0.3264000000000351,
+              "position_residual_m": 2.4011971398518793e-16,
+              "acceleration_std_mps2": 0.21070154119203524,
+              "velocity_valid": true,
+              "acceleration_valid": true
+            }
+          },
+          {
+            "frame_id": 44,
+            "timestamp": 921.811,
+            "pixel": {
+              "x": 219.0,
+              "y": 51.5
+            },
+            "position": {
+              "x": 0.5133,
+              "y": 0.3012
+            },
+            "quality": {
+              "reason": null,
+              "samples": 11,
+              "span_s": 0.3226999999999407,
+              "position_residual_m": 9.377087667366984e-16,
+              "acceleration_std_mps2": 0.21466660776672697,
+              "velocity_valid": true,
+              "acceleration_valid": true
+            }
+          },
+          {
+            "frame_id": 45,
+            "timestamp": 921.8433,
+            "pixel": {
+              "x": 219.0,
+              "y": 51.5
+            },
+            "position": {
+              "x": 0.5133,
+              "y": 0.3012
+            },
+            "quality": {
+              "reason": null,
+              "samples": 11,
+              "span_s": 0.3223000000000411,
+              "position_residual_m": 5.204432969326252e-16,
+              "acceleration_std_mps2": 0.21828036389381747,
+              "velocity_valid": true,
+              "acceleration_valid": true
+            }
+          },
+          {
+            "frame_id": 46,
+            "timestamp": 921.8791,
+            "pixel": {
+              "x": 219.0,
+              "y": 51.5
+            },
+            "position": {
+              "x": 0.5133,
+              "y": 0.3012
+            },
+            "quality": {
+              "reason": null,
+              "samples": 11,
+              "span_s": 0.3242999999999938,
+              "position_residual_m": 1.0098085818473998e-15,
+              "acceleration_std_mps2": 0.21748130330086235,
+              "velocity_valid": true,
+              "acceleration_valid": true
+            }
+          },
+          {
+            "frame_id": 47,
+            "timestamp": 921.9137,
+            "pixel": {
+              "x": 219.0,
+              "y": 51.5
+            },
+            "position": {
+              "x": 0.5133,
+              "y": 0.3012
+            },
+            "quality": {
+              "reason": null,
+              "samples": 11,
+              "span_s": 0.3267999999999347,
+              "position_residual_m": 1.5192111942229762e-15,
+              "acceleration_std_mps2": 0.2136461207233159,
+              "velocity_valid": true,
+              "acceleration_valid": true
+            }
+          },
+          {
+            "frame_id": 48,
+            "timestamp": 921.9461,
+            "pixel": {
+              "x": 219.0,
+              "y": 51.5
+            },
+            "position": {
+              "x": 0.5133,
+              "y": 0.3012
+            },
+            "quality": {
+              "reason": null,
+              "samples": 11,
+              "span_s": 0.32569999999998345,
+              "position_residual_m": 5.29030953014923e-16,
+              "acceleration_std_mps2": 0.2117090667792072,
+              "velocity_valid": true,
+              "acceleration_valid": true
+            }
+          },
+          {
+            "frame_id": 49,
+            "timestamp": 921.9826999999999,
+            "pixel": {
+              "x": 219.0,
+              "y": 51.5
+            },
+            "position": {
+              "x": 0.5133,
+              "y": 0.3012
+            },
+            "quality": {
+              "reason": null,
+              "samples": 11,
+              "span_s": 0.3333999999998696,
+              "position_residual_m": 5.464653415422864e-16,
+              "acceleration_std_mps2": 0.2020026161530269,
+              "velocity_valid": true,
+              "acceleration_valid": true
+            }
+          },
+          {
+            "frame_id": 50,
+            "timestamp": 922.0218000000001,
+            "pixel": {
+              "x": 219.0,
+              "y": 51.5
+            },
+            "position": {
+              "x": 0.5133,
+              "y": 0.3012
+            },
+            "quality": {
+              "reason": null,
+              "samples": 11,
+              "span_s": 0.34340000000008786,
+              "position_residual_m": 1.1858738394153994e-15,
+              "acceleration_std_mps2": 0.19185736538060086,
+              "velocity_valid": true,
+              "acceleration_valid": true
+            }
+          },
+          {
+            "frame_id": 51,
+            "timestamp": 922.0562,
+            "pixel": {
+              "x": 219.0,
+              "y": 51.5
+            },
+            "position": {
+              "x": 0.5133,
+              "y": 0.3012
+            },
+            "quality": {
+              "reason": null,
+              "samples": 11,
+              "span_s": 0.34410000000002583,
+              "position_residual_m": 9.484074592782219e-16,
+              "acceleration_std_mps2": 0.19151846947565251,
+              "velocity_valid": true,
+              "acceleration_valid": true
+            }
+          },
+          {
+            "frame_id": 52,
+            "timestamp": 922.0921999999999,
+            "pixel": {
+              "x": 220.0,
+              "y": 54.5
+            },
+            "position": {
+              "x": 0.5156,
+              "y": 0.2941
+            },
+            "quality": {
+              "reason": "insufficient_time_span",
+              "samples": 1,
+              "span_s": 0.0,
+              "position_residual_m": 0.0,
+              "acceleration_std_mps2": null,
+              "velocity_valid": false,
+              "acceleration_valid": false
+            }
+          },
+          {
+            "frame_id": 53,
+            "timestamp": 922.1209,
+            "pixel": {
+              "x": 219.0,
+              "y": 52.5
+            },
+            "position": {
+              "x": 0.5133,
+              "y": 0.2988
+            },
+            "quality": {
+              "reason": "insufficient_time_span",
+              "samples": 2,
+              "span_s": 0.028700000000071668,
+              "position_residual_m": 0.0,
+              "acceleration_std_mps2": null,
+              "velocity_valid": true,
+              "acceleration_valid": false
+            }
+          },
+          {
+            "frame_id": 54,
+            "timestamp": 922.1573000000001,
+            "pixel": {
+              "x": 219.0,
+              "y": 52.5
+            },
+            "position": {
+              "x": 0.5133,
+              "y": 0.2988
+            },
+            "quality": {
+              "reason": "insufficient_time_span",
+              "samples": 3,
+              "span_s": 0.06510000000014315,
+              "position_residual_m": 3.356205455328104e-16,
+              "acceleration_std_mps2": 7.789785786410478,
+              "velocity_valid": true,
+              "acceleration_valid": false
+            }
+          },
+          {
+            "frame_id": 55,
+            "timestamp": 922.1934,
+            "pixel": {
+              "x": 219.0,
+              "y": 52.5
+            },
+            "position": {
+              "x": 0.5133,
+              "y": 0.2988
+            },
+            "quality": {
+              "reason": "insufficient_time_span",
+              "samples": 4,
+              "span_s": 0.10120000000006257,
+              "position_residual_m": 0.0007362595168618986,
+              "acceleration_std_mps2": 2.9817965929013557,
+              "velocity_valid": true,
+              "acceleration_valid": false
+            }
+          },
+          {
+            "frame_id": 56,
+            "timestamp": 922.2246,
+            "pixel": {
+              "x": 220.0,
+              "y": 52.5
+            },
+            "position": {
+              "x": 0.5156,
+              "y": 0.2988
+            },
+            "quality": {
+              "reason": null,
+              "samples": 5,
+              "span_s": 0.13240000000007512,
+              "position_residual_m": 0.0008647932961083067,
+              "acceleration_std_mps2": 1.6619695484234487,
+              "velocity_valid": true,
+              "acceleration_valid": true
+            }
+          },
+          {
+            "frame_id": 57,
+            "timestamp": 922.2568,
+            "pixel": {
+              "x": 220.0,
+              "y": 51.5
+            },
+            "position": {
+              "x": 0.5156,
+              "y": 0.3012
+            },
+            "quality": {
+              "reason": null,
+              "samples": 6,
+              "span_s": 0.16460000000006403,
+              "position_residual_m": 0.001325422831970188,
+              "acceleration_std_mps2": 1.0157886048546512,
+              "velocity_valid": true,
+              "acceleration_valid": true
+            }
+          },
+          {
+            "frame_id": 58,
+            "timestamp": 922.3240999999999,
+            "pixel": {
+              "x": 220.0,
+              "y": 51.5
+            },
+            "position": {
+              "x": 0.5156,
+              "y": 0.3012
+            },
+            "quality": {
+              "reason": null,
+              "samples": 7,
+              "span_s": 0.231899999999996,
+              "position_residual_m": 0.0014354924344517116,
+              "acceleration_std_mps2": 0.46511822473140413,
+              "velocity_valid": true,
+              "acceleration_valid": true
+            }
+          },
+          {
+            "frame_id": 59,
+            "timestamp": 922.3546,
+            "pixel": {
+              "x": 220.0,
+              "y": 52.5
+            },
+            "position": {
+              "x": 0.5156,
+              "y": 0.2988
+            },
+            "quality": {
+              "reason": null,
+              "samples": 8,
+              "span_s": 0.2624000000000706,
+              "position_residual_m": 0.001437756193005164,
+              "acceleration_std_mps2": 0.3521237834530072,
+              "velocity_valid": true,
+              "acceleration_valid": true
+            }
+          },
+          {
+            "frame_id": 60,
+            "timestamp": 922.3823000000001,
+            "pixel": {
+              "x": 219.0,
+              "y": 53.5
+            },
+            "position": {
+              "x": 0.5133,
+              "y": 0.2965
+            },
+            "quality": {
+              "reason": null,
+              "samples": 9,
+              "span_s": 0.2901000000001659,
+              "position_residual_m": 0.0015958937852243696,
+              "acceleration_std_mps2": 0.28516085977739136,
+              "velocity_valid": true,
+              "acceleration_valid": true
+            }
+          },
+          {
+            "frame_id": 61,
+            "timestamp": 922.4131,
+            "pixel": {
+              "x": 217.0,
+              "y": 62.5
+            },
+            "position": {
+              "x": 0.5086,
+              "y": 0.2754
+            },
+            "quality": {
+              "reason": "insufficient_time_span",
+              "samples": 1,
+              "span_s": 0.0,
+              "position_residual_m": 0.0,
+              "acceleration_std_mps2": null,
+              "velocity_valid": false,
+              "acceleration_valid": false
+            }
+          },
+          {
+            "frame_id": 62,
+            "timestamp": 922.4467,
+            "pixel": {
+              "x": 216.0,
+              "y": 76.5
+            },
+            "position": {
+              "x": 0.5062,
+              "y": 0.2426
+            },
+            "quality": {
+              "reason": "insufficient_time_span",
+              "samples": 2,
+              "span_s": 0.033599999999978536,
+              "position_residual_m": 0.0,
+              "acceleration_std_mps2": null,
+              "velocity_valid": true,
+              "acceleration_valid": false
+            }
+          },
+          {
+            "frame_id": 63,
+            "timestamp": 922.483,
+            "pixel": {
+              "x": 212.5,
+              "y": 97.5
+            },
+            "position": {
+              "x": 0.498,
+              "y": 0.1934
+            },
+            "quality": {
+              "reason": "insufficient_time_span",
+              "samples": 3,
+              "span_s": 0.06989999999996144,
+              "position_residual_m": 3.668541136759071e-16,
+              "acceleration_std_mps2": 6.6582574172059195,
+              "velocity_valid": true,
+              "acceleration_valid": false
+            }
+          },
+          {
+            "frame_id": 64,
+            "timestamp": 922.5158,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 65,
+            "timestamp": 922.5544,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 66,
+            "timestamp": 922.5873,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 67,
+            "timestamp": 922.6201,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 68,
+            "timestamp": 922.6545,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 69,
+            "timestamp": 922.6889,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 70,
+            "timestamp": 922.7204,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 71,
+            "timestamp": 922.7565,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 72,
+            "timestamp": 922.7885,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 73,
+            "timestamp": 922.8248000000001,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 74,
+            "timestamp": 922.8588000000001,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 75,
+            "timestamp": 922.8897,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 76,
+            "timestamp": 922.9184,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 77,
+            "timestamp": 922.952,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 78,
+            "timestamp": 922.9848000000001,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 79,
+            "timestamp": 923.0161999999999,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 80,
+            "timestamp": 923.0503,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 81,
+            "timestamp": 923.0831999999999,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 82,
+            "timestamp": 923.1176999999999,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 83,
+            "timestamp": 923.1553,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 84,
+            "timestamp": 923.1856,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 85,
+            "timestamp": 923.2156,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 86,
+            "timestamp": 923.2511,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 87,
+            "timestamp": 923.2896,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 88,
+            "timestamp": 923.3222,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 89,
+            "timestamp": 923.3605,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 90,
+            "timestamp": 923.3866999999999,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          }
+        ]
+      },
+      "after": {
+        "frames": 90,
+        "tracked": 64,
+        "metric_positions": 63,
+        "worker_median_ms": 12.758646000001761,
+        "worker_p95_ms": 59.06351634999964,
+        "observations": [
+          {
+            "frame_id": 1,
+            "timestamp": 920.3801,
+            "pixel": {
+              "x": 219.0,
+              "y": 52.0
+            },
+            "position": {
+              "x": 0.5133,
+              "y": 0.3
+            },
+            "quality": {
+              "reason": "insufficient_time_span",
+              "samples": 1,
+              "span_s": 0.0,
+              "position_residual_m": 0.0,
+              "acceleration_std_mps2": null,
+              "velocity_valid": false,
+              "acceleration_valid": false
+            }
+          },
+          {
+            "frame_id": 2,
+            "timestamp": 920.4127,
+            "pixel": {
+              "x": 219.0,
+              "y": 52.5
+            },
+            "position": {
+              "x": 0.5133,
+              "y": 0.2988
+            },
+            "quality": {
+              "reason": "insufficient_time_span",
+              "samples": 2,
+              "span_s": 0.03260000000000218,
+              "position_residual_m": 0.0,
+              "acceleration_std_mps2": null,
+              "velocity_valid": true,
+              "acceleration_valid": false
+            }
+          },
+          {
+            "frame_id": 3,
+            "timestamp": 920.4459,
+            "pixel": {
+              "x": 219.0,
+              "y": 51.5
+            },
+            "position": {
+              "x": 0.5133,
+              "y": 0.3012
+            },
+            "quality": {
+              "reason": "insufficient_time_span",
+              "samples": 3,
+              "span_s": 0.06580000000008113,
+              "position_residual_m": 3.1648381112225065e-16,
+              "acceleration_std_mps2": 7.5015127156070145,
+              "velocity_valid": true,
+              "acceleration_valid": false
+            }
+          },
+          {
+            "frame_id": 4,
+            "timestamp": 920.4771,
+            "pixel": {
+              "x": 219.0,
+              "y": 51.5
+            },
+            "position": {
+              "x": 0.5133,
+              "y": 0.3012
+            },
+            "quality": {
+              "reason": "insufficient_time_span",
+              "samples": 4,
+              "span_s": 0.09699999999997999,
+              "position_residual_m": 0.0006607544086119019,
+              "acceleration_std_mps2": 3.1925208668664746,
+              "velocity_valid": true,
+              "acceleration_valid": false
+            }
+          },
+          {
+            "frame_id": 5,
+            "timestamp": 920.5106,
+            "pixel": {
+              "x": 219.0,
+              "y": 51.5
+            },
+            "position": {
+              "x": 0.5133,
+              "y": 0.3012
+            },
+            "quality": {
+              "reason": null,
+              "samples": 5,
+              "span_s": 0.13049999999998363,
+              "position_residual_m": 0.0006779122560073008,
+              "acceleration_std_mps2": 1.658392725184565,
+              "velocity_valid": true,
+              "acceleration_valid": true
+            }
+          },
+          {
+            "frame_id": 6,
+            "timestamp": 920.5429,
+            "pixel": {
+              "x": 219.0,
+              "y": 51.5
+            },
+            "position": {
+              "x": 0.5133,
+              "y": 0.3012
+            },
+            "quality": {
+              "reason": null,
+              "samples": 6,
+              "span_s": 0.16280000000006112,
+              "position_residual_m": 0.0006311770794312874,
+              "acceleration_std_mps2": 1.0207518180227977,
+              "velocity_valid": true,
+              "acceleration_valid": true
+            }
+          },
+          {
+            "frame_id": 7,
+            "timestamp": 920.5783,
+            "pixel": {
+              "x": 219.0,
+              "y": 51.5
+            },
+            "position": {
+              "x": 0.5133,
+              "y": 0.3012
+            },
+            "quality": {
+              "reason": null,
+              "samples": 7,
+              "span_s": 0.19820000000004256,
+              "position_residual_m": 0.0005847046294048065,
+              "acceleration_std_mps2": 0.6607849191843633,
+              "velocity_valid": true,
+              "acceleration_valid": true
+            }
+          },
+          {
+            "frame_id": 8,
+            "timestamp": 920.6168,
+            "pixel": {
+              "x": 219.0,
+              "y": 51.5
+            },
+            "position": {
+              "x": 0.5133,
+              "y": 0.3012
+            },
+            "quality": {
+              "reason": null,
+              "samples": 8,
+              "span_s": 0.23670000000004165,
+              "position_residual_m": 0.0005485672035884985,
+              "acceleration_std_mps2": 0.44521603067927973,
+              "velocity_valid": true,
+              "acceleration_valid": true
+            }
+          },
+          {
+            "frame_id": 9,
+            "timestamp": 920.6494,
+            "pixel": {
+              "x": 219.0,
+              "y": 51.5
+            },
+            "position": {
+              "x": 0.5133,
+              "y": 0.3012
+            },
+            "quality": {
+              "reason": null,
+              "samples": 9,
+              "span_s": 0.26930000000004384,
+              "position_residual_m": 0.0005213874522914334,
+              "acceleration_std_mps2": 0.33123988777957314,
+              "velocity_valid": true,
+              "acceleration_valid": true
+            }
+          },
+          {
+            "frame_id": 10,
+            "timestamp": 920.6843,
+            "pixel": {
+              "x": 219.0,
+              "y": 51.5
+            },
+            "position": {
+              "x": 0.5133,
+              "y": 0.3012
+            },
+            "quality": {
+              "reason": null,
+              "samples": 10,
+              "span_s": 0.3042000000000371,
+              "position_residual_m": 0.0005017445872352846,
+              "acceleration_std_mps2": 0.25270644979185003,
+              "velocity_valid": true,
+              "acceleration_valid": true
+            }
+          },
+          {
+            "frame_id": 11,
+            "timestamp": 920.7171,
+            "pixel": {
+              "x": 219.0,
+              "y": 50.5
+            },
+            "position": {
+              "x": 0.5133,
+              "y": 0.3035
+            },
+            "quality": {
+              "reason": null,
+              "samples": 11,
+              "span_s": 0.3369999999999891,
+              "position_residual_m": 0.0007220249623066402,
+              "acceleration_std_mps2": 0.1996199782078871,
+              "velocity_valid": true,
+              "acceleration_valid": true
+            }
+          },
+          {
+            "frame_id": 12,
+            "timestamp": 920.7514,
+            "pixel": {
+              "x": 219.0,
+              "y": 53.0
+            },
+            "position": {
+              "x": 0.5133,
+              "y": 0.2977
+            },
+            "quality": {
+              "reason": null,
+              "samples": 11,
+              "span_s": 0.3387000000000171,
+              "position_residual_m": 0.0011858208580790444,
+              "acceleration_std_mps2": 0.19871227479473036,
+              "velocity_valid": true,
+              "acceleration_valid": true
+            }
+          },
+          {
+            "frame_id": 13,
+            "timestamp": 920.7855,
+            "pixel": {
+              "x": 219.0,
+              "y": 51.5
+            },
+            "position": {
+              "x": 0.5133,
+              "y": 0.3012
+            },
+            "quality": {
+              "reason": null,
+              "samples": 11,
+              "span_s": 0.33959999999990487,
+              "position_residual_m": 0.0012174669369712946,
+              "acceleration_std_mps2": 0.1967628073232874,
+              "velocity_valid": true,
+              "acceleration_valid": true
+            }
+          },
+          {
+            "frame_id": 14,
+            "timestamp": 920.8195,
+            "pixel": {
+              "x": 219.0,
+              "y": 51.5
+            },
+            "position": {
+              "x": 0.5133,
+              "y": 0.3012
+            },
+            "quality": {
+              "reason": null,
+              "samples": 11,
+              "span_s": 0.3423999999999978,
+              "position_residual_m": 0.0012418937849613587,
+              "acceleration_std_mps2": 0.19302884133290468,
+              "velocity_valid": true,
+              "acceleration_valid": true
+            }
+          },
+          {
+            "frame_id": 15,
+            "timestamp": 920.8525,
+            "pixel": {
+              "x": 219.0,
+              "y": 51.5
+            },
+            "position": {
+              "x": 0.5133,
+              "y": 0.3012
+            },
+            "quality": {
+              "reason": null,
+              "samples": 11,
+              "span_s": 0.34190000000000964,
+              "position_residual_m": 0.0012507366975903344,
+              "acceleration_std_mps2": 0.19228209540787883,
+              "velocity_valid": true,
+              "acceleration_valid": true
+            }
+          },
+          {
+            "frame_id": 16,
+            "timestamp": 920.8859,
+            "pixel": {
+              "x": 219.0,
+              "y": 51.5
+            },
+            "position": {
+              "x": 0.5133,
+              "y": 0.3012
+            },
+            "quality": {
+              "reason": null,
+              "samples": 11,
+              "span_s": 0.3429999999999609,
+              "position_residual_m": 0.0012512542369448462,
+              "acceleration_std_mps2": 0.19190200328835796,
+              "velocity_valid": true,
+              "acceleration_valid": true
+            }
+          },
+          {
+            "frame_id": 17,
+            "timestamp": 920.9153,
+            "pixel": {
+              "x": 219.0,
+              "y": 51.5
+            },
+            "position": {
+              "x": 0.5133,
+              "y": 0.3012
+            },
+            "quality": {
+              "reason": null,
+              "samples": 11,
+              "span_s": 0.3369999999999891,
+              "position_residual_m": 0.0012478653436159067,
+              "acceleration_std_mps2": 0.19945060852197274,
+              "velocity_valid": true,
+              "acceleration_valid": true
+            }
+          },
+          {
+            "frame_id": 18,
+            "timestamp": 920.9473,
+            "pixel": {
+              "x": 219.0,
+              "y": 51.5
+            },
+            "position": {
+              "x": 0.5133,
+              "y": 0.3012
+            },
+            "quality": {
+              "reason": null,
+              "samples": 11,
+              "span_s": 0.3305000000000291,
+              "position_residual_m": 0.0012436900170802528,
+              "acceleration_std_mps2": 0.20761052682361503,
+              "velocity_valid": true,
+              "acceleration_valid": true
+            }
+          },
+          {
+            "frame_id": 19,
+            "timestamp": 920.983,
+            "pixel": {
+              "x": 219.0,
+              "y": 51.5
+            },
+            "position": {
+              "x": 0.5133,
+              "y": 0.3012
+            },
+            "quality": {
+              "reason": null,
+              "samples": 11,
+              "span_s": 0.33359999999993306,
+              "position_residual_m": 0.001242561342799825,
+              "acceleration_std_mps2": 0.20481971817180092,
+              "velocity_valid": true,
+              "acceleration_valid": true
+            }
+          },
+          {
+            "frame_id": 20,
+            "timestamp": 921.0194,
+            "pixel": {
+              "x": 219.0,
+              "y": 51.5
+            },
+            "position": {
+              "x": 0.5133,
+              "y": 0.3012
+            },
+            "quality": {
+              "reason": null,
+              "samples": 11,
+              "span_s": 0.3351000000000113,
+              "position_residual_m": 0.0012444539324655138,
+              "acceleration_std_mps2": 0.20120232894907808,
+              "velocity_valid": true,
+              "acceleration_valid": true
+            }
+          },
+          {
+            "frame_id": 21,
+            "timestamp": 921.0532,
+            "pixel": {
+              "x": 219.0,
+              "y": 51.5
+            },
+            "position": {
+              "x": 0.5133,
+              "y": 0.3012
+            },
+            "quality": {
+              "reason": null,
+              "samples": 11,
+              "span_s": 0.33609999999998763,
+              "position_residual_m": 0.001248085310471088,
+              "acceleration_std_mps2": 0.19883310154541617,
+              "velocity_valid": true,
+              "acceleration_valid": true
+            }
+          },
+          {
+            "frame_id": 22,
+            "timestamp": 921.0871999999999,
+            "pixel": {
+              "x": 219.0,
+              "y": 51.5
+            },
+            "position": {
+              "x": 0.5133,
+              "y": 0.3012
+            },
+            "quality": {
+              "reason": null,
+              "samples": 11,
+              "span_s": 0.33579999999994925,
+              "position_residual_m": 0.0006795406256070127,
+              "acceleration_std_mps2": 0.19968708041001632,
+              "velocity_valid": true,
+              "acceleration_valid": true
+            }
+          },
+          {
+            "frame_id": 23,
+            "timestamp": 921.12,
+            "pixel": {
+              "x": 219.0,
+              "y": 51.5
+            },
+            "position": {
+              "x": 0.5133,
+              "y": 0.3012
+            },
+            "quality": {
+              "reason": null,
+              "samples": 11,
+              "span_s": 0.3345000000000482,
+              "position_residual_m": 7.6935879362872315e-16,
+              "acceleration_std_mps2": 0.20239761715029617,
+              "velocity_valid": true,
+              "acceleration_valid": true
+            }
+          },
+          {
+            "frame_id": 24,
+            "timestamp": 921.1532,
+            "pixel": {
+              "x": 219.0,
+              "y": 51.5
+            },
+            "position": {
+              "x": 0.5133,
+              "y": 0.3012
+            },
+            "quality": {
+              "reason": null,
+              "samples": 11,
+              "span_s": 0.33370000000002165,
+              "position_residual_m": 1.969245308016518e-16,
+              "acceleration_std_mps2": 0.2046239814918453,
+              "velocity_valid": true,
+              "acceleration_valid": true
+            }
+          },
+          {
+            "frame_id": 25,
+            "timestamp": 921.1848,
+            "pixel": {
+              "x": 219.0,
+              "y": 51.5
+            },
+            "position": {
+              "x": 0.5133,
+              "y": 0.3012
+            },
+            "quality": {
+              "reason": null,
+              "samples": 11,
+              "span_s": 0.332300000000032,
+              "position_residual_m": 5.511520865122042e-16,
+              "acceleration_std_mps2": 0.2063560826758935,
+              "velocity_valid": true,
+              "acceleration_valid": true
+            }
+          },
+          {
+            "frame_id": 26,
+            "timestamp": 921.2201,
+            "pixel": {
+              "x": 219.0,
+              "y": 51.5
+            },
+            "position": {
+              "x": 0.5133,
+              "y": 0.3012
+            },
+            "quality": {
+              "reason": null,
+              "samples": 11,
+              "span_s": 0.3342000000000098,
+              "position_residual_m": 4.867428684999258e-16,
+              "acceleration_std_mps2": 0.20268891247182058,
+              "velocity_valid": true,
+              "acceleration_valid": true
+            }
+          },
+          {
+            "frame_id": 27,
+            "timestamp": 921.2542,
+            "pixel": {
+              "x": 219.0,
+              "y": 51.5
+            },
+            "position": {
+              "x": 0.5133,
+              "y": 0.3012
+            },
+            "quality": {
+              "reason": null,
+              "samples": 11,
+              "span_s": 0.3388999999999669,
+              "position_residual_m": 8.240683898717718e-16,
+              "acceleration_std_mps2": 0.1960436275465472,
+              "velocity_valid": true,
+              "acceleration_valid": true
+            }
+          },
+          {
+            "frame_id": 28,
+            "timestamp": 921.2879,
+            "pixel": {
+              "x": 219.0,
+              "y": 51.5
+            },
+            "position": {
+              "x": 0.5133,
+              "y": 0.3012
+            },
+            "quality": {
+              "reason": null,
+              "samples": 11,
+              "span_s": 0.3405999999999949,
+              "position_residual_m": 1.1905894016338558e-15,
+              "acceleration_std_mps2": 0.19434246615436834,
+              "velocity_valid": true,
+              "acceleration_valid": true
+            }
+          },
+          {
+            "frame_id": 29,
+            "timestamp": 921.3207,
+            "pixel": {
+              "x": 219.0,
+              "y": 51.5
+            },
+            "position": {
+              "x": 0.5133,
+              "y": 0.3012
+            },
+            "quality": {
+              "reason": null,
+              "samples": 11,
+              "span_s": 0.33770000000004075,
+              "position_residual_m": 7.678824176014836e-16,
+              "acceleration_std_mps2": 0.19819428227535837,
+              "velocity_valid": true,
+              "acceleration_valid": true
+            }
+          },
+          {
+            "frame_id": 30,
+            "timestamp": 921.3554,
+            "pixel": {
+              "x": 219.0,
+              "y": 51.5
+            },
+            "position": {
+              "x": 0.5133,
+              "y": 0.3012
+            },
+            "quality": {
+              "reason": null,
+              "samples": 11,
+              "span_s": 0.33600000000001273,
+              "position_residual_m": 5.309318771005554e-16,
+              "acceleration_std_mps2": 0.20079461417032582,
+              "velocity_valid": true,
+              "acceleration_valid": true
+            }
+          },
+          {
+            "frame_id": 31,
+            "timestamp": 921.3881,
+            "pixel": {
+              "x": 219.0,
+              "y": 51.5
+            },
+            "position": {
+              "x": 0.5133,
+              "y": 0.3012
+            },
+            "quality": {
+              "reason": null,
+              "samples": 11,
+              "span_s": 0.3349000000000615,
+              "position_residual_m": 3.5305260705992863e-16,
+              "acceleration_std_mps2": 0.20211220496679888,
+              "velocity_valid": true,
+              "acceleration_valid": true
+            }
+          },
+          {
+            "frame_id": 32,
+            "timestamp": 921.4214000000001,
+            "pixel": {
+              "x": 219.0,
+              "y": 51.5
+            },
+            "position": {
+              "x": 0.5133,
+              "y": 0.3012
+            },
+            "quality": {
+              "reason": null,
+              "samples": 11,
+              "span_s": 0.3342000000001235,
+              "position_residual_m": 6.770834043587644e-16,
+              "acceleration_std_mps2": 0.20294268357882023,
+              "velocity_valid": true,
+              "acceleration_valid": true
+            }
+          },
+          {
+            "frame_id": 33,
+            "timestamp": 921.4555,
+            "pixel": {
+              "x": 219.0,
+              "y": 51.5
+            },
+            "position": {
+              "x": 0.5133,
+              "y": 0.3012
+            },
+            "quality": {
+              "reason": null,
+              "samples": 11,
+              "span_s": 0.33550000000002456,
+              "position_residual_m": 5.954724965355133e-16,
+              "acceleration_std_mps2": 0.20130442369205243,
+              "velocity_valid": true,
+              "acceleration_valid": true
+            }
+          },
+          {
+            "frame_id": 34,
+            "timestamp": 921.4883000000001,
+            "pixel": {
+              "x": 219.0,
+              "y": 51.5
+            },
+            "position": {
+              "x": 0.5133,
+              "y": 0.3012
+            },
+            "quality": {
+              "reason": null,
+              "samples": 11,
+              "span_s": 0.33510000000012496,
+              "position_residual_m": 7.794321822510612e-16,
+              "acceleration_std_mps2": 0.20068763800311995,
+              "velocity_valid": true,
+              "acceleration_valid": true
+            }
+          },
+          {
+            "frame_id": 35,
+            "timestamp": 921.521,
+            "pixel": {
+              "x": 219.0,
+              "y": 51.5
+            },
+            "position": {
+              "x": 0.5133,
+              "y": 0.3012
+            },
+            "quality": {
+              "reason": null,
+              "samples": 11,
+              "span_s": 0.33619999999996253,
+              "position_residual_m": 7.483010952109647e-16,
+              "acceleration_std_mps2": 0.20029281393675666,
+              "velocity_valid": true,
+              "acceleration_valid": true
+            }
+          },
+          {
+            "frame_id": 36,
+            "timestamp": 921.5548,
+            "pixel": {
+              "x": 219.0,
+              "y": 51.5
+            },
+            "position": {
+              "x": 0.5133,
+              "y": 0.3012
+            },
+            "quality": {
+              "reason": null,
+              "samples": 11,
+              "span_s": 0.334699999999998,
+              "position_residual_m": 1.0269446544545905e-15,
+              "acceleration_std_mps2": 0.2023624254505248,
+              "velocity_valid": true,
+              "acceleration_valid": true
+            }
+          },
+          {
+            "frame_id": 37,
+            "timestamp": 921.5869,
+            "pixel": {
+              "x": 219.0,
+              "y": 51.5
+            },
+            "position": {
+              "x": 0.5133,
+              "y": 0.3012
+            },
+            "quality": {
+              "reason": null,
+              "samples": 11,
+              "span_s": 0.3327000000000453,
+              "position_residual_m": 2.7352424780922813e-16,
+              "acceleration_std_mps2": 0.20430745811360035,
+              "velocity_valid": true,
+              "acceleration_valid": true
+            }
+          },
+          {
+            "frame_id": 38,
+            "timestamp": 921.6204,
+            "pixel": {
+              "x": 219.0,
+              "y": 51.5
+            },
+            "position": {
+              "x": 0.5133,
+              "y": 0.3012
+            },
+            "quality": {
+              "reason": null,
+              "samples": 11,
+              "span_s": 0.3324999999999818,
+              "position_residual_m": 2.796774825181194e-16,
+              "acceleration_std_mps2": 0.20466194091016152,
+              "velocity_valid": true,
+              "acceleration_valid": true
+            }
+          },
+          {
+            "frame_id": 39,
+            "timestamp": 921.6493,
+            "pixel": {
+              "x": 219.0,
+              "y": 51.5
+            },
+            "position": {
+              "x": 0.5133,
+              "y": 0.3012
+            },
+            "quality": {
+              "reason": null,
+              "samples": 11,
+              "span_s": 0.3286000000000513,
+              "position_residual_m": 1.202046884490225e-15,
+              "acceleration_std_mps2": 0.2091309685461381,
+              "velocity_valid": true,
+              "acceleration_valid": true
+            }
+          },
+          {
+            "frame_id": 40,
+            "timestamp": 921.6784,
+            "pixel": {
+              "x": 219.0,
+              "y": 51.5
+            },
+            "position": {
+              "x": 0.5133,
+              "y": 0.3012
+            },
+            "quality": {
+              "reason": null,
+              "samples": 11,
+              "span_s": 0.3229999999999791,
+              "position_residual_m": 4.992708422417701e-16,
+              "acceleration_std_mps2": 0.21668792412148055,
+              "velocity_valid": true,
+              "acceleration_valid": true
+            }
+          },
+          {
+            "frame_id": 41,
+            "timestamp": 921.7121,
+            "pixel": {
+              "x": 219.0,
+              "y": 51.5
+            },
+            "position": {
+              "x": 0.5133,
+              "y": 0.3012
+            },
+            "quality": {
+              "reason": null,
+              "samples": 11,
+              "span_s": 0.32399999999995543,
+              "position_residual_m": 5.351975890549616e-16,
+              "acceleration_std_mps2": 0.21702388304845746,
+              "velocity_valid": true,
+              "acceleration_valid": true
+            }
+          },
+          {
+            "frame_id": 42,
+            "timestamp": 921.749,
+            "pixel": {
+              "x": 219.0,
+              "y": 51.5
+            },
+            "position": {
+              "x": 0.5133,
+              "y": 0.3012
+            },
+            "quality": {
+              "reason": null,
+              "samples": 11,
+              "span_s": 0.32759999999996126,
+              "position_residual_m": 1.4503694845382562e-16,
+              "acceleration_std_mps2": 0.21197551678815407,
+              "velocity_valid": true,
+              "acceleration_valid": true
+            }
+          },
+          {
+            "frame_id": 43,
+            "timestamp": 921.7819000000001,
+            "pixel": {
+              "x": 219.0,
+              "y": 51.5
+            },
+            "position": {
+              "x": 0.5133,
+              "y": 0.3012
+            },
+            "quality": {
+              "reason": null,
+              "samples": 11,
+              "span_s": 0.3264000000000351,
+              "position_residual_m": 2.4011971398518793e-16,
+              "acceleration_std_mps2": 0.21070154119203524,
+              "velocity_valid": true,
+              "acceleration_valid": true
+            }
+          },
+          {
+            "frame_id": 44,
+            "timestamp": 921.811,
+            "pixel": {
+              "x": 219.0,
+              "y": 51.5
+            },
+            "position": {
+              "x": 0.5133,
+              "y": 0.3012
+            },
+            "quality": {
+              "reason": null,
+              "samples": 11,
+              "span_s": 0.3226999999999407,
+              "position_residual_m": 9.377087667366984e-16,
+              "acceleration_std_mps2": 0.21466660776672697,
+              "velocity_valid": true,
+              "acceleration_valid": true
+            }
+          },
+          {
+            "frame_id": 45,
+            "timestamp": 921.8433,
+            "pixel": {
+              "x": 219.0,
+              "y": 51.5
+            },
+            "position": {
+              "x": 0.5133,
+              "y": 0.3012
+            },
+            "quality": {
+              "reason": null,
+              "samples": 11,
+              "span_s": 0.3223000000000411,
+              "position_residual_m": 5.204432969326252e-16,
+              "acceleration_std_mps2": 0.21828036389381747,
+              "velocity_valid": true,
+              "acceleration_valid": true
+            }
+          },
+          {
+            "frame_id": 46,
+            "timestamp": 921.8791,
+            "pixel": {
+              "x": 219.0,
+              "y": 51.5
+            },
+            "position": {
+              "x": 0.5133,
+              "y": 0.3012
+            },
+            "quality": {
+              "reason": null,
+              "samples": 11,
+              "span_s": 0.3242999999999938,
+              "position_residual_m": 1.0098085818473998e-15,
+              "acceleration_std_mps2": 0.21748130330086235,
+              "velocity_valid": true,
+              "acceleration_valid": true
+            }
+          },
+          {
+            "frame_id": 47,
+            "timestamp": 921.9137,
+            "pixel": {
+              "x": 219.0,
+              "y": 51.5
+            },
+            "position": {
+              "x": 0.5133,
+              "y": 0.3012
+            },
+            "quality": {
+              "reason": null,
+              "samples": 11,
+              "span_s": 0.3267999999999347,
+              "position_residual_m": 1.5192111942229762e-15,
+              "acceleration_std_mps2": 0.2136461207233159,
+              "velocity_valid": true,
+              "acceleration_valid": true
+            }
+          },
+          {
+            "frame_id": 48,
+            "timestamp": 921.9461,
+            "pixel": {
+              "x": 219.0,
+              "y": 51.5
+            },
+            "position": {
+              "x": 0.5133,
+              "y": 0.3012
+            },
+            "quality": {
+              "reason": null,
+              "samples": 11,
+              "span_s": 0.32569999999998345,
+              "position_residual_m": 5.29030953014923e-16,
+              "acceleration_std_mps2": 0.2117090667792072,
+              "velocity_valid": true,
+              "acceleration_valid": true
+            }
+          },
+          {
+            "frame_id": 49,
+            "timestamp": 921.9826999999999,
+            "pixel": {
+              "x": 219.0,
+              "y": 51.5
+            },
+            "position": {
+              "x": 0.5133,
+              "y": 0.3012
+            },
+            "quality": {
+              "reason": null,
+              "samples": 11,
+              "span_s": 0.3333999999998696,
+              "position_residual_m": 5.464653415422864e-16,
+              "acceleration_std_mps2": 0.2020026161530269,
+              "velocity_valid": true,
+              "acceleration_valid": true
+            }
+          },
+          {
+            "frame_id": 50,
+            "timestamp": 922.0218000000001,
+            "pixel": {
+              "x": 219.0,
+              "y": 51.5
+            },
+            "position": {
+              "x": 0.5133,
+              "y": 0.3012
+            },
+            "quality": {
+              "reason": null,
+              "samples": 11,
+              "span_s": 0.34340000000008786,
+              "position_residual_m": 1.1858738394153994e-15,
+              "acceleration_std_mps2": 0.19185736538060086,
+              "velocity_valid": true,
+              "acceleration_valid": true
+            }
+          },
+          {
+            "frame_id": 51,
+            "timestamp": 922.0562,
+            "pixel": {
+              "x": 219.0,
+              "y": 51.5
+            },
+            "position": {
+              "x": 0.5133,
+              "y": 0.3012
+            },
+            "quality": {
+              "reason": null,
+              "samples": 11,
+              "span_s": 0.34410000000002583,
+              "position_residual_m": 9.484074592782219e-16,
+              "acceleration_std_mps2": 0.19151846947565251,
+              "velocity_valid": true,
+              "acceleration_valid": true
+            }
+          },
+          {
+            "frame_id": 52,
+            "timestamp": 922.0921999999999,
+            "pixel": {
+              "x": 220.0,
+              "y": 54.5
+            },
+            "position": {
+              "x": 0.5156,
+              "y": 0.2941
+            },
+            "quality": {
+              "reason": "insufficient_time_span",
+              "samples": 1,
+              "span_s": 0.0,
+              "position_residual_m": 0.0,
+              "acceleration_std_mps2": null,
+              "velocity_valid": false,
+              "acceleration_valid": false
+            }
+          },
+          {
+            "frame_id": 53,
+            "timestamp": 922.1209,
+            "pixel": {
+              "x": 219.0,
+              "y": 52.5
+            },
+            "position": {
+              "x": 0.5133,
+              "y": 0.2988
+            },
+            "quality": {
+              "reason": "insufficient_time_span",
+              "samples": 2,
+              "span_s": 0.028700000000071668,
+              "position_residual_m": 0.0,
+              "acceleration_std_mps2": null,
+              "velocity_valid": true,
+              "acceleration_valid": false
+            }
+          },
+          {
+            "frame_id": 54,
+            "timestamp": 922.1573000000001,
+            "pixel": {
+              "x": 219.0,
+              "y": 52.5
+            },
+            "position": {
+              "x": 0.5133,
+              "y": 0.2988
+            },
+            "quality": {
+              "reason": "insufficient_time_span",
+              "samples": 3,
+              "span_s": 0.06510000000014315,
+              "position_residual_m": 3.356205455328104e-16,
+              "acceleration_std_mps2": 7.789785786410478,
+              "velocity_valid": true,
+              "acceleration_valid": false
+            }
+          },
+          {
+            "frame_id": 55,
+            "timestamp": 922.1934,
+            "pixel": {
+              "x": 219.0,
+              "y": 52.5
+            },
+            "position": {
+              "x": 0.5133,
+              "y": 0.2988
+            },
+            "quality": {
+              "reason": "insufficient_time_span",
+              "samples": 4,
+              "span_s": 0.10120000000006257,
+              "position_residual_m": 0.0007362595168618986,
+              "acceleration_std_mps2": 2.9817965929013557,
+              "velocity_valid": true,
+              "acceleration_valid": false
+            }
+          },
+          {
+            "frame_id": 56,
+            "timestamp": 922.2246,
+            "pixel": {
+              "x": 220.0,
+              "y": 52.5
+            },
+            "position": {
+              "x": 0.5156,
+              "y": 0.2988
+            },
+            "quality": {
+              "reason": null,
+              "samples": 5,
+              "span_s": 0.13240000000007512,
+              "position_residual_m": 0.0008647932961083067,
+              "acceleration_std_mps2": 1.6619695484234487,
+              "velocity_valid": true,
+              "acceleration_valid": true
+            }
+          },
+          {
+            "frame_id": 57,
+            "timestamp": 922.2568,
+            "pixel": {
+              "x": 220.0,
+              "y": 51.5
+            },
+            "position": {
+              "x": 0.5156,
+              "y": 0.3012
+            },
+            "quality": {
+              "reason": null,
+              "samples": 6,
+              "span_s": 0.16460000000006403,
+              "position_residual_m": 0.001325422831970188,
+              "acceleration_std_mps2": 1.0157886048546512,
+              "velocity_valid": true,
+              "acceleration_valid": true
+            }
+          },
+          {
+            "frame_id": 58,
+            "timestamp": 922.3240999999999,
+            "pixel": {
+              "x": 220.0,
+              "y": 51.5
+            },
+            "position": {
+              "x": 0.5156,
+              "y": 0.3012
+            },
+            "quality": {
+              "reason": null,
+              "samples": 7,
+              "span_s": 0.231899999999996,
+              "position_residual_m": 0.0014354924344517116,
+              "acceleration_std_mps2": 0.46511822473140413,
+              "velocity_valid": true,
+              "acceleration_valid": true
+            }
+          },
+          {
+            "frame_id": 59,
+            "timestamp": 922.3546,
+            "pixel": {
+              "x": 220.0,
+              "y": 52.5
+            },
+            "position": {
+              "x": 0.5156,
+              "y": 0.2988
+            },
+            "quality": {
+              "reason": null,
+              "samples": 8,
+              "span_s": 0.2624000000000706,
+              "position_residual_m": 0.001437756193005164,
+              "acceleration_std_mps2": 0.3521237834530072,
+              "velocity_valid": true,
+              "acceleration_valid": true
+            }
+          },
+          {
+            "frame_id": 60,
+            "timestamp": 922.3823000000001,
+            "pixel": {
+              "x": 219.0,
+              "y": 53.5
+            },
+            "position": {
+              "x": 0.5133,
+              "y": 0.2965
+            },
+            "quality": {
+              "reason": null,
+              "samples": 9,
+              "span_s": 0.2901000000001659,
+              "position_residual_m": 0.0015958937852243696,
+              "acceleration_std_mps2": 0.28516085977739136,
+              "velocity_valid": true,
+              "acceleration_valid": true
+            }
+          },
+          {
+            "frame_id": 61,
+            "timestamp": 922.4131,
+            "pixel": {
+              "x": 217.0,
+              "y": 62.5
+            },
+            "position": {
+              "x": 0.5086,
+              "y": 0.2754
+            },
+            "quality": {
+              "reason": "insufficient_time_span",
+              "samples": 1,
+              "span_s": 0.0,
+              "position_residual_m": 0.0,
+              "acceleration_std_mps2": null,
+              "velocity_valid": false,
+              "acceleration_valid": false
+            }
+          },
+          {
+            "frame_id": 62,
+            "timestamp": 922.4467,
+            "pixel": {
+              "x": 216.0,
+              "y": 76.5
+            },
+            "position": {
+              "x": 0.5062,
+              "y": 0.2426
+            },
+            "quality": {
+              "reason": "insufficient_time_span",
+              "samples": 2,
+              "span_s": 0.033599999999978536,
+              "position_residual_m": 0.0,
+              "acceleration_std_mps2": null,
+              "velocity_valid": true,
+              "acceleration_valid": false
+            }
+          },
+          {
+            "frame_id": 63,
+            "timestamp": 922.483,
+            "pixel": {
+              "x": 212.5,
+              "y": 97.5
+            },
+            "position": {
+              "x": 0.498,
+              "y": 0.1934
+            },
+            "quality": {
+              "reason": "insufficient_time_span",
+              "samples": 3,
+              "span_s": 0.06989999999996144,
+              "position_residual_m": 3.668541136759071e-16,
+              "acceleration_std_mps2": 6.6582574172059195,
+              "velocity_valid": true,
+              "acceleration_valid": false
+            }
+          },
+          {
+            "frame_id": 64,
+            "timestamp": 922.5158,
+            "pixel": {
+              "x": 206.54,
+              "y": 122.04
+            },
+            "position": null,
+            "quality": {
+              "reason": "localization_uncertain"
+            }
+          },
+          {
+            "frame_id": 65,
+            "timestamp": 922.5544,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 66,
+            "timestamp": 922.5873,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 67,
+            "timestamp": 922.6201,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 68,
+            "timestamp": 922.6545,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 69,
+            "timestamp": 922.6889,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 70,
+            "timestamp": 922.7204,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 71,
+            "timestamp": 922.7565,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 72,
+            "timestamp": 922.7885,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 73,
+            "timestamp": 922.8248000000001,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 74,
+            "timestamp": 922.8588000000001,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 75,
+            "timestamp": 922.8897,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 76,
+            "timestamp": 922.9184,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 77,
+            "timestamp": 922.952,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 78,
+            "timestamp": 922.9848000000001,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 79,
+            "timestamp": 923.0161999999999,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 80,
+            "timestamp": 923.0503,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 81,
+            "timestamp": 923.0831999999999,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 82,
+            "timestamp": 923.1176999999999,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 83,
+            "timestamp": 923.1553,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 84,
+            "timestamp": 923.1856,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 85,
+            "timestamp": 923.2156,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 86,
+            "timestamp": 923.2511,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 87,
+            "timestamp": 923.2896,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 88,
+            "timestamp": 923.3222,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 89,
+            "timestamp": 923.3605,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          },
+          {
+            "frame_id": 90,
+            "timestamp": 923.3866999999999,
+            "pixel": null,
+            "position": null,
+            "quality": null
+          }
+        ]
+      },
+      "source_sha256": "5ddcb60557ff8d559bb9a29edf73ae2006b62d276393582e8429f47b8a5b1ae1",
+      "capture": {
+        "frame_count": 90,
+        "duration_s": 3.006599999999935,
+        "fps": 29.601543271470074,
+        "max_gap_ms": 67.29999999993197
+      }
+    }
+  }
+}

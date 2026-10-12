@@ -9,6 +9,7 @@ import '../../../state/session_controller.dart';
 import 'ar_vector_layer.dart';
 import 'vector_overlay.dart';
 import 'vector_overlay_painter.dart';
+import 'local_estimate_overlay.dart';
 
 /// The picture with the arrows on it: the camera feed with the
 /// [VectorOverlay] on top.
@@ -42,6 +43,13 @@ class ExperimentStage extends ConsumerWidget {
         d,
       _ => null,
     };
+    final localSource = switch (ref.read(frameSourceProvider)) {
+      final LocalVisualSource source
+          when session.phase == SessionPhase.running &&
+              source.supportsLocalEstimates =>
+        source,
+      _ => null,
+    };
 
     return ClipRect(
       child: Stack(
@@ -71,6 +79,12 @@ class ExperimentStage extends ConsumerWidget {
               state: session.latest,
               massKg: settings.massKg,
               layers: layers,
+            ),
+          if (localSource != null)
+            LocalEstimateOverlay(
+              source: localSource,
+              frameSize:
+                  session.frameSize ?? SessionController.fallbackFrameSize,
             ),
           if (settings.mode == ExperimentMode.collision)
             VectorOverlay(

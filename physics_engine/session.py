@@ -18,8 +18,9 @@ FORGET_AFTER_S = 0.5
 # Free fall bounds its history by time (0.35 s), not by count. Seven samples
 # at 30 fps span only 0.2 s, too short for the acceleration uncertainty gate
 # once the tracker jitters by a pixel or two, so most of a drop would show no
-# acceleration. Twelve covers the time window at 30 fps.
-FREE_FALL_MAX_SAMPLES = 12
+# acceleration. Twenty-four also covers that same time window at 60 fps;
+# the 0.35 s cutoff still excludes older positions.
+FREE_FALL_MAX_SAMPLES = 24
 
 
 class PhysicsSession:
@@ -139,6 +140,9 @@ class PhysicsSession:
                     min_acceleration_span=0.12 if mode == "free_fall" else 0.0,
                     position_noise_m=1.0 / scale if scale and scale > 0 else 0.0,
                     max_acceleration_std=2.0 if mode == "free_fall" else None,
+                    reset_on_motion=mode == "free_fall",
+                    # Spatial coordinates are rounded to four decimal places.
+                    position_quantization_m=0.0001,
                 )
             engine = self.engines[object_id]
             result = engine.add_world_sample(
@@ -150,7 +154,8 @@ class PhysicsSession:
 
         target_result = results.get(int(target["id"]))
         if target_result is None:
-            state["physics_quality"] = {"reason": "tracking_unreliable"}
+            state["physics_quality"] = {"reason": "localization_uncertain"
+                                        if target.get("measurement_valid") is False else "tracking_unreliable"}
             return state
 
         state["physics_quality"] = {

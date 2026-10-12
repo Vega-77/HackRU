@@ -81,6 +81,8 @@ class KinematicsEngine:
         min_acceleration_span: float = 0.0,
         position_noise_m: float = 0.0,
         max_acceleration_std: Optional[float] = None,
+        reset_on_motion: bool = False,
+        position_quantization_m: float = 0.0,
     ) -> None:
         if window_size < 3:
             raise ValueError("window_size must be at least 3")
@@ -98,6 +100,8 @@ class KinematicsEngine:
         self.min_acceleration_span = min_acceleration_span
         self.position_noise_m = position_noise_m
         self.max_acceleration_std = max_acceleration_std
+        self.reset_on_motion = reset_on_motion
+        self.position_quantization_m = position_quantization_m
         self._samples: Deque[_PositionSample] = deque(maxlen=window_size)
 
     def reset(self) -> None:
@@ -279,6 +283,18 @@ class KinematicsEngine:
                     timestamp, position, "timestamp_not_strictly_increasing"
                 )
             if self.max_gap_seconds is not None and time_delta > self.max_gap_seconds:
+                self.reset()
+
+        if (self.reset_on_motion and self.position_noise_m > 0 and len(self._samples) >= 4
+                and self._samples[-1].timestamp - self._samples[0].timestamp
+                >= self.min_acceleration_span):
+            tolerance = 3 * self.position_noise_m + self.position_quantization_m
+            xs, ys = [s.x for s in self._samples], [s.y for s in self._samples]
+            stationary = max(max(xs) - min(xs), max(ys) - min(ys)) <= tolerance + 1e-12
+            moved = hypot(position.x - sum(xs) / len(xs),
+                          position.y - sum(ys) / len(ys)) > tolerance
+            if stationary and moved:
+                # A new motion interval must earn its own derivative span.
                 self.reset()
 
         self._samples.append(_PositionSample(timestamp, position.x, position.y))

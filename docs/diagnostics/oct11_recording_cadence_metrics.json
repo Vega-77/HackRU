@@ -1,0 +1,21 @@
+{
+  "method": "Two serial pairs, real VM timers, simulated 60 FPS sensor and 12 ms encoding delay, one-second recording each. Baseline recorder extracted exactly from dabf422; current source uses deadlines. Synthetic camera experiment, not phone results.",
+  "runs": [
+    {
+      "before_frames": 31,
+      "before_fps": 31.03448275862069,
+      "before_max_gap_ms": 33.333333333333435,
+      "after_frames": 55,
+      "after_fps": 54.91525423728814,
+      "after_max_gap_ms": 33.33333333333334
+    },
+    {
+      "before_frames": 32,
+      "before_fps": 31.52542372881356,
+      "before_max_gap_ms": 33.333333333333435,
+      "after_frames": 55,
+      "after_fps": 54.91525423728814,
+      "after_max_gap_ms": 33.33333333333336
+    }
+  ]
+}

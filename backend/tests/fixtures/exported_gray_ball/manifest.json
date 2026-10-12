@@ -1,0 +1,294 @@
+{
+  "source": "HandsOnPhysics-2026-10-11T22-34-05-920Z.hop.json",
+  "config": {
+    "type": "config",
+    "mode": "free_fall",
+    "mass_kg": 0.1,
+    "px_per_m": 426.6666666666667,
+    "target_px": {
+      "x": 216.18777087135038,
+      "y": 48.900547445255484
+    },
+    "target_bbox": {
+      "x": 199.32367700729927,
+      "y": 31.835652372262775,
+      "w": 33.7281877281022,
+      "h": 34.12979014598541
+    },
+    "second_target_px": null,
+    "second_target_bbox": null,
+    "frame_size": {
+      "w": 320,
+      "h": 180
+    },
+    "ar_plane": null,
+    "debug_tracking": true,
+    "initialization_required": true
+  },
+  "frames": [
+    {
+      "frame_id": 0,
+      "timestamp": 880.1786,
+      "frame_size": {
+        "w": 320,
+        "h": 180
+      },
+      "encode_ms": 9.099,
+      "age_at_encoding_ms": 42.999999964260496,
+      "file": "selection.jpg"
+    },
+    {
+      "frame_id": 1,
+      "timestamp": 889.4559,
+      "frame_size": {
+        "w": 320,
+        "h": 180
+      },
+      "encode_ms": 4.5,
+      "age_at_encoding_ms": 39.19999996421393,
+      "file": "frame_0001.jpg"
+    },
+    {
+      "frame_id": 2,
+      "timestamp": 889.4891,
+      "frame_size": {
+        "w": 320,
+        "h": 180
+      },
+      "encode_ms": 4.8,
+      "age_at_encoding_ms": 30.099999988102354,
+      "file": "frame_0002.jpg"
+    },
+    {
+      "frame_id": 3,
+      "timestamp": 889.5193,
+      "frame_size": {
+        "w": 320,
+        "h": 180
+      },
+      "encode_ms": 2.2,
+      "age_at_encoding_ms": 19.499999952269718,
+      "file": "frame_0003.jpg"
+    },
+    {
+      "frame_id": 4,
+      "timestamp": 889.5536999999999,
+      "frame_size": {
+        "w": 320,
+        "h": 180
+      },
+      "encode_ms": 2.199,
+      "age_at_encoding_ms": 22.499999988125637,
+      "file": "frame_0004.jpg"
+    },
+    {
+      "frame_id": 5,
+      "timestamp": 889.5795,
+      "frame_size": {
+        "w": 320,
+        "h": 180
+      },
+      "encode_ms": 3.801,
+      "age_at_encoding_ms": 20.5,
+      "file": "frame_0005.jpg"
+    },
+    {
+      "frame_id": 6,
+      "timestamp": 889.6113,
+      "frame_size": {
+        "w": 320,
+        "h": 180
+      },
+      "encode_ms": 2.5,
+      "age_at_encoding_ms": 28.099999976111576,
+      "file": "frame_0006.jpg"
+    },
+    {
+      "frame_id": 7,
+      "timestamp": 889.6509,
+      "frame_size": {
+        "w": 320,
+        "h": 180
+      },
+      "encode_ms": 2.3,
+      "age_at_encoding_ms": 26.19999996421393,
+      "file": "frame_0007.jpg"
+    },
+    {
+      "frame_id": 8,
+      "timestamp": 889.6838,
+      "frame_size": {
+        "w": 320,
+        "h": 180
+      },
+      "encode_ms": 4.2,
+      "age_at_encoding_ms": 33.79999996419065,
+      "file": "frame_0008.jpg"
+    },
+    {
+      "frame_id": 9,
+      "timestamp": 889.7144000000001,
+      "frame_size": {
+        "w": 320,
+        "h": 180
+      },
+      "encode_ms": 1.699,
+      "age_at_encoding_ms": 21.299999988055788,
+      "file": "frame_0009.jpg"
+    },
+    {
+      "frame_id": 10,
+      "timestamp": 889.7494,
+      "frame_size": {
+        "w": 320,
+        "h": 180
+      },
+      "encode_ms": 7,
+      "age_at_encoding_ms": 28.399999952293,
+      "file": "frame_0010.jpg"
+    },
+    {
+      "frame_id": 11,
+      "timestamp": 889.7871,
+      "frame_size": {
+        "w": 320,
+        "h": 180
+      },
+      "encode_ms": 3.601,
+      "age_at_encoding_ms": 12.900000000023283,
+      "file": "frame_0011.jpg"
+    },
+    {
+      "frame_id": 12,
+      "timestamp": 889.8177,
+      "frame_size": {
+        "w": 320,
+        "h": 180
+      },
+      "encode_ms": 2.7,
+      "age_at_encoding_ms": 20.09999995236285,
+      "file": "frame_0012.jpg"
+    },
+    {
+      "frame_id": 13,
+      "timestamp": 889.8538000000001,
+      "frame_size": {
+        "w": 320,
+        "h": 180
+      },
+      "encode_ms": 4.9,
+      "age_at_encoding_ms": 26.399999988032505,
+      "file": "frame_0013.jpg"
+    },
+    {
+      "frame_id": 14,
+      "timestamp": 889.8885,
+      "frame_size": {
+        "w": 320,
+        "h": 180
+      },
+      "encode_ms": 4.6,
+      "age_at_encoding_ms": 12.699999988079071,
+      "file": "frame_0014.jpg"
+    },
+    {
+      "frame_id": 15,
+      "timestamp": 889.9205,
+      "frame_size": {
+        "w": 320,
+        "h": 180
+      },
+      "encode_ms": 2.7,
+      "age_at_encoding_ms": 19.399999976158142,
+      "file": "frame_0015.jpg"
+    },
+    {
+      "frame_id": 16,
+      "timestamp": 889.9553000000001,
+      "frame_size": {
+        "w": 320,
+        "h": 180
+      },
+      "encode_ms": 2.1,
+      "age_at_encoding_ms": 23.599999976111576,
+      "file": "frame_0016.jpg"
+    },
+    {
+      "frame_id": 17,
+      "timestamp": 889.9866999999999,
+      "frame_size": {
+        "w": 320,
+        "h": 180
+      },
+      "encode_ms": 4.9,
+      "age_at_encoding_ms": 18.09999995236285,
+      "file": "frame_0017.jpg"
+    },
+    {
+      "frame_id": 18,
+      "timestamp": 890.0204,
+      "frame_size": {
+        "w": 320,
+        "h": 180
+      },
+      "encode_ms": 1,
+      "age_at_encoding_ms": 22.49999997613486,
+      "file": "frame_0018.jpg"
+    },
+    {
+      "frame_id": 19,
+      "timestamp": 890.0535,
+      "frame_size": {
+        "w": 320,
+        "h": 180
+      },
+      "encode_ms": 2,
+      "age_at_encoding_ms": 9.099999964237213,
+      "file": "frame_0019.jpg"
+    },
+    {
+      "frame_id": 20,
+      "timestamp": 890.0866,
+      "frame_size": {
+        "w": 320,
+        "h": 180
+      },
+      "encode_ms": 1.401,
+      "age_at_encoding_ms": 19.400000000023283,
+      "file": "frame_0020.jpg"
+    },
+    {
+      "frame_id": 65,
+      "timestamp": 891.5845,
+      "frame_size": {
+        "w": 320,
+        "h": 180
+      },
+      "encode_ms": 2,
+      "age_at_encoding_ms": 24.599999964237213,
+      "file": "frame_0065.jpg"
+    },
+    {
+      "frame_id": 66,
+      "timestamp": 891.6135,
+      "frame_size": {
+        "w": 320,
+        "h": 180
+      },
+      "encode_ms": 1.4,
+      "age_at_encoding_ms": 31.69999998807907,
+      "file": "frame_0066.jpg"
+    },
+    {
+      "frame_id": 67,
+      "timestamp": 891.6495,
+      "frame_size": {
+        "w": 320,
+        "h": 180
+      },
+      "encode_ms": 4.3,
+      "age_at_encoding_ms": 20.19999998807907,
+      "file": "frame_0067.jpg"
+    }
+  ]
+}
