@@ -13,6 +13,30 @@ import 'package:hands_on_physics/models/vec3.dart';
 /// If one fails after a protocol change, update the doc and Dev 4 too.
 void main() {
   group('ServerMessage.parse', () {
+    test('uncertain localization retains only the visible marker', () {
+      final message = ServerMessage.parse(
+        jsonEncode({
+          'type': 'state',
+          'frame_id': 14,
+          'timestamp': .6,
+          'tracked': true,
+          'tracking_status': 'low_confidence',
+          'pixel': {'x': 95.69, 'y': 56.82},
+          'position': null,
+          'physics_quality': {'reason': 'localization_uncertain'},
+          'forces': [],
+        }),
+      );
+      final state = (message as StateMessage).state;
+      expect(state.tracked, isTrue);
+      expect(state.pixel, const Vec2(95.69, 56.82));
+      expect(state.position, isNull);
+      expect(state.velocity, isNull);
+      expect(state.acceleration, isNull);
+      expect(state.energy, isNull);
+      expect(state.forces, isEmpty);
+    });
+
     test('reads the second collision object with its velocity', () {
       final message = ServerMessage.parse(
         jsonEncode({

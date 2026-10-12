@@ -317,3 +317,86 @@ Use the local frontend at `http://127.0.0.1:8086/` and backend at `ws://127.0.0.
 Future work, not implemented: inspect and label original blurred JPEGs for a bounded detector experiment, comparing localization and false-identity rates before changing acceptance thresholds. Edge-inferred contact normals can also appear in Free Fall outputs; those inferred surfaces are not physically verified in these clips, so these bundles do not validate force arrows or contact classification. Worker offloading, broader tracker changes and Render hosting changes remain proposals. These captures justify no Render plan or region change.
 
 After deployment approval, deploy through the existing process, verify the backend commit at `/health`, reload Pages and repeat the calibrated trial on desktop and phone. Download the `.hop.json` and debug log, inspect release/loss/reacquisition frames, then compare physical free-flight results and capture FPS with local results. No push, production deployment or infrastructure change is part of this follow-up.
+
+
+## October 12 follow-up: original capture loses the falling ball
+
+### Evidence and scope
+
+The new source is `diagnostics/logs/HandsOnPhysics-2026-10-11T23-02-11-324Z.hop.json`, SHA-256 `ab20ba78a2cb9d6fe8f0f8df6344acafbc0df144ee41e5d77f0d7c2e298ca1cb`. It contains 69 original JPEGs over 2.9673 s, 22.92 FPS, largest capture gap 80.7 ms. Replay of the committed tracker reproduced every original pixel observation: **six accepted frames, all before release**. Port 8002 was running that committed source; using that port did not resolve the detector failure. The newly reported hair lock was not reproduced in this capture; the earlier original-JPEG hair regression remains covered.
+
+The ball is already rejected intermittently while held. After release around frame 14 (0.569 s into capture), it becomes vertically blurred and changes contrast against the shirt. The original sharp silhouette, template correlation and selected foreground/background checks reject it. Template candidates near the hand/face can also displace the ball from the candidate list. Examination of actual camera JPEGs, template candidates, appearance masks and foreground scores supports this explanation. Optical-flow and vertically blurred-template probes did not reliably localize the fall and were not shipped.
+
+Frame 16 is strongly smeared; frames 17–18 touch the bottom edge. A returning/bouncing ball appears around frames 19–24. This whole interval is not an ideal free-flight interval. The default setup ruler and 426.67 px/m remain unverified physical calibration. No gravitational accuracy claim follows from this capture.
+
+### Implemented fixes
+
+- `backend/cv_engine/foreground.py`: derive a pixel eligibility mask from the original round object's Lab colour/lightness reference, retaining directional exposure allowances.
+- `backend/cv_engine/universal.py`: after strict local/global matching fails, permit a nearby, sufficiently large elliptical component of that original colour to preserve the visible marker. This applies only to selected neutral round objects, expires **200 ms after the last strict match**, rejects ambiguous alternatives and components within three pixels of the frame edge, and never learns a new appearance template or changes the template search size. Weak observations do not extend the expiry time. Existing strict identity/measurement thresholds remain in use.
+- `backend/cv_engine/pipeline.py`: weak continuation reports `tracking_status: low_confidence`, score 0.59 and `measurement_valid: false`. The score routes these observations through the existing low-confidence status; it is not a calibrated identity probability. It preserves pixel/bbox but clears metric position, dimensions and axes.
+- `physics_engine/session.py`: report `physics_quality.reason: localization_uncertain`. The existing missing-position path clears derivative history. These frames supply **no velocity, acceleration, force or energy measurements**; a subsequent precise match starts a fresh measurement interval. Flutter already accepts a marker without metric fields and skips it in metric telemetry.
+- `mobile/lib/services/network/recorded_analysis.dart`: schedule recording against monotonic deadlines so JPEG encoding occupies part of the capture interval. Skip elapsed deadlines without a burst of catch-up captures; preserve actual camera timestamps, duplicate rejection, cancellation and memory limits. Previously a full 16.7 ms sleep was added after every encode.
+- `backend/tests/test_blurred_gray_ball.py`, `backend/tests/fixtures/blurred_gray_ball/`: exact JPEGs and hashes for held/released/partial/absent frames. Tests check visually annotated center bounds, withheld SI fields, fresh derivative history, unchanged templates and expiry despite successive weak matches. Visual centers have an 8 px tolerance; they are not independent physical ground truth.
+- `backend/tests/test_exported_gray_ball.py`, `mobile/test/models/protocol_test.dart`, `mobile/test/services/recorded_analysis_test.dart`: preserve precise original detections, test marker-only parsing and recording with encoder work included in the interval. `docs/protocol.md` documents the additive measurement flag and quality reason.
+
+### Measured results
+
+| Capture | Visible observations before → after | Precise metric positions before → after | Newly recovered moving markers |
+| --- | --- | --- | --- |
+| New `23-02-11-324Z` | 6 → 14 of 69 | 6 → 6 | Frames 14–15 |
+| Earlier short hold | 18 → 21 of 91 | 18 → 18 | Frames 17–18, 21 |
+| Earlier long hold | 63 → 64 of 90 | 63 → 63 | Frame 64 |
+
+All previously accepted precise pixel coordinates are unchanged in these three full replays. All additions are explicitly uncertain visual observations. The earlier 27 hair detections remain rejected. The new clip still loses the ball after frame 15: the next sample is beyond the continuation deadline, subsequent samples are partial, and later return/bounce frames fail strict reacquisition. **The implementation improves marker continuity; it does not recover complete or accurate free-flight measurements from this recording.**
+
+Two serial full replays per variant, in one process with OpenCV one thread and RNG seed zero, measured worker median / p95 milliseconds:
+
+| Capture | Continuation disabled | Continuation enabled |
+| --- | --- | --- |
+| New | 70.30 / 94.81 | 61.71 / 81.31 |
+| Earlier short | 52.05 / 68.60 | 49.45 / 66.06 |
+| Earlier long | 12.77 / 57.58 | 12.76 / 59.06 |
+
+The disabled variant retains the same strict tracker and physics. Runs were serial without other test/build jobs, but background machine load and fixed before/after ordering remain uncontrolled. These timings exclude WebSocket transport. Their variation, and the slight p95 increase on the long clip, do not establish a general backend speedup. Continuation adds segmentation work after failed searches; its justified benefit here is six recovered moving markers with no newly accepted SI samples. See [per-frame metrics](diagnostics/oct11_blur_metrics.json) and [benchmark script](diagnostics/benchmark_blur.py).
+
+A separate real-timer VM experiment used an emulated 60 FPS sensor, 12 ms JPEG work and one-second recordings. Two pairs measured **31/32 saved frames (31.03/31.53 FPS) before versus 55 frames (54.92 FPS) after**. Maximum sensor-time gaps remained 33.3 ms. Baseline was the exact recorder from `dabf422`. This establishes removed scheduling overhead under that workload, not physical phone FPS. In the user's new capture encode median / p95 were only **1.401 / 4.401 ms**, and median age at encoding was 16.2 ms. The recording sleep is therefore not a complete explanation for the observed 22.92 FPS; browser/sensor availability and other scheduling effects require a new capture to measure. [Cadence metrics](diagnostics/oct11_recording_cadence_metrics.json) preserve the measured runs.
+
+### Validation and reproduction
+
+- Backend and physics: **265 passed**, 15 dependency deprecation warnings, 24.44 s. Existing ambiguity, hair/wrist rejection, calibration, camera-frame transport and all experiment-mode physics regressions pass.
+- Relevant Flutter VM coverage: **97 passed**, including recording, export, socket, protocol, session, telemetry, controls and experiment previews.
+- `flutter analyze`: **no issues found**.
+- Chrome: **36 passed**, including marker-only protocol parsing and the actual Blob/anchor download helper. Release Web build and WASM dry run succeed; the existing missing CupertinoIcons font warning remains.
+- No physical phone or Safari run was performed. Existing browser fallbacks remain; a successful Chrome run and WASM dry run do not establish Safari hardware behavior.
+
+From the repository root:
+
+```sh
+backend/.venv/bin/python -m pytest backend/tests tests -q
+backend/.venv/bin/python backend/analyze_capture_bundle.py diagnostics/logs/HandsOnPhysics-2026-10-11T23-02-11-324Z.hop.json --out /tmp/hop-falling-analysis.json
+backend/.venv/bin/python docs/diagnostics/benchmark_blur.py
+cd mobile
+flutter test test/services/recorded_analysis_test.dart test/services/capture_export_test.dart test/services/physics_socket_test.dart test/models/protocol_test.dart test/state/session_controller_test.dart test/state/telemetry_buffer_test.dart test/features/preview_physics_test.dart test/widgets/recording_controls_test.dart
+flutter test --platform chrome test/services/capture_download_web_test.dart test/models/protocol_test.dart
+flutter analyze
+flutter build web --release --dart-define=BACKEND_URL=ws://127.0.0.1:8002/ws/frames --dart-define=TRACKING_DIAGNOSTICS=true
+```
+
+The blur benchmark requires the three original ignored captures and rewrites only its report metrics. Tests use the smaller committed JPEG fixtures independently. To reproduce the cadence comparison, create these temporary files only if those names do not already exist, from the repository root:
+
+```sh
+git show dabf422:mobile/lib/services/network/recorded_analysis.dart > mobile/lib/services/network/recorded_analysis_baseline.dart
+cp docs/diagnostics/benchmark_recording_cadence_test.dart mobile/test/services/tmp_cadence_benchmark_test.dart
+cd mobile
+flutter test test/services/tmp_cadence_benchmark_test.dart
+```
+
+Remove the two created temporary files afterward. They are not application changes.
+
+### Local and deployed physical verification
+
+Reload the rebuilt local frontend at `http://127.0.0.1:8086/`, confirm the backend endpoint is `ws://127.0.0.1:8002/ws/frames`, and start a new calibration/session. Use a real ruler aligned in the drop plane, a fixed camera and enough space below release to keep the entire ball visible. Brighter diffuse illumination reduces motion smear. Record/export another trial with a short hold, release and re-entry. Compare saved FPS/gaps with this bundle; inspect original falling JPEGs. Low-confidence markers must have `localization_uncertain` and no metric vectors. A returning ball must reacquire through strict matching; absence must not become a persistent face/hair target. Repeat on a real phone, including Safari/iPhone, and verify capture export reaches Downloads/Files.
+
+After deployment approval, deploy the reviewed local commit through the existing process, reload Pages, verify the deployed backend version/endpoint and repeat those trials at measured 250–300 ms RTT. Recorded analysis should preserve all captured IDs/timestamps regardless of RTT. Live local-marker freshness and scientific measurement quality must be assessed separately. No push, deployment or infrastructure change was performed. Fetched remote main is an ancestor of the current branch; existing local work and the unrelated Xcode change were preserved.
+
+Remaining/proposed work: precise localization of severely blurred neutral balls, complete measured free-flight intervals, reliable re-entry across changed appearance, independently checked physical scale/contact classification and phone capture cadence. The bounded visual fallback may still choose a nearby lookalike outside the tested clips and only supports neutral round selections. Worker placement/offloading or Render hosting changes require deployed CPU/queue/network evidence; these local captures justify no plan or region change. Longer visual extrapolation, relaxed scientific acceptance and a hard-coded gravity value are not implemented.

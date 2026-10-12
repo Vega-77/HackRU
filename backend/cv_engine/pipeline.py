@@ -280,6 +280,11 @@ class TrackingPipeline:
             o["target"] = o["id"] == self._target_id
             o["timestamp"] = frame.timestamp
             o["tracking_status"] = "low_confidence" if o["score"] < 0.6 else "detected"
+            manual = self._second if o["label"] == SECOND_LABEL else self._manual
+            if o["source"] == "manual" and manual.visual_only:
+                o["measurement_valid"] = False
+                for key in ("position", "position_3d", "screen_axes", "width_m", "height_m"):
+                    o[key] = None
             if edges and (o["target"] or o["label"] == SECOND_LABEL):
                 o["surfaces"] = edge_surface(frame, o, self.spatial)
         if target is not None:

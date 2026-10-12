@@ -27,15 +27,21 @@ class RecordedSequence {
 
 /// Captures first, sends later. No socket credit or reply gates this loop.
 class SequenceRecorder {
+  SequenceRecorder({Stopwatch Function()? stopwatchFactory})
+    : _stopwatchFactory = stopwatchFactory ?? Stopwatch.new;
+  final Stopwatch Function() _stopwatchFactory;
+
   Future<RecordedSequence> collect(
     FrameSource camera, {
     Duration duration = const Duration(seconds: 3),
     bool Function()? cancelled,
     void Function(double)? progress,
   }) async {
-    final clock = Stopwatch()..start();
+    final clock = _stopwatchFactory()..start();
     final frames = <EncodedFrame>[];
     var bytes = 0;
+    const intervalUs = 1000000 ~/ AppConfig.captureFps;
+    var nextCaptureUs = 0;
     while (clock.elapsed < duration) {
       if (cancelled?.call() == true || !camera.isRunning) {
         throw StateError('Recording cancelled.');
@@ -52,8 +58,16 @@ class SequenceRecorder {
         frames.add(frame);
       }
       progress?.call(clock.elapsedMicroseconds / duration.inMicroseconds);
+      nextCaptureUs += intervalUs;
+      final nowUs = clock.elapsedMicroseconds;
+      if (nextCaptureUs <= nowUs) {
+        nextCaptureUs = (nowUs ~/ intervalUs + 1) * intervalUs;
+      }
+      final remainingUs = duration.inMicroseconds - nowUs;
+      if (remainingUs <= 0) break;
+      final waitUs = nextCaptureUs - nowUs;
       await Future<void>.delayed(
-        const Duration(microseconds: 1000000 ~/ AppConfig.captureFps),
+        Duration(microseconds: waitUs < remainingUs ? waitUs : remainingUs),
       );
     }
     if (frames.length < 4 ||

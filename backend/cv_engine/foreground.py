@@ -149,3 +149,12 @@ class RoundReference:
                 and abs(lightness_delta)
                 <= max(30, min(45, 0.75 * self.spread)) + exposure_allowance
                 and float(np.diff(np.percentile(lab[interior, 0], [25, 75]))[0]) <= self.spread + 15)
+
+    def appearance_mask(self, image, lightness_shift=0.0):
+        lab = cv2.cvtColor(image, cv2.COLOR_BGR2LAB).astype(np.float32)
+        chroma_delta = lab[:, :, 1:] - self.chroma
+        lightness_delta = lab[:, :, 0] - self.lightness
+        allowance = np.where(lightness_delta * lightness_shift >= 0, abs(lightness_shift), 0)
+        return np.uint8((np.linalg.norm(chroma_delta, axis=2) <= 12)
+                        & (np.linalg.norm(chroma_delta / self.chroma_spread, axis=2) <= 3)
+                        & (abs(lightness_delta) <= max(30, min(45, .75 * self.spread)) + allowance))

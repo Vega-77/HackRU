@@ -98,7 +98,51 @@ class FreshCamera extends Fake implements FrameSource {
       frame(duplicate ? time : time += 1 / 60);
 }
 
+class RecordingClock extends Stopwatch {
+  Duration now = Duration.zero;
+  @override
+  void start() {}
+  @override
+  Duration get elapsed => now;
+  @override
+  int get elapsedMicroseconds => now.inMicroseconds;
+}
+
+class EncodingCamera extends Fake implements FrameSource {
+  EncodingCamera(this.clock);
+  final RecordingClock clock;
+  @override
+  bool get isRunning => true;
+  @override
+  Future<EncodedFrame?> capture({int width = 320}) async {
+    final sensorTime = clock.elapsedMicroseconds / 1000000;
+    await Future<void>.delayed(const Duration(milliseconds: 12));
+    return frame(sensorTime);
+  }
+}
+
 void main() {
+  testWidgets('encoding time is included in the recording interval', (
+    tester,
+  ) async {
+    final clock = RecordingClock();
+    RecordedSequence? recorded;
+    final pending = SequenceRecorder(stopwatchFactory: () => clock)
+        .collect(
+          EncodingCamera(clock),
+          duration: const Duration(milliseconds: 500),
+        )
+        .then((value) => recorded = value);
+    for (var i = 0; i < 520; i++) {
+      clock.now += const Duration(milliseconds: 1);
+      await tester.pump(const Duration(milliseconds: 1));
+    }
+    await pending;
+    expect(recorded!.frames.length, greaterThanOrEqualTo(27));
+    expect(recorded!.fps, closeTo(60, 3));
+    expect(recorded!.maxGapMs, lessThan(35));
+  });
+
   const config = SessionConfig(
     mode: ExperimentMode.freeFall,
     massKg: .1,

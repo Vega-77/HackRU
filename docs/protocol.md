@@ -164,6 +164,10 @@ the marker and the x(t) chart from the object marked `"target": true`:
 - `pixel` and `bbox` are in the pixels of the frame the app sent (x right,
   y down), the same space as `target_px`.
 - `position` is in metres (y up), or `null` without a calibration.
+- `measurement_valid: false` on a manual object means its visible region is
+  located approximately through blur. `pixel`/`bbox` remain available, with
+  `tracking_status: low_confidence`; metric position, dimensions and axes are
+  null. These observations cannot supply velocity, acceleration or energy.
 - `screen_axes` (when calibrated): where world +x and +y point in the frame
   at the object, in frame pixels per metre (y down). The app draws a vector
   `(vx, vy)` along `vx * x + vy * y`, so arrows lie on a tilted surface.
@@ -276,7 +280,9 @@ Additional diagnostic fields are optional and backward compatible:
   `acceleration_std_mps2`, derivative validity flags and `reason`.
   Missing/uncertain acceleration is omitted, never replaced with gravity.
   Reasons include `insufficient_samples`, `insufficient_time_span`,
-  `acceleration_uncertain`, and `capture_timestamp_missing`.
+  `acceleration_uncertain`, `capture_timestamp_missing`, and
+  `localization_uncertain`. Uncertain localization resets derivative history;
+  subsequent precise observations must establish a new valid time span.
 - `stats`: cumulative received, processed, dropped, and error counters.
 
 The client logs observation age as local capture/encoding age plus frame RTT;

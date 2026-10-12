@@ -154,7 +154,8 @@ class PhysicsSession:
 
         target_result = results.get(int(target["id"]))
         if target_result is None:
-            state["physics_quality"] = {"reason": "tracking_unreliable"}
+            state["physics_quality"] = {"reason": "localization_uncertain"
+                                        if target.get("measurement_valid") is False else "tracking_unreliable"}
             return state
 
         state["physics_quality"] = {

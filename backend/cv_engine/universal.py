@@ -124,6 +124,8 @@ class ManualTracker:
         self._scene_lightness = 0.0
         self._lightness_shift = 0.0
         self._recent_score: float | None = None  # typical confidence of recent matches
+        self.visual_only = False
+        self._last_verified_time = float('-inf')
 
     # Selection
 
@@ -206,6 +208,7 @@ class ManualTracker:
         self._center = (tx + tw / 2, ty + th / 2)
         self._size = (float(tw), float(th))
         self._time = frame.timestamp
+        self._last_verified_time = frame.timestamp
         self._scene_lightness = float(np.median(cv2.cvtColor(frame.bgr, cv2.COLOR_BGR2LAB)[:, :, 0]))
         self.debug = {"reason": "initialized", "bbox": list(self.bbox)}
 
@@ -218,6 +221,7 @@ class ManualTracker:
     # Tracking
 
     def detect(self, frame: PreprocessedFrame) -> Detection | None:
+        self.visual_only = False
         if self.original is None or self.bbox is None:
             return None
         if self.round_reference is not None:
@@ -278,18 +282,71 @@ class ManualTracker:
         if best is None:
             best = self._search(frame, (0, 0, fw, fh), (px, py), reach, global_search=True)
         if best is None:
+            best = self._foreground_continuation(frame, dt)
+            self.visual_only = best is not None
+            recovered = True
+        if best is None:
             self.missed += 1
             self.debug["missed"] = self.missed
             return None
 
         confidence = best.confidence(has_color)
+        previous_size = self._size
         self._update(frame, best, dt, recovered)
+        if self.visual_only:
+            self._size = previous_size
+        if not self.visual_only:
+            self._last_verified_time = frame.timestamp
         self.missed = 0
         self.debug.update(reason="detected", bbox=list(self.bbox), score=round(confidence, 3))
+        if self.visual_only:
+            self.debug.update(method="foreground_continuation", measurement_valid=False)
         x, y, bw, bh = self.bbox
         # Positions here are continuous (a box from x to x + w has its middle at x + w / 2);
         # detections report pixel indices, like the other detectors' centroids.
         return Detection("selected", (best.cx - 0.5, best.cy - 0.5), self.bbox, float(bw * bh), confidence, "manual")
+
+    def _foreground_continuation(self, frame, dt):
+        # A blurred colour component can preserve a marker, but its centre is
+        # biased by glare and background mixing. It cannot supply SI samples.
+        if (self.round_reference is None or self.color_model is not None
+                or self.debug.get("reason") == "ambiguous_match"
+                or not 0 < frame.timestamp - self._last_verified_time <= .2):
+            return None
+        mask = self.round_reference.appearance_mask(frame.bgr, self._lightness_shift)
+        kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5))
+        mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel)
+        mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, np.ones((3, 3), np.uint8))
+        reference = max(cv2.findContours(np.uint8(self._mask >= 1), cv2.RETR_EXTERNAL,
+                                        cv2.CHAIN_APPROX_NONE)[0], key=cv2.contourArea)
+        reference_area = cv2.contourArea(reference)
+        _, reference_axes, _ = cv2.fitEllipse(reference)
+        reach = max(reference_axes) + UNKNOWN_SPEED * frame.size[0] / 320 * dt
+        candidates = []
+        for contour in cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)[0]:
+            area = cv2.contourArea(contour)
+            x, y, w, h = cv2.boundingRect(contour)
+            if min(x, y, frame.size[0] - x - w, frame.size[1] - y - h) < 3:
+                continue
+            if len(contour) < 5 or not .3 * reference_area <= area <= 1.8 * reference_area:
+                continue
+            (cx, cy), axes, _ = cv2.fitEllipse(contour)
+            perimeter = cv2.arcLength(contour, True)
+            fill = area / max(1, math.pi * axes[0] * axes[1] / 4)
+            if (min(axes) < .55 * min(reference_axes) or max(axes) > 2 * max(reference_axes)
+                    or min(axes) / max(axes) < .4 or not .55 <= fill <= 1.15
+                    or 4 * math.pi * area / max(1, perimeter * perimeter) < .35):
+                continue
+            distance = math.hypot(cx - self._center[0], cy - self._center[1])
+            if distance <= reach:
+                candidates.append((distance, _Candidate(cx + .5, cy + .5, w, h, .59, 0)))
+        candidates.sort(key=lambda item: item[0])
+        if not candidates:
+            return None
+        distance, best = candidates[0]
+        if len(candidates) > 1 and candidates[1][0] - distance < max(reference_axes) / 2:
+            return None
+        return best
 
     def _search(self, frame: PreprocessedFrame, bounds, predicted, reach, global_search: bool):
         left, top, right, bottom = bounds

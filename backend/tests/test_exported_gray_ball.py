@@ -34,7 +34,7 @@ def test_bundle_analysis_replays_original_ids_times_and_calibration(tmp_path):
     assert result["config"] == bundle["config"]
     assert [(r["frame_id"], r["timestamp"]) for r in result["observations"]] == [
         (r["frame_id"], r["timestamp"]) for r in bundle["frames"]]
-    assert result["metrics"]["tracked"] == 18
+    assert sum(r.get("position") is not None for r in result["observations"]) == 18
     assert all("physics" in r["timing_ms"] for r in result["observations"])
 
 
