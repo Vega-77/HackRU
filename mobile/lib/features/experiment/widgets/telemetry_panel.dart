@@ -68,9 +68,10 @@ class _TelemetryPanelState extends ConsumerState<TelemetryPanel> {
     final controller = ref.read(sessionProvider.notifier);
     final session = ref.read(sessionProvider);
     _shownVersion = session.telemetryVersion;
-    final latest = session.recordingPhase == RecordingPhase.complete
-        ? session.recordedLatest
-        : session.latest;
+    final recorded =
+        AppConfig.showRecordingUi &&
+        session.recordingPhase == RecordingPhase.complete;
+    final latest = recorded ? session.recordedLatest : session.latest;
     final samples = controller.telemetry.samples.toList(growable: false);
 
     return ListView(
@@ -91,9 +92,7 @@ class _TelemetryPanelState extends ConsumerState<TelemetryPanel> {
           children: [
             Expanded(
               child: Text(
-                session.recordingPhase == RecordingPhase.complete
-                    ? 'Recorded measurements'
-                    : 'Measurements',
+                recorded ? 'Recorded measurements' : 'Measurements',
                 style: Theme.of(context).textTheme.titleLarge,
               ),
             ),
@@ -179,7 +178,7 @@ class _TelemetryPanelState extends ConsumerState<TelemetryPanel> {
                 child: TelemetryChart(
                   samples: samples,
                   quantity: _quantity,
-                  recorded: session.recordingPhase == RecordingPhase.complete,
+                  recorded: recorded,
                 ),
               ),
               Padding(

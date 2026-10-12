@@ -24,6 +24,8 @@ abstract final class AppConfig {
   /// is at most 17 ms old. Cameras that can't do 60 use their fastest rate.
   static const int captureFps = 60;
 
+  static const bool showRecordingUi = bool.fromEnvironment('SHOW_RECORDING_UI');
+
   static const Duration frameTimeout = Duration(seconds: 1);
   static const Duration observationExpiry = Duration(seconds: 1);
   static const Duration reconnectDelay = Duration(seconds: 2);
