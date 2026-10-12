@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:hands_on_physics/core/config/app_config.dart';
 import 'package:hands_on_physics/features/experiment/experiment_screen.dart';
 import 'package:hands_on_physics/models/physics_state.dart';
 import 'package:hands_on_physics/models/experiment_mode.dart';
@@ -70,6 +71,53 @@ class RecordingSession extends SessionController {
 }
 
 void main() {
+  if (!AppConfig.showRecordingUi) {
+    for (final size in [const Size(390, 844), const Size(1366, 768)]) {
+      for (final phase in RecordingPhase.values) {
+        testWidgets('recording $phase UI is hidden at $size', (tester) async {
+          tester.view.physicalSize = size;
+          tester.view.devicePixelRatio = 1;
+          addTearDown(tester.view.reset);
+          final controller = RecordingSession(phase);
+          await tester.pumpWidget(
+            ProviderScope(
+              overrides: [
+                sessionProvider.overrideWith(() => controller),
+                experimentSettingsProvider.overrideWith(FreeFallSettings.new),
+              ],
+              child: const MaterialApp(home: ExperimentScreen()),
+            ),
+          );
+          await tester.pump(const Duration(milliseconds: 100));
+          for (final label in [
+            'Record 3 s',
+            'Download capture',
+            'Retry analysis',
+            'Cancel',
+            'Recording the camera locally',
+            'Analyzing the saved recording',
+            'Recorded charts. Resume for live measurements.',
+            'Recorded measurements',
+          ]) {
+            expect(find.text(label), findsNothing);
+          }
+          expect(find.textContaining('For fast falls, record'), findsNothing);
+          expect(find.textContaining('Recording 40%'), findsNothing);
+          expect(find.textContaining('Analyzing 40%'), findsNothing);
+          expect(find.textContaining('Saved recording.'), findsNothing);
+          expect(find.text('Paused. Tap play to carry on.'), findsOneWidget);
+          expect(controller.recorded, 0);
+          expect(controller.retried, 0);
+          expect(controller.cancelled, 0);
+          expect(tester.takeException(), isNull);
+          await tester.pumpWidget(const SizedBox());
+          await tester.pump(const Duration(seconds: 1));
+        });
+      }
+    }
+    return;
+  }
+
   testWidgets(
     'download failure reports an error and leaves the capture available',
     (tester) async {

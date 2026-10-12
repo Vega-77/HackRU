@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/routing/router.dart';
+import '../../core/config/app_config.dart';
 import '../../core/theme/app_icons.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/theme/tokens.dart';
@@ -393,7 +394,8 @@ class _Banners extends ConsumerWidget {
     );
 
     final banners = <Widget>[
-      if (ref.watch(experimentSettingsProvider).mode ==
+      if (AppConfig.showRecordingUi &&
+          ref.watch(experimentSettingsProvider).mode ==
               ExperimentMode.freeFall &&
           ref.watch(sessionProvider).isActive)
         const _RecordingBanner(),
@@ -588,9 +590,9 @@ class _StageMessage extends ConsumerWidget {
     final trackingStatus = ref.watch(
       sessionProvider.select((s) => s.latest?.trackingStatus),
     );
-    final recording = ref.watch(
-      sessionProvider.select((s) => s.recordingPhase),
-    );
+    final recording = AppConfig.showRecordingUi
+        ? ref.watch(sessionProvider.select((s) => s.recordingPhase))
+        : RecordingPhase.idle;
 
     final (IconData, String)? message = switch (phase) {
       SessionPhase.starting => (AppIcons.circle, 'Starting'),

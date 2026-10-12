@@ -400,3 +400,17 @@ Reload the rebuilt local frontend at `http://127.0.0.1:8086/`, confirm the backe
 After deployment approval, deploy the reviewed local commit through the existing process, reload Pages, verify the deployed backend version/endpoint and repeat those trials at measured 250–300 ms RTT. Recorded analysis should preserve all captured IDs/timestamps regardless of RTT. Live local-marker freshness and scientific measurement quality must be assessed separately. No push, deployment or infrastructure change was performed. Fetched remote main is an ancestor of the current branch; existing local work and the unrelated Xcode change were preserved.
 
 Remaining/proposed work: precise localization of severely blurred neutral balls, complete measured free-flight intervals, reliable re-entry across changed appearance, independently checked physical scale/contact classification and phone capture cadence. The bounded visual fallback may still choose a nearby lookalike outside the tested clips and only supports neutral round selections. Worker placement/offloading or Render hosting changes require deployed CPU/queue/network evidence; these local captures justify no plan or region change. Longer visual extrapolation, relaxed scientific acceptance and a hard-coded gravity value are not implemented.
+
+
+## October 12: recording UI hidden by default
+
+At the user's request, normal builds hide the Record 3 s banner/actions, download/retry/cancel controls, recording/analysis progress messages and recorded-measurement labels. The recorder, analyzer, export/download services and session APIs remain in source. `AppConfig.showRecordingUi` defaults to false; developers can restore the existing UI with `--dart-define=SHOW_RECORDING_UI=true`. There is no user-facing toggle. Live tracking and its browser estimate remain available.
+
+Verification: 28 relevant default-build Flutter tests passed, covering hidden UI across all five recording phases at 390x844 and 1366x768, plus capture/export/session functionality. The existing 11 recording-control interaction tests passed with the development flag enabled. Flutter analysis reports no issues. The default release Web build and WASM dry run pass; the existing CupertinoIcons font warning remains. The ten default-hidden UI cases were also rerun after retaining the original busy-state guards.
+
+Antislop delivery gate for this limited visibility change, retaining the existing laboratory direction and ENERGY 1 / RHYTHM 1 / MOTION 1:
+
+- Hard gate PASS: hidden controls/messages are absent in ten phone/desktop phase cases; restored controls still execute real actions in eleven interaction tests. No new navigation, styles, product claims or visual assets were added.
+- Purpose gate PASS: the visibility change directly implements the user's request and keeps the capture feature recoverable for development.
+- Liveliness PASS: the existing camera focal point, structural spacing, laboratory typography and copper accent are retained.
+- Craftsmanship PASS: the UI and feature services are checked separately; default builds show live measurements, and opt-in builds retain the original recording workflow.
